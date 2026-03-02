@@ -59,7 +59,6 @@ def check_correctness(
             expected,
             rtol=config.rtol,
             atol=config.atol,
-            equal_nan=True,
         )
         return True, {
             "max_abs_error": max_abs_error,
