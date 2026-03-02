@@ -1,4 +1,4 @@
-"""GPUMode Task implementation (TriMul).
+"""GPUMode Task implementation.
 
 This task is intentionally self-contained and can be wired into generators later.
 All GPUMode task utilities (spec/prompt text + evaluation) live under `k_search.tasks.gpu_mode`.
@@ -9,6 +9,7 @@ Note: the legacy top-level `gpu_mode/` folder is expected to be removed later.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import importlib.util
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -24,8 +25,32 @@ from k_search.tasks.task_base import (
 )
 from k_search.tasks.gpu_mode.code_utils import normalize_cuda_sources
 from k_search.tasks.gpu_mode.evaluator import evaluate_trimul_submission
-from k_search.tasks.gpu_mode.trimul.spec import TRIMUL_SPEC_TEXT_CUDA, TRIMUL_SPEC_TEXT_TRITON
 from k_search.tasks.gpu_mode import DEFAULT_TRIMUL_TASK_DIR
+
+
+def _load_spec_from_task_dir(task_dir: Path) -> tuple[str, str]:
+    """Dynamically load spec text from a task directory's spec.py module."""
+    spec_path = task_dir / "spec.py"
+    if not spec_path.exists():
+        raise FileNotFoundError(f"No spec.py found in {task_dir}")
+
+    spec_module = importlib.util.spec_from_file_location("spec", spec_path)
+    if spec_module is None or spec_module.loader is None:
+        raise ImportError(f"Could not load spec from {spec_path}")
+
+    module = importlib.util.module_from_spec(spec_module)
+    spec_module.loader.exec_module(module)
+
+    # Try task-specific naming first, fall back to TRIMUL naming for backwards compat
+    triton_spec = getattr(module, "CAUSAL_CONV1D_SPEC_TEXT_TRITON", None)
+    cuda_spec = getattr(module, "CAUSAL_CONV1D_SPEC_TEXT_CUDA", None)
+
+    if triton_spec is None:
+        triton_spec = getattr(module, "TRIMUL_SPEC_TEXT_TRITON", "")
+    if cuda_spec is None:
+        cuda_spec = getattr(module, "TRIMUL_SPEC_TEXT_CUDA", triton_spec)
+
+    return str(triton_spec or ""), str(cuda_spec or "")
 
 
 @dataclass(frozen=True)
@@ -38,7 +63,7 @@ class GpuModeTriMulTaskConfig:
 
 
 class GpuModeTriMulTask:
-    """Task wrapper around GPUMode TriMul evaluation."""
+    """Task wrapper around GPUMode task evaluation."""
 
     def __init__(
         self,
@@ -47,16 +72,22 @@ class GpuModeTriMulTask:
         keep_tmp: bool = False,
         task_dir: str | Path | None = None,
         artifacts_dir: str | None = None,
-        name: str = "gpumode_trimul",
+        name: str | None = None,
     ) -> None:
-        self._name = str(name or "gpumode_trimul")
+        resolved_task_dir = Path(task_dir).expanduser().resolve() if task_dir is not None else DEFAULT_TRIMUL_TASK_DIR
+        # Derive name from task_dir if not provided
+        if name is None:
+            name = f"gpumode_{resolved_task_dir.name}"
+        self._name = str(name)
         self._cfg = GpuModeTriMulTaskConfig(
             mode=str(mode or "benchmark"),
             keep_tmp=bool(keep_tmp),
-            task_dir=(Path(task_dir).expanduser().resolve() if task_dir is not None else DEFAULT_TRIMUL_TASK_DIR),
+            task_dir=resolved_task_dir,
         )
         self._ksearch_artifacts_dir: str | None = (str(artifacts_dir) if artifacts_dir is not None else None)
         self._solutions: dict[str, Solution] = {}
+        # Dynamically load spec texts from task_dir
+        self._spec_triton, self._spec_cuda = _load_spec_from_task_dir(resolved_task_dir)
         # Last-round cache for prompt feedback (best-effort; generator reads via getattr).
         self._last_round_trace_logs_for_prompt: str = ""
         self._last_round_passed_count: int = 0
@@ -78,14 +109,14 @@ class GpuModeTriMulTask:
         if not lang:
             lang = "triton"
         if lang not in ("triton", "cuda"):
-            raise ValueError(f"Unsupported language for gpumode_trimul definition text: {lang!r}")
+            raise ValueError(f"Unsupported language for {self._name} definition text: {lang!r}")
         return f"{self.get_definition_text_for_language(language=lang)}\n"
 
     # Optional helper (not part of the Task Protocol): generators/CLIs can use this
     # to get language-specific prompt text.
     def get_definition_text_for_language(self, *, language: str) -> str:
         lang = str(language or "").strip().lower()
-        return TRIMUL_SPEC_TEXT_CUDA if lang == "cuda" else TRIMUL_SPEC_TEXT_TRITON
+        return self._spec_cuda if lang == "cuda" else self._spec_triton
 
     # Optional (not in Task Protocol): language-specific generation prompt.
     def get_generation_prompt(self, *, language: str, target_gpu: str) -> str:
