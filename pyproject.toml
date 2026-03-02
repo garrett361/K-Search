@@ -13,9 +13,11 @@ dependencies = [
     "pyyaml",
     "numpy",
     "torch>=2.0",
+    "flash-linear-attention",
 ]
 
 [project.optional-dependencies]
+dev = ["pytest>=8.0", "ty"]
 flashinfer = [
     "flashinfer-bench-ksearch @ git+https://github.com/caoshiyi/flashinfer-bench-ksearch.git",
 ]
