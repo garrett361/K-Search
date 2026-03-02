@@ -46,10 +46,10 @@ for round_num in range(1, max_opt_rounds + 1):
 ```
 
 **Key characteristics:**
-- Each round is independent
-- No structured exploration strategy
-- LLM decides what to optimize based on logs only
-- No memory of what strategies were tried
+- Rounds share best-so-far state and previous round summary
+- No structured exploration strategy (LLM decides from recent feedback)
+- No decision tree or solution genealogy
+- No systematic memory of the broader exploration landscape
 
 ---
 
@@ -185,10 +185,11 @@ while cycle_start_round <= max_opt_rounds:
 | Aspect | KernelGenerator | WorldModelKernelGenerator |
 |--------|-----------------|---------------------------|
 | **Loop structure** | Flat: N sequential rounds | Nested: Cycles of action attempts |
-| **State** | Stateless between rounds | Persistent decision tree + solution DB |
-| **Prompt content** | Spec + code + logs | Spec + code + logs + **WM JSON** + **action** |
-| **Optimization strategy** | LLM decides from scratch each round | Tree-guided exploration with utility function |
+| **State between rounds** | Best solution + previous round summary | Persistent decision tree + solution DB |
+| **Prompt content** | Spec + code + logs + best-so-far | Spec + code + logs + **WM JSON** + **action** |
+| **Optimization strategy** | LLM decides from recent feedback | Tree-guided exploration with utility function |
 | **Code ancestry** | No tracking | Full solution genealogy in database |
+| **Exploration memory** | Only best-so-far + last round | Full decision tree of all attempts |
 | **Stagnation handling** | None (always runs max rounds) | Early cycle termination on plateau |
 | **Action selection** | Implicit (LLM decides) | Explicit (choose frontier node by utility) |
 | **Tree expansion** | N/A | `propose_action_nodes()` adds candidates |
@@ -257,10 +258,10 @@ This gives the LLM:
 ## Why World Model is Better
 
 **KernelGenerator issues:**
-1. LLM forgets what it tried 10 rounds ago
-2. May repeat failed strategies
-3. No systematic exploration
-4. Hard to resume/analyze
+1. Only remembers best-so-far + last round (no long-term exploration memory)
+2. May repeat failed strategies from earlier rounds
+3. No systematic exploration (LLM decides ad-hoc from recent feedback)
+4. Limited resumability and no solution genealogy for analysis
 
 **WorldModelKernelGenerator advantages:**
 1. Structured exploration prevents redundant attempts
