@@ -5,23 +5,21 @@ from __future__ import annotations
 
 def _read_reference_kernel() -> str:
     """Load FLA causal_conv1d Triton kernel source for inclusion in prompts."""
-    try:
-        import inspect
-        import re
+    import inspect
+    import re
 
-        import fla.modules.convolution as conv_module
+    import fla.modules.convolution as conv_module
 
-        source_file = inspect.getfile(conv_module)
-        with open(source_file) as f:
-            content = f.read()
+    source_file = inspect.getfile(conv_module)
+    with open(source_file) as f:
+        content = f.read()
 
-        pattern = r"(@triton\.heuristics.*?@triton\.jit\ndef causal_conv1d_fwd_kernel\(.*?\n)(\s{4}.*?)(?=\n@|\ndef [a-z]|\nclass |\Z)"
-        match = re.search(pattern, content, re.DOTALL)
-        if match:
-            return match.group(1) + match.group(2)
-        return ""
-    except Exception:
-        return ""
+    pattern = r"(@triton\.heuristics.*?@triton\.jit\ndef causal_conv1d_fwd_kernel\(.*?\n)(\s{4}.*?)(?=\n@|\ndef [a-z]|\nclass |\Z)"
+    match = re.search(pattern, content, re.DOTALL)
+    if match:
+        return match.group(1) + match.group(2)
+    else: 
+        raise ValueError("FLA ref kernel not found")
 
 
 _REFERENCE_KERNEL = _read_reference_kernel().strip()
