@@ -32,11 +32,4 @@ try:  # pragma: no cover
 except Exception:
     GpuModeTriMulTask = None  # type: ignore
 
-try:
-    from k_search.tasks.causal_conv1d import CausalConv1dTask
-
-    __all__.append("CausalConv1dTask")
-except ImportError:
-    CausalConv1dTask = None  # type: ignore
-
 
