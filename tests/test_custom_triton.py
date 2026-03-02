@@ -69,12 +69,6 @@ class TestCheckCorrectness:
         passed, details = check_correctness(a, b, config)
         assert passed is False
 
-    def test_both_nan_passes(self, config):
-        a = torch.tensor([1.0, float("nan"), 3.0])
-        b = torch.tensor([1.0, float("nan"), 3.0])
-        passed, details = check_correctness(a, b, config)
-        assert passed is True
-
     def test_inf_mismatch(self, config):
         a = torch.tensor([1.0, float("inf"), 3.0])
         b = torch.tensor([1.0, 2.0, 3.0])

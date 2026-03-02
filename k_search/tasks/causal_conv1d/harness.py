@@ -3,16 +3,12 @@
 from __future__ import annotations
 
 import logging
-import re
 import tempfile
 from pathlib import Path
 from typing import Any, Callable
 
 import torch
 import triton
-
-from k_search.tasks.custom_triton import BenchmarkConfig, benchmark_triton_kernel
-
 
 logger = logging.getLogger(__name__)
 
@@ -76,93 +72,6 @@ class CausalConv1dHarness:
         except Exception as e:
             logger.error(f"Kernel compilation failed: {e}")
             raise RuntimeError(f"Triton kernel compilation failed: {e}") from e
-
-    def run(
-        self,
-        kernel_fn: Callable,
-        inputs: dict[str, Any],
-        config: BenchmarkConfig,
-    ) -> dict[str, float]:
-        """
-        Execute and benchmark a compiled Triton kernel.
-
-        Args:
-            kernel_fn: Compiled kernel function (ignored, uses inputs['kernel_code'])
-            inputs: Dictionary containing kernel inputs and metadata
-            config: Benchmark configuration
-
-        Returns:
-            Dictionary with latency_ms and other metrics
-        """
-        x = inputs["x"]
-        weight = inputs["weight"]
-        bias = inputs.get("bias")
-        residual = inputs.get("residual")
-        activation = inputs.get("activation", "silu")
-
-        B, T, D = x.shape
-        W = weight.shape[1]
-
-        output = torch.empty_like(x)
-
-        kernel_inputs = {
-            "x_ptr": x,
-            "weight_ptr": weight,
-            "bias_ptr": bias if bias is not None else torch.empty(0, device=x.device),
-            "residual_ptr": residual if residual is not None else torch.empty(0, device=x.device),
-            "out_ptr": output,
-            "B": B,
-            "T": T,
-            "D": D,
-            "W": W,
-            "activation": activation,
-            "has_bias": bias is not None,
-            "has_residual": residual is not None,
-        }
-
-        try:
-            if self._compiled_kernel is None:
-                raise RuntimeError("Kernel not compiled")
-            kernel_fn = self._compiled_kernel
-
-            def wrapped_kernel(**kwargs):
-                """Wrapper to handle kernel invocation."""
-                kernel_fn(
-                    x_ptr=kwargs["x_ptr"],
-                    weight_ptr=kwargs["weight_ptr"],
-                    bias_ptr=kwargs["bias_ptr"],
-                    residual_ptr=kwargs["residual_ptr"],
-                    out_ptr=kwargs["out_ptr"],
-                    B=kwargs["B"],
-                    T=kwargs["T"],
-                    D=kwargs["D"],
-                    W=kwargs["W"],
-                    activation=kwargs["activation"],
-                )
-                return kwargs["out_ptr"]
-
-            results = benchmark_triton_kernel(
-                kernel_fn=wrapped_kernel,
-                inputs=kernel_inputs,
-                config=config,
-            )
-
-            mem_bytes = (x.numel() + weight.numel() + output.numel()) * x.element_size()
-            if bias is not None:
-                mem_bytes += bias.numel() * bias.element_size()
-            if residual is not None:
-                mem_bytes += residual.numel() * residual.element_size()
-
-            latency_ms = results["latency_ms"]
-            bandwidth_gb_s = (mem_bytes / 1e9) / (latency_ms / 1000) if latency_ms > 0 else 0.0
-
-            results["bandwidth_gb_s"] = bandwidth_gb_s
-
-            return results
-
-        except Exception as e:
-            logger.error(f"Kernel execution failed: {e}")
-            raise RuntimeError(f"Kernel execution failed: {e}") from e
 
     def execute_once(
         self,

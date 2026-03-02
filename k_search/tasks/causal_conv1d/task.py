@@ -8,9 +8,11 @@ from typing import Any
 import torch
 
 from k_search.tasks.custom_triton import (
+    BenchmarkConfig,
     CorrectnessConfig,
-    GenericKernelEvaluator,
     MeanAggregation,
+    benchmark_triton_kernel,
+    check_correctness,
 )
 from k_search.tasks.task_base import (
     BuildSpec,
@@ -29,14 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class CausalConv1dTask:
-    """
-    K-Search task for optimizing causal_conv1d_fwd kernels.
-
-    Uses the generic custom_triton evaluation framework with:
-    - FLA (Flash Linear Attention) as reference implementation
-    - 4 representative training workload configurations
-    - Triton kernel compilation and benchmarking
-    """
+    """K-Search task for optimizing causal_conv1d_fwd kernels."""
 
     WORKLOADS = [
         {"B": 2, "T": 4096, "D": 2048, "W": 4, "activation": "silu"},
@@ -52,97 +47,44 @@ class CausalConv1dTask:
     ):
         self._dtype = dtype
         self._device = device
-
         self._harness = CausalConv1dHarness()
-        self._evaluator = GenericKernelEvaluator(
-            harness=self._harness,
-            correctness_config=CorrectnessConfig(rtol=2e-2, atol=2e-2),
-            aggregation=MeanAggregation(),
-        )
+        self._correctness_config = CorrectnessConfig(rtol=2e-2, atol=2e-2)
 
     @property
     def name(self) -> str:
         return "causal_conv1d"
 
-    def _input_generator(self, workload: dict[str, Any]) -> dict[str, Any]:
-        """
-        Generate test inputs for a workload configuration.
-
-        Args:
-            workload: Configuration dict with B, T, D, W, activation
-
-        Returns:
-            Dictionary of input tensors
-        """
-        inputs = create_reference_inputs(
-            B=workload["B"],
-            T=workload["T"],
-            D=workload["D"],
-            W=workload["W"],
-            dtype=self._dtype,
-            device=self._device,
-            with_bias=True,
-            with_residual=False,
-        )
-
-        inputs["activation"] = workload.get("activation", "silu")
-
-        return inputs
-
     def get_definition_text(self, language: str | None = None) -> str:
-        """
-        Get kernel specification text for LLM prompts.
-
-        Args:
-            language: Programming language (ignored, always Triton)
-
-        Returns:
-            Kernel specification text
-        """
         return CAUSAL_CONV1D_SPEC_TEXT_TRITON
 
     def get_solution(self, solution_name: str) -> Solution | None:
-        """
-        Get a named solution (e.g., baseline).
-
-        Args:
-            solution_name: Name of solution to retrieve
-
-        Returns:
-            Solution object or None if not found
-        """
         if solution_name.lower() in ("baseline", "fla", "reference"):
-            try:
-                from fla.modules.convolution import causal_conv1d_fwd_kernel
-
-                kernel_code = ""
-                if hasattr(causal_conv1d_fwd_kernel, "__code__"):
-                    import inspect
-
-                    kernel_code = inspect.getsource(causal_conv1d_fwd_kernel)
-
-                return Solution(
-                    name="fla_baseline",
-                    definition="causal_conv1d",
-                    author="flash-linear-attention",
-                    spec=BuildSpec(
-                        language=SupportedLanguages.TRITON,
-                        target_hardware=["cuda"],
-                        entry_point="causal_conv1d_fwd.py::causal_conv1d_fwd_kernel",
-                    ),
-                    sources=[
-                        SourceFile(
-                            path="causal_conv1d_fwd.py",
-                            content=kernel_code if kernel_code else "# FLA baseline (source not extractable)",
-                        )
-                    ],
-                    description="Flash Linear Attention baseline implementation",
-                )
-            except Exception as e:
-                logger.warning(f"Failed to load FLA baseline solution: {e}")
-                return None
-
+            return None  # No extractable baseline; use reference fn directly
         return None
+
+    def make_solution_from_generated_code(
+        self,
+        *,
+        cleaned_code: Any,
+        raw_code: Any,
+        round_num: int,
+        model_name: str,
+        target_gpu: str,
+        language: str,
+    ) -> Solution:
+        code_text = str(cleaned_code or raw_code or "")
+        return Solution(
+            name=f"{model_name}_{self.name}_{language}_r{round_num}",
+            definition=self.name,
+            author=str(model_name),
+            spec=BuildSpec(
+                language=SupportedLanguages.TRITON,
+                target_hardware=[str(target_gpu)],
+                entry_point="submission.py::custom_kernel",
+            ),
+            sources=[SourceFile(path="submission.py", content=code_text)],
+            description=f"Causal conv1d optimized kernel (round {round_num})",
+        )
 
     def run_benchmark(
         self,
@@ -152,112 +94,134 @@ class CausalConv1dTask:
         dump_traces: bool = False,
         round_num: int | None = None,
     ) -> EvalResult:
-        """
-        Evaluate a solution across all workload configurations.
-
-        Args:
-            solution: Candidate kernel solution
-            config: Optional configuration (unused)
-            dump_traces: Whether to dump trace logs (unused)
-            round_num: Current optimization round (unused)
-
-        Returns:
-            EvalResult with aggregated metrics
-        """
         entry_source = solution.get_entry_source()
         if entry_source is None:
-            return EvalResult(
-                status="failed",
-                log_excerpt="No entry source found in solution",
-            )
+            return EvalResult(status="failed", log_excerpt="No entry source found")
 
         try:
             self._harness.compile_kernel(entry_source.content)
         except Exception as e:
+            return EvalResult(status="failed", log_excerpt=f"Compilation failed: {e}")
+
+        passed_latencies: list[float] = []
+        passed_speedups: list[float] = []
+        errors: list[str] = []
+
+        for workload in self.WORKLOADS:
+            try:
+                inputs = self._make_inputs(workload)
+
+                candidate_out = self._harness.execute_once(
+                    x=inputs["x"],
+                    weight=inputs["weight"],
+                    bias=inputs.get("bias"),
+                    residual=inputs.get("residual"),
+                    activation=inputs.get("activation", "silu"),
+                )
+                reference_out = fla_causal_conv1d_reference(**inputs)
+
+                ok, details = check_correctness(candidate_out, reference_out, self._correctness_config)
+                if not ok:
+                    errors.append(f"Workload {workload}: {details.get('error_message', 'mismatch')}")
+                    continue
+
+                def run_candidate(**kw: Any) -> torch.Tensor:
+                    return self._harness.execute_once(
+                        x=kw["x"], weight=kw["weight"], bias=kw.get("bias"),
+                        residual=kw.get("residual"), activation=kw.get("activation", "silu"),
+                    )
+
+                cand_bench = benchmark_triton_kernel(run_candidate, inputs, BenchmarkConfig())
+                ref_bench = benchmark_triton_kernel(fla_causal_conv1d_reference, inputs, BenchmarkConfig())
+
+                lat = cand_bench["latency_ms"]
+                ref_lat = ref_bench["latency_ms"]
+                passed_latencies.append(lat)
+                passed_speedups.append(ref_lat / lat if lat > 0 else 0.0)
+
+            except Exception as e:
+                errors.append(f"Workload {workload}: {e}")
+
+        if not passed_latencies:
             return EvalResult(
                 status="failed",
-                log_excerpt=f"Kernel compilation failed: {e}",
+                log_excerpt=f"All workloads failed: {errors[:3]}",
+                metrics={"num_passed": 0, "num_total": len(self.WORKLOADS)},
             )
 
-        def candidate_fn(**inputs):
-            """Wrapper for candidate kernel execution."""
-            return self._harness.execute_once(
-                x=inputs["x"],
-                weight=inputs["weight"],
-                bias=inputs.get("bias"),
-                residual=inputs.get("residual"),
-                activation=inputs.get("activation", "silu"),
-            )
-
-        result = self._evaluator.evaluate(
-            solution=solution,
-            reference_fn=fla_causal_conv1d_reference,
-            workloads=self.WORKLOADS,
-            input_generator=self._input_generator,
-        )
-
-        return result
-
-    def code_for_world_model_from_raw(self, *, raw: Any, language: str) -> str:
-        """
-        Format code for world model context.
-
-        Args:
-            raw: Raw code (string or Solution)
-            language: Programming language
-
-        Returns:
-            Formatted code string
-        """
-        if isinstance(raw, str):
-            return raw
-
-        if isinstance(raw, Solution):
-            entry_source = raw.get_entry_source()
-            if entry_source:
-                return entry_source.content
-
-        return str(raw)
-
-    def seed_eval_for_base_solution(
-        self,
-        *,
-        base_solution: Solution,
-        config: Any = None,
-    ) -> EvalResult:
-        """
-        Generate seed evaluation for baseline solution.
-
-        Args:
-            base_solution: Baseline solution to evaluate
-            config: Optional configuration
-
-        Returns:
-            EvalResult with status='seeded'
-        """
-        result = self.run_benchmark(solution=base_solution, config=config)
+        mean_lat = sum(passed_latencies) / len(passed_latencies)
+        mean_speedup = sum(passed_speedups) / len(passed_speedups)
+        num_passed = len(passed_latencies)
 
         return EvalResult(
-            status="seeded",
-            latency_ms=result.latency_ms,
-            reference_latency_ms=result.latency_ms,
-            speedup_factor=1.0,
-            mean_vs_baseline_factor=1.0,
-            log_excerpt=result.log_excerpt,
-            metrics=result.metrics,
+            status="passed" if num_passed == len(self.WORKLOADS) else "failed",
+            latency_ms=mean_lat,
+            speedup_factor=mean_speedup,
+            mean_vs_baseline_factor=mean_speedup,
+            log_excerpt=f"{num_passed}/{len(self.WORKLOADS)} passed, {mean_lat:.3f}ms, {mean_speedup:.2f}x",
+            metrics={
+                "num_passed": num_passed,
+                "num_total": len(self.WORKLOADS),
+                "score_name": "speedup",
+                "score": mean_speedup,
+            },
         )
 
-    def get_config_for_logging(self) -> dict[str, Any]:
-        """
-        Get task configuration for logging.
+    def _make_inputs(self, workload: dict[str, Any]) -> dict[str, Any]:
+        inputs = create_reference_inputs(
+            B=workload["B"], T=workload["T"], D=workload["D"], W=workload["W"],
+            dtype=self._dtype, device=self._device, with_bias=True, with_residual=False,
+        )
+        inputs["activation"] = workload.get("activation", "silu")
+        return inputs
 
-        Returns:
-            Dictionary of configuration parameters
-        """
+    def seed_eval_for_base_solution(self, *, base_solution: Solution, config: Any = None) -> EvalResult:
+        # No compilable baseline; return a seeded result using reference timing
+        inputs = self._make_inputs(self.WORKLOADS[0])
+        ref_bench = benchmark_triton_kernel(fla_causal_conv1d_reference, inputs, BenchmarkConfig())
+        return EvalResult(
+            status="seeded",
+            latency_ms=ref_bench["latency_ms"],
+            reference_latency_ms=ref_bench["latency_ms"],
+            speedup_factor=1.0,
+            mean_vs_baseline_factor=1.0,
+            log_excerpt="Seeded with FLA reference timing",
+            metrics={"score_name": "speedup", "score": 1.0},
+        )
+
+    def run_final_evaluation(
+        self,
+        *,
+        solutions: list[Solution],
+        config: Any = None,
+        dump_traces: bool = False,
+        workload_limit: int | None = None,
+    ) -> dict[str, Any]:
+        results = []
+        for sol in solutions or []:
+            if sol is None:
+                continue
+            er = self.run_benchmark(solution=sol, round_num=None)
+            results.append({
+                "solution": sol.name,
+                "status": er.status,
+                "latency_ms": er.latency_ms,
+                "speedup": er.speedup_factor,
+            })
+        return {"task": self.name, "solutions": results}
+
+    def code_for_world_model_from_raw(self, *, raw: Any, language: str) -> str:
+        if isinstance(raw, str):
+            return raw
+        if isinstance(raw, Solution):
+            src = raw.get_entry_source()
+            return src.content if src else ""
+        return str(raw)
+
+    def get_config_for_logging(self) -> dict[str, Any]:
         return {
             "task": self.name,
             "dtype": str(self._dtype),
             "device": self._device,
             "num_workloads": len(self.WORKLOADS),
-            "workloads": self.WORKLOADS,
         }
