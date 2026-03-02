@@ -5,6 +5,7 @@ import uuid
 from pathlib import Path
 from typing import Any, List, Optional
 import json
+import torch
 
 def _persist_ksearch_solution(
     solution: Any, *, definition_name: str, artifacts_dir: Optional[str]
@@ -243,7 +244,7 @@ def main():
     parser.add_argument("--local", required=False, default=None, help="Path to flashinfer-trace dataset root (flashinfer only)")
     parser.add_argument(
         "--task-source",
-        choices=["flashinfer", "gpumode"],
+        choices=["flashinfer", "gpumode", "causal_conv1d"],
         default="flashinfer",
         help="Task backend to use.",
     )
@@ -374,6 +375,10 @@ def main():
             task_dir=(str(args.gpumode_task_dir) if args.gpumode_task_dir else None),
             artifacts_dir=args.artifacts_dir,
         )
+    elif task_source == "causal_conv1d":
+        from k_search.tasks.causal_conv1d import CausalConv1dTask
+
+        task = CausalConv1dTask(device="cuda")
     else:
         raise ValueError(f"Unsupported task_source: {task_source}")
     generate_and_evaluate(
