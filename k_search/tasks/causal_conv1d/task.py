@@ -207,6 +207,8 @@ class CausalConv1dTask:
                 "status": er.status,
                 "latency_ms": er.latency_ms,
                 "speedup": er.speedup_factor,
+                "log_excerpt": er.log_excerpt,
+                "metrics": er.metrics,
             })
         return {"task": self.name, "solutions": results}
 
