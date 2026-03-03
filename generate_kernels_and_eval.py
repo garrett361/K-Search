@@ -30,7 +30,7 @@ def _persist_ksearch_solution(
         ).resolve()
         out_dir = root / "solutions" / str(definition_name or "__unknown__")
         out_dir.mkdir(parents=True, exist_ok=True)
-        name = str(getattr(solution, "name", "") or "solution")
+        name = str(getattr(solution, "name", "") or "solution").replace("/", "-")
         dest = out_dir / f"{name}.json"
         if KSearchSolution is not None and isinstance(solution, KSearchSolution):
             obj = solution.to_dict()
