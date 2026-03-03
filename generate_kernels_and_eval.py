@@ -7,6 +7,7 @@ from typing import Any, List, Optional
 import json
 import torch
 
+
 def _persist_ksearch_solution(
     solution: Any, *, definition_name: str, artifacts_dir: Optional[str]
 ) -> Optional[Path]:
@@ -34,12 +35,17 @@ def _persist_ksearch_solution(
         if KSearchSolution is not None and isinstance(solution, KSearchSolution):
             obj = solution.to_dict()
         else:
-            obj = solution.__dict__ if hasattr(solution, "__dict__") else {"solution": str(solution)}
+            obj = (
+                solution.__dict__
+                if hasattr(solution, "__dict__")
+                else {"solution": str(solution)}
+            )
         dest.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
         return dest
     except Exception as e:
         print(f"Error saving k-search solution: {e}")
         import traceback
+
         traceback.print_exc()
         return None
 
@@ -66,14 +72,21 @@ def _persist_ksearch_eval_report(
         out_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         sn = str(solution_name or "").strip()
-        safe_sn = "".join([c if (c.isalnum() or c in ("-", "_", ".")) else "_" for c in sn]) if sn else ""
+        safe_sn = (
+            "".join([c if (c.isalnum() or c in ("-", "_", ".")) else "_" for c in sn])
+            if sn
+            else ""
+        )
         suffix = f"_{safe_sn}" if safe_sn else ""
         dest = out_dir / f"eval_report_{ts}{suffix}.json"
-        dest.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        dest.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         return dest
     except Exception as e:
         print(f"Error saving eval report: {e}")
         import traceback
+
         traceback.print_exc()
         return None
 
@@ -100,11 +113,12 @@ def generate_and_evaluate(
     wm_stagnation_window: int = 5,
     wm_max_difficulty: Optional[int] = None,
     artifacts_dir: Optional[str] = None,
+    use_reasoning_api: bool = True,
 ) -> None:
     """
     Generate exactly one solution for the task, then run final evaluation.
     """
-    
+
     # Optional Weights & Biases support
     try:
         import wandb  # type: ignore
@@ -165,7 +179,9 @@ def generate_and_evaluate(
 
     if enable_world_model:
         # World-model mode uses the WM generator (task-driven).
-        from k_search.kernel_generators.kernel_generator_world_model import WorldModelKernelGeneratorWithBaseline
+        from k_search.kernel_generators.kernel_generator_world_model import (
+            WorldModelKernelGeneratorWithBaseline,
+        )
 
         generator = WorldModelKernelGeneratorWithBaseline(
             model_name=model_name,
@@ -173,6 +189,7 @@ def generate_and_evaluate(
             target_gpu=target_gpu,
             api_key=api_key,
             base_url=base_url,
+            use_reasoning_api=use_reasoning_api,
             artifacts_dir=artifacts_dir,
             wm_max_difficulty=wm_max_difficulty,
         )
@@ -186,6 +203,7 @@ def generate_and_evaluate(
             target_gpu=target_gpu,
             api_key=api_key,
             base_url=base_url,
+            use_reasoning_api=use_reasoning_api,
         )
 
     # Generate exactly one solution.
@@ -210,14 +228,18 @@ def generate_and_evaluate(
     solution.name = f"{solution.name}_{ts}_{uid}"
     # Optional: reflect in description
     try:
-        solution.description = (solution.description or "") + f" (generated {ts} uid={uid})"
+        solution.description = (
+            solution.description or ""
+        ) + f" (generated {ts} uid={uid})"
     except Exception:
         pass
 
     # Optionally persist to disk (k-search solution type)
     if save_solutions:
         saved_path = _persist_ksearch_solution(
-            solution, definition_name=str(getattr(task, "name", "") or ""), artifacts_dir=artifacts_dir
+            solution,
+            definition_name=str(getattr(task, "name", "") or ""),
+            artifacts_dir=artifacts_dir,
         )
         if saved_path:
             print(f"  ✓ Saved solution to: {saved_path}")
@@ -240,8 +262,15 @@ def generate_and_evaluate(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate kernels with GPT/Gemini (OpenAI-compatible) and evaluate via task backends.")
-    parser.add_argument("--local", required=False, default=None, help="Path to flashinfer-trace dataset root (flashinfer only)")
+    parser = argparse.ArgumentParser(
+        description="Generate kernels with GPT/Gemini (OpenAI-compatible) and evaluate via task backends."
+    )
+    parser.add_argument(
+        "--local",
+        required=False,
+        default=None,
+        help="Path to flashinfer-trace dataset root (flashinfer only)",
+    )
     parser.add_argument(
         "--task-source",
         choices=["flashinfer", "gpumode"],
@@ -253,13 +282,44 @@ def main():
         default=None,
         help="Task source path/identifier. For --task-source=flashinfer, this is the dataset root path (defaults to --local).",
     )
-    parser.add_argument("--definition", default=None, help="Single definition name to target (required)")
-    parser.add_argument("--model-name", required=True, help="LLM model name (e.g., gpt-4.1, gpt-5, gemini-2.5-pro via compatible endpoint)")
-    parser.add_argument("--base-url", default=None, help="OpenAI-compatible base URL for non-OpenAI providers (e.g. Gemini proxy)")
-    parser.add_argument("--api-key", default=None, help="API key; if omitted, uses LLM_API_KEY env var")
-    parser.add_argument("--language", default="triton", choices=["triton", "python", "cuda"], help="Target language for generated kernel")
-    parser.add_argument("--target-gpu", default="H100", help="Target GPU architecture hint for prompts")
-    parser.add_argument("--max-opt-rounds", type=int, default=5, help="Max optimization rounds for each solution generation")
+    parser.add_argument(
+        "--definition", default=None, help="Single definition name to target (required)"
+    )
+    parser.add_argument(
+        "--model-name",
+        required=True,
+        help="LLM model name (e.g., gpt-4.1, gpt-5, gemini-2.5-pro via compatible endpoint)",
+    )
+    parser.add_argument(
+        "--base-url",
+        default=None,
+        help="OpenAI-compatible base URL for non-OpenAI providers (e.g. Gemini proxy)",
+    )
+    parser.add_argument(
+        "--api-key", default=None, help="API key; if omitted, uses LLM_API_KEY env var"
+    )
+    parser.add_argument(
+        "--language",
+        default="triton",
+        choices=["triton", "python", "cuda"],
+        help="Target language for generated kernel",
+    )
+    parser.add_argument(
+        "--target-gpu", default="H100", help="Target GPU architecture hint for prompts"
+    )
+    parser.add_argument(
+        "--max-opt-rounds",
+        type=int,
+        default=5,
+        help="Max optimization rounds for each solution generation",
+    )
+    parser.add_argument(
+        "--no-reasoning-api",
+        dest="use_reasoning_api",
+        action="store_false",
+        default=True,
+        help="Disable reasoning API (use standard chat completions instead)",
+    )
 
     # Benchmark configuration
     parser.add_argument("--warmup-runs", type=int, default=10)
@@ -279,7 +339,9 @@ def main():
         default=0,
         help="Max concurrent workloads when --parallel-workloads is enabled (0 = auto based on visible CUDA devices).",
     )
-    parser.add_argument("--no-save-results", action="store_true", help="Do not write traces to dataset")
+    parser.add_argument(
+        "--no-save-results", action="store_true", help="Do not write traces to dataset"
+    )
     parser.add_argument(
         "--save-solutions",
         action="store_true",
@@ -290,10 +352,23 @@ def main():
         default=".ksearch",
         help="Base directory for k-search artifacts (solutions, world model snapshots, eval reports).",
     )
-    parser.add_argument("--baseline-solution", default=None, help="Optional baseline solution name to compare against; if absent, 'vs_base' is omitted")
-    parser.add_argument("--num-eval-workload", type=int, default=None, help="If set, evaluate only this many workloads per definition; default uses all workloads")
+    parser.add_argument(
+        "--baseline-solution",
+        default=None,
+        help="Optional baseline solution name to compare against; if absent, 'vs_base' is omitted",
+    )
+    parser.add_argument(
+        "--num-eval-workload",
+        type=int,
+        default=None,
+        help="If set, evaluate only this many workloads per definition; default uses all workloads",
+    )
     # Continue optimization options
-    parser.add_argument("--continue-from-solution", default=None, help="Resume optimization from an existing solution name in the dataset")
+    parser.add_argument(
+        "--continue-from-solution",
+        default=None,
+        help="Resume optimization from an existing solution name in the dataset",
+    )
     parser.add_argument(
         "--continue-from-world-model",
         default=None,
@@ -302,9 +377,19 @@ def main():
             "Use 'auto' to load <artifacts>/<task>/world_model/world_model.json if present."
         ),
     )
-    parser.add_argument("--feedback-workloads", nargs="+", default=None, help="Explicit workload UUIDs to use for optimization feedback rounds")
+    parser.add_argument(
+        "--feedback-workloads",
+        nargs="+",
+        default=None,
+        help="Explicit workload UUIDs to use for optimization feedback rounds",
+    )
     # Nsight Compute
-    parser.add_argument("--feedback-trace-policy", default="first", choices=["first", "random"], help="Policy for selecting feedback traces")
+    parser.add_argument(
+        "--feedback-trace-policy",
+        default="first",
+        choices=["first", "random"],
+        help="Policy for selecting feedback traces",
+    )
     parser.add_argument(
         "--world-model",
         action="store_true",
@@ -323,14 +408,32 @@ def main():
         help="World-model mode: max difficulty (1-5) for action selection. Actions above this are deferred. Default: use policy default (4).",
     )
     # W&B options
-    parser.add_argument("--wandb", action="store_true", help="Enable Weights & Biases logging")
-    parser.add_argument("--wandb-project", default=os.getenv("WANDB_PROJECT"), help="W&B project")
-    parser.add_argument("--run-name", default=os.getenv("RUN_NAME"), help="W&B run name")
+    parser.add_argument(
+        "--wandb", action="store_true", help="Enable Weights & Biases logging"
+    )
+    parser.add_argument(
+        "--wandb-project", default=os.getenv("WANDB_PROJECT"), help="W&B project"
+    )
+    parser.add_argument(
+        "--run-name", default=os.getenv("RUN_NAME"), help="W&B run name"
+    )
 
     # GPUMode options
-    parser.add_argument("--gpumode-mode", default="benchmark", help="GPUMode eval mode (e.g., benchmark/test/leaderboard/profile)")
-    parser.add_argument("--gpumode-keep-tmp", action="store_true", help="Keep GPUMode temp working dir for debugging")
-    parser.add_argument("--gpumode-task-dir", default=None, help="Override GPUMode task dir (defaults to vendored trimul task)")
+    parser.add_argument(
+        "--gpumode-mode",
+        default="benchmark",
+        help="GPUMode eval mode (e.g., benchmark/test/leaderboard/profile)",
+    )
+    parser.add_argument(
+        "--gpumode-keep-tmp",
+        action="store_true",
+        help="Keep GPUMode temp working dir for debugging",
+    )
+    parser.add_argument(
+        "--gpumode-task-dir",
+        default=None,
+        help="Override GPUMode task dir (defaults to vendored trimul task)",
+    )
 
     args = parser.parse_args()
 
@@ -344,7 +447,9 @@ def main():
         from k_search.tasks.flashinfer_bench_task import FlashInferBenchTask
 
         if not task_path:
-            raise ValueError("--local or --task-path is required for --task-source=flashinfer")
+            raise ValueError(
+                "--local or --task-path is required for --task-source=flashinfer"
+            )
         if not args.definition:
             raise ValueError("--definition is required")
         def_name = str(args.definition)
@@ -397,10 +502,9 @@ def main():
         enable_wandb=args.wandb,
         wandb_project=args.wandb_project,
         run_name=args.run_name,
+        use_reasoning_api=args.use_reasoning_api,
     )
 
 
 if __name__ == "__main__":
     main()
-
-
