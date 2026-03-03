@@ -59,6 +59,9 @@ class KernelGenerator:
         if base_url is not None:
             client_kwargs["base_url"] = base_url
 
+        if (rits_api_key := os.getenv("RITS_API_KEY")) is not None:
+            client_kwargs["default_headers"] = {"RITS_API_KEY": rits_api_key}
+
         self.client = openai.OpenAI(**client_kwargs)
 
     def _get_supported_language(self) -> SupportedLanguages:
@@ -257,7 +260,7 @@ class KernelGenerator:
             description=solution_description,
         )
         return solution
-    
+
     def generate(  # type: ignore[override]
         self,
         task: Task,
