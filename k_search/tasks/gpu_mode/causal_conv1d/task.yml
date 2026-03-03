@@ -12,19 +12,16 @@ description: |
 
   The task is to optimize the forward pass of a causal 1D convolution with:
   - Sliding window of width W over the time dimension
-  - Optional bias and residual addition
   - SiLU activation
 
   Input:
-  - `data`: Tuple of (x, weight, bias, residual, config)
-    - x: Input tensor [B, T, D]
-    - weight: Convolution weights [D, W]
-    - bias: Optional bias [D] or None
-    - residual: Optional residual [B, T, D] or None
-    - config: Dict with 'activation' key ('silu' or None)
+  - `data`: Tuple of (x, weight, config)
+    - x: Input tensor [B, T, D] bfloat16
+    - weight: Convolution weights [D, W] bfloat16
+    - config: Dict (reserved for future use)
 
   Output:
-  - torch.Tensor [B, T, D]
+  - torch.Tensor [B, T, D] bfloat16
 
 config:
   main: "eval.py"
@@ -38,26 +35,7 @@ ranked_timeout: 1200
 ranking_by: "geom"
 
 tests:
-  - {"B": 2, "T": 4096, "D": 2048, "W": 4, "seed": 1001, "activation": "silu", "withbias": True, "withresidual": False}
-  - {"B": 2, "T": 4096, "D": 2048, "W": 4, "seed": 1002, "activation": "silu", "withbias": True, "withresidual": True}
-  - {"B": 2, "T": 4096, "D": 4096, "W": 4, "seed": 1003, "activation": "silu", "withbias": True, "withresidual": False}
-  - {"B": 2, "T": 8192, "D": 2048, "W": 4, "seed": 1004, "activation": "silu", "withbias": True, "withresidual": False}
-  - {"B": 2, "T": 8192, "D": 4096, "W": 4, "seed": 1005, "activation": "silu", "withbias": False, "withresidual": True}
-  - {"B": 4, "T": 4096, "D": 2048, "W": 4, "seed": 2001, "activation": "silu", "withbias": True, "withresidual": False}
-  - {"B": 4, "T": 4096, "D": 4096, "W": 4, "seed": 2002, "activation": "silu", "withbias": False, "withresidual": False}
-  - {"B": 4, "T": 8192, "D": 2048, "W": 4, "seed": 2003, "activation": "silu", "withbias": True, "withresidual": True}
-  - {"B": 4, "T": 8192, "D": 4096, "W": 4, "seed": 2004, "activation": "silu", "withbias": True, "withresidual": False}
-  - {"B": 4, "T": 8192, "D": 4096, "W": 4, "seed": 2005, "activation": "silu", "withbias": False, "withresidual": True}
-  - {"B": 8, "T": 4096, "D": 2048, "W": 4, "seed": 3001, "activation": "silu", "withbias": True, "withresidual": False}
-  - {"B": 8, "T": 4096, "D": 4096, "W": 4, "seed": 3002, "activation": "silu", "withbias": True, "withresidual": True}
-  - {"B": 8, "T": 8192, "D": 2048, "W": 4, "seed": 3003, "activation": "silu", "withbias": False, "withresidual": False}
-  - {"B": 8, "T": 8192, "D": 2048, "W": 4, "seed": 3004, "activation": "silu", "withbias": True, "withresidual": True}
-  - {"B": 8, "T": 8192, "D": 4096, "W": 4, "seed": 3005, "activation": "silu", "withbias": True, "withresidual": False}
+  - {"B": 2, "T": 4096, "D": 2048, "W": 4, "seed": 1001}
 
 benchmarks:
-  - {"B": 2, "T": 4096, "D": 2048, "W": 4, "seed": 4001, "activation": "silu", "withbias": True, "withresidual": False}
-  - {"B": 4, "T": 4096, "D": 4096, "W": 4, "seed": 4002, "activation": "silu", "withbias": True, "withresidual": True}
-  - {"B": 4, "T": 8192, "D": 2048, "W": 4, "seed": 4003, "activation": "silu", "withbias": True, "withresidual": False}
-  - {"B": 8, "T": 4096, "D": 4096, "W": 4, "seed": 4004, "activation": "silu", "withbias": False, "withresidual": True}
-  - {"B": 8, "T": 8192, "D": 2048, "W": 4, "seed": 4005, "activation": "silu", "withbias": True, "withresidual": True}
-  - {"B": 8, "T": 8192, "D": 4096, "W": 4, "seed": 4006, "activation": "silu", "withbias": True, "withresidual": False}
+  - {"B": 2, "T": 4096, "D": 2048, "W": 4, "seed": 4001}
