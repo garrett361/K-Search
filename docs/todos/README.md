@@ -5,6 +5,7 @@ This directory contains one markdown file per TODO/feature proposal.
 ## Active TODOs
 
 1. [parallel-gpu-search.md](./parallel-gpu-search.md) - Parallelize world model search across multiple GPUs for ~K× speedup
+2. [ncu-profile-feedback.md](./ncu-profile-feedback.md) - Feed NCU profiling metrics back to LLM optimization loop
 
 ## Format
 
