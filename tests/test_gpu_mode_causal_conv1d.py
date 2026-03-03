@@ -94,8 +94,8 @@ class TestReference:
 
 @pytest.mark.cuda
 class TestIntegration:
-    @pytest.mark.skip(reason="Requires Task 3 (ref_kernel) and Task 4 (custom_kernel) to be updated")
-    def test_baseline_correctness(self):
+    def test_baseline_matches_reference(self):
+        """Verify custom_kernel matches ref_kernel exactly."""
         data = generate_input(B=2, T=128, D=64, W=4, seed=42)
 
         expected = ref_kernel(data)
@@ -103,16 +103,24 @@ class TestIntegration:
 
         assert torch.allclose(expected, actual, rtol=2e-2, atol=2e-2)
 
-    @pytest.mark.skip(reason="Requires Task 3 (ref_kernel) and Task 4 (custom_kernel) to be updated")
+    def test_baseline_output_shape_and_dtype(self):
+        """Verify custom_kernel produces correct output."""
+        data = generate_input(B=2, T=128, D=64, W=4, seed=42)
+        output = custom_kernel(data)
+
+        assert output.shape == (2, 128, 64)
+        assert output.dtype == torch.bfloat16
+
     def test_check_implementation_passes_baseline(self):
+        """Verify baseline submission passes check_implementation."""
         data = generate_input(B=2, T=128, D=64, W=4, seed=42)
         output = custom_kernel(data)
 
         passed, message = check_implementation(data, output)
         assert passed, f"Baseline should pass: {message}"
 
-    @pytest.mark.skip(reason="Requires Task 3 (ref_kernel) and Task 4 (custom_kernel) to be updated")
     def test_check_implementation_fails_wrong_output(self):
+        """Verify check_implementation catches incorrect outputs."""
         data = generate_input(B=2, T=128, D=64, W=4, seed=42)
         wrong_output = torch.zeros_like(data[0])
 
