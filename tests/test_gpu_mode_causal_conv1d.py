@@ -144,3 +144,19 @@ class TestIntegration:
 
         passed, message = check_implementation(data, wrong_output)
         assert not passed, "Should fail for wrong shape"
+
+
+@pytest.mark.cuda
+@pytest.mark.slow
+class TestPerformance:
+    def test_full_scale_test_case(self):
+        """Verify reference and baseline work on full-scale test case."""
+        # B=2, T=4096, D=2048, W=4 from spec
+        data = generate_input(B=2, T=4096, D=2048, W=4, seed=42)
+
+        ref_output = ref_kernel(data)
+        baseline_output = custom_kernel(data)
+
+        assert ref_output.shape == (2, 4096, 2048)
+        assert baseline_output.shape == (2, 4096, 2048)
+        assert torch.allclose(ref_output, baseline_output, rtol=2e-2, atol=2e-2)
