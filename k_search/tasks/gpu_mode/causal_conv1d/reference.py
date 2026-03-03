@@ -24,9 +24,6 @@ def generate_input(
     D: int,
     W: int,
     seed: int,
-    activation: str,
-    withbias: bool,
-    withresidual: bool,
 ) -> input_t:
     gen = torch.Generator(device="cuda")
     gen.manual_seed(seed)
@@ -34,17 +31,9 @@ def generate_input(
     x = torch.randn(B, T, D, device="cuda", dtype=torch.bfloat16, generator=gen)
     weight = torch.randn(D, W, device="cuda", dtype=torch.bfloat16, generator=gen)
 
-    bias = None
-    if withbias:
-        bias = torch.randn(D, device="cuda", dtype=torch.bfloat16, generator=gen)
+    config = {}
 
-    residual = None
-    if withresidual:
-        residual = torch.randn(B, T, D, device="cuda", dtype=torch.bfloat16, generator=gen)
-
-    config = {"activation": activation}
-
-    return (x, weight, bias, residual, config)
+    return (x, weight, config)
 
 
 check_implementation = make_match_reference(ref_kernel, rtol=2e-2, atol=2e-2)
