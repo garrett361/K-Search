@@ -67,6 +67,32 @@ class TestGenerateInput:
 
 
 @pytest.mark.cuda
+class TestReference:
+    def test_ref_kernel_output_shape(self):
+        """Verify ref_kernel produces correct output shape."""
+        data = generate_input(B=2, T=128, D=64, W=4, seed=42)
+        output = ref_kernel(data)
+
+        assert output.shape == (2, 128, 64)
+        assert output.dtype == torch.bfloat16
+
+    def test_ref_kernel_causal_property(self):
+        """Verify output at time t only depends on inputs up to time t."""
+        B, T, D, W = 1, 10, 4, 4
+        x, weight, config = generate_input(B=B, T=T, D=D, W=W, seed=42)
+
+        # Modify input after time t=5
+        x_modified = x.clone()
+        x_modified[:, 6:, :] = 0
+
+        output_original = ref_kernel((x, weight, config))
+        output_modified = ref_kernel((x_modified, weight, config))
+
+        # Output at t=5 and earlier should be unchanged
+        assert torch.allclose(output_original[:, :6, :], output_modified[:, :6, :])
+
+
+@pytest.mark.cuda
 class TestIntegration:
     @pytest.mark.skip(reason="Requires Task 3 (ref_kernel) and Task 4 (custom_kernel) to be updated")
     def test_baseline_correctness(self):
