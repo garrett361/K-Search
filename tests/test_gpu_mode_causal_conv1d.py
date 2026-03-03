@@ -136,3 +136,11 @@ class TestIntegration:
 
         passed, message = check_implementation(data, wrong_output)
         assert not passed, "Should fail for wrong output"
+
+    def test_check_implementation_fails_wrong_shape(self):
+        """Verify check_implementation rejects wrong shape."""
+        data = generate_input(B=2, T=128, D=64, W=4, seed=42)
+        wrong_output = torch.zeros(2, 64, 64, device="cuda", dtype=torch.bfloat16)
+
+        passed, message = check_implementation(data, wrong_output)
+        assert not passed, "Should fail for wrong shape"
