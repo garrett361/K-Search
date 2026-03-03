@@ -36,6 +36,8 @@ uv pip install -e ".[dev]"   # Editable install with dev deps
 ## Code Quality
 
 ```bash
+ruff check path/to/modified/files/
+ruff format path/to/modified/files/
 ty check path/to/modified/files/
 pytest tests/                 # All tests
 pytest -m cuda tests/         # GPU tests only
@@ -48,3 +50,7 @@ GPU tests use `@pytest.mark.cuda`.
 - Favor descriptive variable and function names over comments
 - Comment only the *why*, never the *what*
 - No decorative comment headers or section separators
+
+## Documentation
+
+Implementation details and design decisions are documented in `docs/` with descriptive filenames.
