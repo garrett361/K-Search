@@ -16,21 +16,31 @@ from submission import custom_kernel  # noqa: E402  # ty: ignore[unresolved-impo
 
 class TestSpec:
     def test_spec_text_loads(self):
+        """Verify spec text loads and is non-empty."""
         assert isinstance(CAUSAL_CONV1D_SPEC_TEXT_TRITON, str)
         assert len(CAUSAL_CONV1D_SPEC_TEXT_TRITON) > 500
 
     def test_spec_contains_interface(self):
+        """Verify spec documents the 3-tuple interface."""
         assert "custom_kernel(data)" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
-        assert "(x, weight, bias, residual, config)" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
+        assert "(x, weight, config)" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
 
-    def test_spec_contains_reference(self):
-        try:
-            import fla.modules.convolution  # noqa: F401
+    def test_spec_mentions_silu(self):
+        """Verify spec documents SiLU activation."""
+        assert "silu" in CAUSAL_CONV1D_SPEC_TEXT_TRITON.lower()
 
-            assert "causal_conv1d_fwd_kernel" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
-            assert "@triton.jit" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
-        except ImportError:
-            pytest.skip("FLA not installed")
+    def test_spec_has_test_case(self):
+        """Verify spec contains test case constraints."""
+        assert "B = 2" in CAUSAL_CONV1D_SPEC_TEXT_TRITON or "B=2" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
+        assert "4096" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
+        assert "2048" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
+
+    def test_spec_contains_baseline_submission(self):
+        """Verify spec includes baseline submission.py code for LLM reference."""
+        assert "Reference code (baseline `submission.py`)" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
+        assert "def custom_kernel(data: input_t) -> output_t:" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
+        assert "F.conv1d" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
+        assert "F.silu" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
 
 
 @pytest.mark.cuda
