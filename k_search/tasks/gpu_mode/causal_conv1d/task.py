@@ -1,8 +1,8 @@
-from typing import Any, TypeAlias, TypedDict
+from typing import TypeAlias, TypedDict
 
 import torch
 
-input_t: TypeAlias = tuple[torch.Tensor, torch.Tensor, torch.Tensor | None, torch.Tensor | None, dict[str, Any]]
+input_t: TypeAlias = tuple[torch.Tensor, torch.Tensor, dict[str, str]]
 output_t: TypeAlias = torch.Tensor
 
 
@@ -12,6 +12,3 @@ class TestSpec(TypedDict):
     D: int
     W: int
     seed: int
-    activation: str
-    withbias: bool
-    withresidual: bool

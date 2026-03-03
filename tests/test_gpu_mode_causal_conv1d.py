@@ -35,6 +35,17 @@ class TestSpec:
 
 @pytest.mark.cuda
 class TestGenerateInput:
+    def test_generate_input_returns_three_tuple(self):
+        """Verify generate_input returns (x, weight, config) tuple."""
+        data = generate_input(B=2, T=64, D=32, W=4, seed=42)
+
+        assert isinstance(data, tuple)
+        assert len(data) == 3
+        x, weight, config = data
+        assert isinstance(x, torch.Tensor)
+        assert isinstance(weight, torch.Tensor)
+        assert isinstance(config, dict)
+
     def test_generate_input_shapes(self):
         B, T, D, W = 2, 128, 64, 4
         x, weight, bias, residual, config = generate_input(
