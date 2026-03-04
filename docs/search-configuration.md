@@ -55,6 +55,13 @@ Configuration options for K-Search kernel optimization runs.
 | `--base-url` | - | OpenAI-compatible endpoint URL |
 | `--no-reasoning-api` | off | Use chat completions instead of reasoning API |
 
+## Rounds vs Cycles
+
+- **Round**: One LLM generation attempt. All count toward `--max-opt-rounds`.
+- **Cycle**: One action from the world model tree, retried up to `--wm-stagnation-window` rounds until improvement or stagnation.
+
+With defaults: `128 rounds / 5 per cycle ≈ 25 actions explored`
+
 ## Programmatic Configuration
 
 ### WorldModelSelectionPolicy
