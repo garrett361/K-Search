@@ -7,7 +7,7 @@ from task import input_t, output_t
 def custom_kernel(data: input_t) -> output_t:
     """For-loop MoE expert computation baseline.
 
-    Optimization target: replace for-loop with torch._grouped_mm or Triton.
+    Optimization target: replace for-loop with Triton kernels or better PyTorch.
     """
     x, w1, w2, w3, num_tokens_per_expert, config = data
 

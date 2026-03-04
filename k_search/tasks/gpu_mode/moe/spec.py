@@ -21,10 +21,9 @@ GPUMode Mixture of Experts (Triton submission)
 
 Task:
 - Optimize the forward pass of SwiGLU-based Mixture of Experts.
-- Tokens are pre-sorted by expert assignment (grouped_mm compatible).
+- Tokens are pre-sorted by expert assignment.
 - Primary goal: eliminate Python for-loop over experts.
-  - Use **torch._grouped_mm** for parallel expert computation.
-  - Or implement custom **Triton kernels** for fused operations.
+  - Consider custom **Triton kernels** for fused operations.
 - Include short comment at top summarizing implementation.
 
 Data interface:

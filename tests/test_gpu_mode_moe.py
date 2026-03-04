@@ -25,9 +25,9 @@ class TestSpec:
         assert "custom_kernel(data)" in MOE_SPEC_TEXT_TRITON
         assert "(x, w1, w2, w3, num_tokens_per_expert, config)" in MOE_SPEC_TEXT_TRITON
 
-    def test_spec_mentions_grouped_mm(self):
-        """Verify spec documents torch._grouped_mm optimization."""
-        assert "grouped_mm" in MOE_SPEC_TEXT_TRITON.lower()
+    def test_spec_does_not_mention_grouped_mm(self):
+        """Verify spec does not leak torch._grouped_mm hint to LLM."""
+        assert "grouped_mm" not in MOE_SPEC_TEXT_TRITON.lower()
 
     def test_spec_has_test_case(self):
         """Verify spec contains test case constraints."""
