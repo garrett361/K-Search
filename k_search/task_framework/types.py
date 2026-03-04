@@ -1,9 +1,12 @@
 """Core types for task framework."""
 
-from dataclasses import dataclass, field
-from typing import Any
+from __future__ import annotations
 
-from k_search.task_framework.protocols.results import EvaluationResult, SolutionArtifact
+from dataclasses import dataclass, field
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from k_search.task_framework.protocols.results import EvaluationResult, SolutionArtifact
 
 
 @dataclass
