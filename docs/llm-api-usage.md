@@ -71,6 +71,10 @@ generator = KernelGenerator(
 - For OSS models via litellm: **Unverified** - litellm should auto-detect from `tokenizer_config.json` but this has not been tested with K-Search
 - If using a custom proxy, ensure it properly formats messages for your model
 
+## Timeout
+
+Default: 300 seconds. Use `--llm-timeout` CLI flag or `timeout=` parameter on `KernelGenerator`.
+
 ## Implementation
 
 - `k_search/kernel_generators/kernel_generator.py:162` - API selection logic

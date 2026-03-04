@@ -54,6 +54,7 @@ Configuration options for K-Search kernel optimization runs.
 | `--api-key` | `$LLM_API_KEY` | API key for LLM provider |
 | `--base-url` | - | OpenAI-compatible endpoint URL |
 | `--no-reasoning-api` | off | Use chat completions instead of reasoning API |
+| `--llm-timeout` | `300` | Timeout in seconds for LLM API calls |
 
 ## Rounds vs Cycles
 

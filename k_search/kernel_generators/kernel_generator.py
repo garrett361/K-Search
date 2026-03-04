@@ -36,6 +36,7 @@ class KernelGenerator:
         base_url: Optional[str] = None,
         reasoning_effort: str = "medium",
         use_reasoning_api: bool = True,
+        timeout: float = 300.0,
     ):
         """
         Args:
@@ -46,12 +47,14 @@ class KernelGenerator:
             base_url: Base URL for the API (need to provide for non-openai api models)
             reasoning_effort: Reasoning effort for OpenAI reasoning models ("low", "medium", "high", default: "medium")
             use_reasoning_api: Whether to use responses API (default: True)
+            timeout: Timeout in seconds for LLM API calls (default: 300)
         """
         self.model_name = model_name
         self.language = language
         self.target_gpu = target_gpu
         self.reasoning_effort = reasoning_effort
         self.use_reasoning_api = use_reasoning_api
+        self.timeout = timeout
 
         if api_key is None:
             api_key = os.getenv("LLM_API_KEY")
@@ -67,7 +70,7 @@ class KernelGenerator:
         if (rits_api_key := os.getenv("RITS_API_KEY")) is not None:
             client_kwargs["default_headers"] = {"RITS_API_KEY": rits_api_key}
 
-        self.client = openai.OpenAI(**client_kwargs, timeout=120.0)
+        self.client = openai.OpenAI(**client_kwargs, timeout=self.timeout)
 
     def _get_supported_language(self) -> SupportedLanguages:
         language_map = {

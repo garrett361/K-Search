@@ -108,6 +108,7 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
         base_url: Optional[str] = None,
         reasoning_effort: str = "medium",
         use_reasoning_api: bool = True,
+        timeout: float = 300.0,
         enable_world_model: bool = True,
         world_model_max_chars: int = 50000,
         artifacts_dir: str | None = None,
@@ -121,6 +122,7 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
             base_url=base_url,
             reasoning_effort=reasoning_effort,
             use_reasoning_api=use_reasoning_api,
+            timeout=timeout,
         )
         self._world_model_max_chars = int(world_model_max_chars)
         self._artifacts_dir = artifacts_dir

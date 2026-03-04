@@ -120,6 +120,7 @@ def generate_and_evaluate(
     wm_max_difficulty: Optional[int] = None,
     artifacts_dir: Optional[str] = None,
     use_reasoning_api: bool = True,
+    llm_timeout: float = 300.0,
 ) -> None:
     """
     Generate exactly one solution for the task, then run final evaluation.
@@ -196,6 +197,7 @@ def generate_and_evaluate(
             api_key=api_key,
             base_url=base_url,
             use_reasoning_api=use_reasoning_api,
+            timeout=llm_timeout,
             artifacts_dir=artifacts_dir,
             wm_max_difficulty=wm_max_difficulty,
         )
@@ -210,6 +212,7 @@ def generate_and_evaluate(
             api_key=api_key,
             base_url=base_url,
             use_reasoning_api=use_reasoning_api,
+            timeout=llm_timeout,
         )
 
     # Generate exactly one solution.
@@ -325,6 +328,12 @@ def main():
         action="store_false",
         default=True,
         help="Disable reasoning API (use standard chat completions instead)",
+    )
+    parser.add_argument(
+        "--llm-timeout",
+        type=float,
+        default=300.0,
+        help="Timeout in seconds for LLM API calls (default: 300)",
     )
 
     # Benchmark configuration
@@ -509,6 +518,7 @@ def main():
         wandb_project=args.wandb_project,
         run_name=args.run_name,
         use_reasoning_api=args.use_reasoning_api,
+        llm_timeout=args.llm_timeout,
     )
 
 
