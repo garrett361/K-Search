@@ -914,7 +914,8 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                     try:
                         import tempfile
 
-                        art_name = f"r{round_num}_code"
+                        run_id = wandb.run.id
+                        art_name = f"{run_id}_r{round_num}_code"
                         artifact = wandb.Artifact(
                             name=art_name,
                             type="generated-code",

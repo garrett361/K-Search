@@ -421,10 +421,10 @@ class KernelGenerator:
                 and getattr(wandb, "run", None) is not None
             ):
                 try:
-                    # Truncate artifact name to satisfy WandB limit.
+                    run_id = wandb.run.id
                     safe_def = str(task.name or "")[:32]
-                    safe_sol = str(solution.name or "")[-32:]
-                    art_name = f"{safe_def}_r{round_num}_{safe_sol}_code"
+                    safe_sol = str(solution.name or "")[-24:]
+                    art_name = f"{run_id}_{safe_def}_r{round_num}_{safe_sol}_code"
                     if len(art_name) > 128:
                         import hashlib
 
