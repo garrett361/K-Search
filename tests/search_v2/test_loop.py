@@ -224,3 +224,57 @@ class TestSearchResult:
         assert result.score == 0.75
         assert result.result is mock_eval_result
         assert result.rounds_completed == 5
+
+
+class TestBuildPrompt:
+    """Tests for build_prompt function."""
+
+    def test_first_round_returns_task_prompt(self):
+        from k_search.search_v2.prompts import build_prompt
+
+        task = make_task_mock()
+        task.get_prompt_text.return_value = "Task specification here"
+
+        result = build_prompt(task, None)
+
+        assert result == "Task specification here"
+        task.get_prompt_text.assert_called_once()
+
+    def test_with_outcome_includes_feedback(self):
+        from k_search.search_v2.prompts import build_prompt
+        from k_search.task_framework.types import EvalOutcome
+
+        task = make_task_mock()
+        task.get_prompt_text.return_value = "Task spec"
+        task.feedback_provider.for_codegen.return_value = "Error on line 42"
+
+        mock_impl = Mock()
+        mock_result = make_eval_result_mock()
+        outcome = EvalOutcome(impl=mock_impl, result=mock_result)
+
+        result = build_prompt(task, outcome)
+
+        assert "Task spec" in result
+        assert "Error on line 42" in result
+        task.feedback_provider.for_codegen.assert_called_once_with(outcome)
+
+
+class TestCreateImplementation:
+    """Tests for create_implementation function."""
+
+    def test_creates_valid_implementation(self):
+        from k_search.search_v2.prompts import create_implementation
+
+        impl = create_implementation("def kernel(): pass", 5, "my_task", "triton")
+
+        assert impl.name == "my_task_r5"
+        assert impl.content.definition == "my_task"
+        assert impl.content.author == "search_v2"
+        assert "def kernel(): pass" in impl.content.sources[0].content
+
+    def test_default_language_is_triton(self):
+        from k_search.search_v2.prompts import create_implementation
+
+        impl = create_implementation("code", 0)
+
+        assert impl.content.spec.language.value == "triton"
