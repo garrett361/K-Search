@@ -57,9 +57,6 @@ Test Cases (optimize for these):
   (total_tokens=16384, sparsity=1.56%)
 
 Optimization hints:
-- torch._grouped_mm(x, w.transpose(-2,-1), offs=cumsum(num_tokens_per_expert))
-  replaces the for-loop with a single fused operation
-- Offsets must be int32 cumsum of token counts
 - Fuse the two up-projections (w1, w3) if possible
 """
     + _REFERENCE_BLOCK
