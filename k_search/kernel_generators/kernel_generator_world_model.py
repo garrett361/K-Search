@@ -478,6 +478,7 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
         best_eval: Optional[EvalResult] = None
         best_score: float = -1.0
         session_best_speedup: Optional[float] = None
+        session_best_latency_ms: Optional[float] = None
 
         current_raw_code: Any = str(initial_raw_code or "")
         last_solution: Optional[Any] = None
@@ -653,7 +654,7 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                 round_num = cycle_start_round + rounds_consumed
                 logger.info(f"=== Optimization Round {round_num}/{max_opt_rounds} ===")
                 if session_best_speedup is not None:
-                    logger.info(f"[SEARCH] session_best_speedup={session_best_speedup}")
+                    logger.info(f"[SEARCH] session_best_speedup={session_best_speedup} latency_ms={session_best_latency_ms}")
                 _emit(
                     f"[CYCLE] action_node_id={chosen_leaf} attempt={attempt_idx} "
                     f"parent_is_root={'yes' if parent_is_root else 'no'} "
@@ -997,6 +998,7 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                             or round_speedup > session_best_speedup
                         ):
                             session_best_speedup = round_speedup
+                            session_best_latency_ms = er.latency_ms
                     else:
                         no_improve_streak += 1
                 else:
