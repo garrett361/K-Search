@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+"""V2 Search Loop entry point."""
+
+import argparse
+import logging
+import os
+import sys
+from pathlib import Path
+
+import openai
+
+from k_search.search_v2 import run_search, SearchConfig
+from k_search.tasks.gpu_mode_task import GpuModeTask
+from k_search.task_framework.adapters import GpuModeAdapter, GpuModeEvaluator
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+
+def create_llm_call(
+    client: openai.OpenAI,
+    model_name: str,
+    use_reasoning_api: bool = True,
+    reasoning_effort: str = "medium",
+):
+    """Create LLM callable for search loop."""
+
+    def llm_call(prompt: str) -> str:
+        if use_reasoning_api:
+            response = client.responses.create(
+                model=model_name,
+                input=prompt,
+                reasoning={"effort": reasoning_effort},
+            )
+            return (response.output_text or "").strip()
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return (response.choices[0].message.content or "").strip()
+
+    return llm_call
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Run V2 search loop")
+    parser.add_argument(
+        "--task", required=True, help="Task name (e.g., causal_conv1d, trimul)"
+    )
+    parser.add_argument("--language", default="triton", choices=["triton", "cuda"])
+    parser.add_argument("--max-rounds", type=int, default=10)
+    parser.add_argument("--model-name", required=True, help="LLM model name")
+    parser.add_argument("--base-url", default=None, help="OpenAI-compatible base URL")
+    parser.add_argument(
+        "--api-key", default=None, help="API key; if omitted, uses LLM_API_KEY env var"
+    )
+    parser.add_argument("--timeout", type=int, default=300)
+    parser.add_argument(
+        "--no-reasoning-api",
+        dest="use_reasoning_api",
+        action="store_false",
+        default=True,
+        help="Disable reasoning API (use standard chat completions instead)",
+    )
+    parser.add_argument(
+        "--reasoning-effort",
+        default="medium",
+        choices=["low", "medium", "high"],
+        help="Reasoning effort level for responses API",
+    )
+
+    args = parser.parse_args()
+
+    api_key = args.api_key or os.getenv("LLM_API_KEY")
+    if not api_key:
+        logger.error("API key is required (pass --api-key or set LLM_API_KEY)")
+        sys.exit(1)
+
+    task_dir = Path(__file__).parent / "k_search" / "tasks" / "gpu_mode" / args.task
+    if not task_dir.exists():
+        logger.error(f"Task directory not found: {task_dir}")
+        sys.exit(1)
+
+    logger.info(f"Loading task: {args.task}")
+    gpu_task = GpuModeTask(name=args.task, task_dir=task_dir)
+    adapter = GpuModeAdapter(gpu_task)
+    evaluator = GpuModeEvaluator(gpu_task)
+
+    client_kwargs = {"api_key": api_key, "timeout": args.timeout}
+    if args.base_url is not None:
+        client_kwargs["base_url"] = args.base_url
+    if (rits_api_key := os.getenv("RITS_API_KEY")) is not None:
+        client_kwargs["default_headers"] = {"RITS_API_KEY": rits_api_key}
+
+    client = openai.OpenAI(**client_kwargs)
+    llm = create_llm_call(
+        client,
+        args.model_name,
+        use_reasoning_api=args.use_reasoning_api,
+        reasoning_effort=args.reasoning_effort,
+    )
+
+    config = SearchConfig(max_rounds=args.max_rounds)
+    logger.info(
+        f"Starting V2 search: max_rounds={args.max_rounds}, model={args.model_name}"
+    )
+
+    result = run_search(adapter, evaluator, llm, config)
+
+    logger.info("=" * 60)
+    logger.info("SEARCH COMPLETE")
+    logger.info(f"Rounds completed: {result.rounds_completed}")
+    logger.info(f"Best score: {result.score:.4f}")
+    if result.result:
+        metrics = result.result.get_metrics()
+        logger.info(f"Speedup factor: {metrics.get('speedup_factor', 'N/A')}")
+        logger.info(f"Status: {metrics.get('status', 'N/A')}")
+    logger.info("=" * 60)
+
+
+if __name__ == "__main__":
+    main()
