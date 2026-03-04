@@ -831,6 +831,109 @@ Round N:
 
 ---
 
+## 8. Metrics Tracking
+
+Lightweight scalar metrics with wandb integration path.
+
+### Protocol (Sketch)
+
+```python
+class MetricsTracker(Protocol):
+    def log(self, metrics: dict[str, float | int], step: int | None = None) -> None: ...
+
+@dataclass
+class MetricsConfig:
+    enabled: bool = True
+    backend: str = "wandb"  # or "none", "json"
+```
+
+### Tracked Metrics
+
+- **Per-round**: latency_ms, tokens_in, tokens_out, action_type
+- **Per-run**: total_tokens, best_speedup, rounds_to_best, wall_time_secs
+
+### Integration
+
+Injected into `SearchOrchestrator`. Logs at each round and at run completion.
+
+---
+
+## 9. Artifact Store
+
+Full-fidelity artifact persistence, configurable per-run. Separate from MetricsTracker — artifacts are larger, stored less frequently.
+
+### Protocol (Sketch)
+
+```python
+class ArtifactStore(Protocol):
+    def store(self, artifact: Artifact, tags: dict[str, str] | None = None) -> None: ...
+
+@dataclass
+class Artifact:
+    type: str  # "solution", "prompt", "response", "log", "profile"
+    content: bytes | str
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+@dataclass
+class ArtifactConfig:
+    enabled: bool = False
+    types: list[str] | None = None  # None = all, or ["solution", "log"]
+    backend: str = "wandb"  # or "local", "none"
+```
+
+### Integration
+
+Injected into `SearchOrchestrator`. Tree remains source of truth during execution; ArtifactStore persists full-fidelity copies externally.
+
+---
+
+## 10. Multiple Baselines
+
+Run baseline solutions once at search start, track speedups independently.
+
+### Design (Sketch)
+
+```python
+@dataclass
+class BaselineConfig:
+    solutions: list[Solution]  # Run once at search start
+    primary: str  # Name of primary baseline for scoring
+```
+
+One baseline designated as primary — its relative speedup guides scoring decisions. All baseline speedups logged to MetricsTracker.
+
+### Integration
+
+Passed to `SearchOrchestrator`. Baselines evaluated in `run()` before search loop begins.
+
+---
+
+## 11. Separate LLM Endpoints
+
+Support different models for world model (P_world) vs code generation (P_gen).
+
+### Design
+
+```python
+class SearchOrchestrator:
+    def __init__(
+        self,
+        ...,
+        codegen_llm: LLMCall,
+        world_model_llm: LLMCall | None = None,  # Falls back to codegen_llm
+    ): ...
+```
+
+Two injection points. Config determines which provider/model backs each.
+
+---
+
+## 12. MCP Server for Remote Execution
+
+Future capability for running k-search as a remote service. Useful for scale-up (shared GPU pool) or RL training (reward evaluation). API to be defined when needed.
+
+---
+
 ## Implementation Order
 
 Suggested sequence:
@@ -841,6 +944,11 @@ Suggested sequence:
 4. **Enhanced feedback aggregation** — Polish after parallel works
 5. **Configurable limits** — Low priority, current defaults work
 6. **LLM query mechanism** — Adds LLM agency, implement after core search loop stable
+7. **Metrics tracking** — Add after core loop stable, before production runs
+8. **Artifact store** — Add alongside metrics for full observability
+9. **Multiple baselines** — Add when comparing against multiple references needed
+10. **Separate LLM endpoints** — Add when experimenting with model combinations
+11. **MCP server** — Future, when remote execution needed
 
 ## References
 
