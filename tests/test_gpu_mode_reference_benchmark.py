@@ -14,6 +14,7 @@ _TASK_DIR = (
 sys.path.insert(0, str(_TASK_DIR))
 
 
+@pytest.mark.cuda_subprocess
 @pytest.mark.cuda
 class TestBenchmarkReference:
     def test_benchmark_reference_returns_latency(self):
@@ -29,6 +30,7 @@ class TestBenchmarkReference:
         assert summary.latency_ms > 0, f"Invalid latency: {summary.latency_ms}"
 
 
+@pytest.mark.cuda_subprocess
 @pytest.mark.cuda
 class TestSpeedupFactor:
     def test_speedup_factor_populated(self):
