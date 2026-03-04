@@ -278,3 +278,56 @@ class TestCreateImplementation:
         impl = create_implementation("code", 0)
 
         assert impl.content.spec.language.value == "triton"
+
+
+class TestStripMarkdownFences:
+    """Tests for strip_markdown_fences function."""
+
+    def test_no_fences_unchanged(self):
+        from k_search.search_v2.prompts import strip_markdown_fences
+
+        code = "def custom_kernel():\n    pass"
+        assert strip_markdown_fences(code) == code
+
+    def test_strips_python_fences(self):
+        from k_search.search_v2.prompts import strip_markdown_fences
+
+        code = "```python\ndef custom_kernel():\n    pass\n```"
+        expected = "def custom_kernel():\n    pass"
+        assert strip_markdown_fences(code) == expected
+
+    def test_strips_triton_fences(self):
+        from k_search.search_v2.prompts import strip_markdown_fences
+
+        code = "```triton\n@triton.jit\ndef kernel():\n    pass\n```"
+        expected = "@triton.jit\ndef kernel():\n    pass"
+        assert strip_markdown_fences(code) == expected
+
+    def test_strips_bare_fences(self):
+        from k_search.search_v2.prompts import strip_markdown_fences
+
+        code = "```\ndef custom_kernel():\n    pass\n```"
+        expected = "def custom_kernel():\n    pass"
+        assert strip_markdown_fences(code) == expected
+
+    def test_extracts_first_fenced_block(self):
+        from k_search.search_v2.prompts import strip_markdown_fences
+
+        code = "Here's the code:\n```python\ndef kernel():\n    pass\n```\nAnd more text."
+        expected = "def kernel():\n    pass"
+        assert strip_markdown_fences(code) == expected
+
+    def test_handles_empty_string(self):
+        from k_search.search_v2.prompts import strip_markdown_fences
+
+        assert strip_markdown_fences("") == ""
+        assert strip_markdown_fences(None) is None
+
+    def test_handles_unclosed_fence(self):
+        from k_search.search_v2.prompts import strip_markdown_fences
+
+        code = "```python\ndef kernel():\n    pass"
+        # Should strip the leading fence at minimum
+        result = strip_markdown_fences(code)
+        assert "```" not in result
+        assert "def kernel():" in result

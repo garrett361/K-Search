@@ -56,9 +56,7 @@ def run_search(
             last_outcome = EvalOutcome(impl=best_impl, result=best_result)
 
         prompt = build_prompt(task, last_outcome)
-
         code = llm(prompt)
-
         impl = create_implementation(code, round_idx, task_name=task.name)
         result = evaluator.evaluate(impl)
         score = task.scorer.score(result)
