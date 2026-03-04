@@ -127,7 +127,8 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
 
         def _llm_call(prompt: str) -> str:
             logger.info(
-                f"[LLM] Starting call: model={self.model_name}, prompt_len={len(prompt)}, reasoning={self.use_reasoning_api}"
+                "[LLM] Starting call: model=%s, prompt_chars=%d, reasoning=%s",
+                self.model_name, len(prompt), self.use_reasoning_api
             )
             t0 = time.perf_counter()
             try:
@@ -145,7 +146,14 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                     )
                     result = (response.choices[0].message.content or "").strip()
                 dt = time.perf_counter() - t0
-                logger.info(f"[LLM] Completed in {dt:.2f}s, response_len={len(result)}")
+                usage = getattr(response, "usage", None)
+                if usage:
+                    logger.info(
+                        "[LLM] Completed in %.2fs, prompt_tokens=%s, completion_tokens=%s",
+                        dt, getattr(usage, "prompt_tokens", "?"), getattr(usage, "completion_tokens", "?")
+                    )
+                else:
+                    logger.info("[LLM] Completed in %.2fs, response_chars=%d", dt, len(result))
                 return result
             except Exception as e:
                 dt = time.perf_counter() - t0

@@ -185,10 +185,10 @@ class WorldModelManager:
             prediction=None,
             max_chars_per_block=self._cfg.max_chars_per_block,
         )
-        logger.info(f"[WM] Calling LLM for world model init, prompt_len={len(prompts.init_prompt)}")
+        logger.info(f"[WM] Calling LLM for world model init, prompt_chars={len(prompts.init_prompt)}")
         raw = (self._llm_call(prompts.init_prompt) or "").strip()
         parsed = try_parse_world_model_json(raw)
-        logger.info(f"[WM] LLM returned raw_len={len(raw)}, parsed={'ok' if parsed else 'failed'}")
+        logger.info(f"[WM] LLM returned response_chars={len(raw)}, parsed={'ok' if parsed else 'failed'}")
         if parsed:
             # Persist a bounded excerpt of the reference implementation into the root node's notes.
             # Root stays a dummy decision/choice=null node; this is just a stable "anchor" for humans and WM.
