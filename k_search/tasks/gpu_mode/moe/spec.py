@@ -55,6 +55,26 @@ Test Cases (optimize for these):
 - Arcee Trinity Large: seq_tokens=4096, top_k=4, dim=3072, hidden_dim=3072, num_experts=256
   (total_tokens=16384, sparsity=1.56%)
 
+Expert token boundaries:
+- offsets = cumsum(num_tokens_per_expert)  # [num_experts], same device as inputs
+- Expert i processes tokens from offsets[i-1] (or 0 if i==0) to offsets[i]
+
+Triton implementation notes:
+- tl.dot(a, b) requires a.dtype == b.dtype
+- For fp32 accumulation: cast BOTH operands with .to(tl.float32) before tl.dot()
+- Use tl.trans(tensor) for transposition - tl.dot() has no trans_a/trans_b args
+- Cast output to bf16 with .to(tl.bfloat16) before tl.store()
+
+Triton block size constraints:
+- BLOCK sizes for tl.arange, tl.zeros, tl.dot must be powers of 2 (32, 64, 128, etc.)
+- dim=3072 is NOT a power of 2 - use BLOCK_K=128 and loop with masking
+- Pattern: for k in range(0, dim, BLOCK_K): mask = (k + tl.arange(0, BLOCK_K)) < dim
+
+Triton control flow limitations:
+- No `continue` or `break` inside tl.static_range loops
+- Use tl.where(cond, val, 0.0) instead of if/continue patterns
+- Triton functions (@triton.jit) cannot be called from Python - only as kernels
+
 Optimization hints:
 - Fuse the two up-projections (w1, w3) if possible
 """
