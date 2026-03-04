@@ -619,6 +619,91 @@ Detailed design deferred until core framework is stable.
 
 ---
 
+## 7. LLM Query Mechanism
+
+Let the LLM request additional context before acting. Currently, information flow is push-based (system decides what each LLM sees). This extension adds pull-based queries where the LLM declares what info it needs.
+
+### Motivation
+
+Both P_world (action selection) and P_gen (code generation) currently receive fixed context. But the optimal context varies:
+- When selecting next action: might want to see top 3 implementations to understand what's working
+- When debugging a failure: might want to see similar past failures
+- When refining: might not need any extra context
+
+### Design
+
+**Two-phase prompting per round:**
+
+```
+Phase 1 (Query Request):
+  Prompt: Tree summary + "Available queries: [...]. What info do you need?"
+  LLM: Outputs query requests (e.g., "top_solutions(3)")
+
+Phase 2 (Action with Context):
+  Prompt: Original prompt + query results
+  LLM: Takes action
+```
+
+**QueryProvider protocol:**
+
+```python
+class QueryProvider(Protocol):
+    def get_available_queries(self) -> list[QuerySpec]:
+        """Return specs for queries the LLM can request."""
+        ...
+
+    def execute(self, query: QueryRequest) -> QueryResult:
+        """Execute a single query, return formatted result."""
+        ...
+```
+
+**Core queries:**
+
+| Query | Description |
+|-------|-------------|
+| `top_solutions(n, sort_by)` | Top N solutions with code + metrics |
+| `solution(node_id)` | Single solution details |
+| `failed_solutions(n)` | Recent failures |
+| `parent(node_id)` | Parent node |
+| `children(node_id)` | Child nodes |
+| `path_to_root(node_id)` | Ancestry chain |
+
+**Parsing** lives in `parsing/query_parser.py`, returns `ParseResult[list[QueryRequest]]` for retry support.
+
+### Configuration
+
+```python
+@dataclass
+class QueryConfig:
+    enabled: bool = False
+    available_queries: list[str] | None = None  # None = all
+    max_queries_per_request: int = 5
+```
+
+### Integration
+
+Query phase is optional — config flag to enable/disable. Can skip for simple "refine best" actions.
+
+```
+Round N:
+  1. Format tree state (existing)
+  2. Query phase (NEW, optional)
+     - Send query menu to LLM
+     - Parse requests, execute, append results
+  3. Action phase (existing)
+  4. Update tree (existing)
+```
+
+### Files to Add
+
+| File | Purpose |
+|------|---------|
+| `protocols/query_provider.py` | QueryProvider protocol, QuerySpec, QueryRequest, QueryResult |
+| `query/tree_query_provider.py` | Implementation backed by SolutionTree |
+| `parsing/query_parser.py` | Parse LLM output into QueryRequest list |
+
+---
+
 ## Implementation Order
 
 Suggested sequence:
@@ -628,6 +713,7 @@ Suggested sequence:
 3. **Async pipelining** — Overlaps with parallel, can be done in parallel
 4. **Enhanced feedback aggregation** — Polish after parallel works
 5. **Configurable limits** — Low priority, current defaults work
+6. **LLM query mechanism** — Adds LLM agency, implement after core search loop stable
 
 ## References
 
