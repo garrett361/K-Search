@@ -111,3 +111,17 @@ execute(impl, eval) → evaluator.evaluate(impl)
 - **Executor**: Orchestration (sequential, parallel, pipelined)
 - **Evaluator**: Runs implementations (loading, execution, checking)
 - **Implementation**: The code data
+
+## EvalOutcome
+
+Pairs a solution with its evaluation result. Extension point for additional data (e.g., analysis results).
+
+```python
+@dataclass
+class EvalOutcome:
+    solution: Implementation
+    result: EvaluationResult
+    # Extension fields added by subclasses or composition
+```
+
+The `solution` field is `Implementation`, not a separate type — consistent with reference and solution being the same protocol.
