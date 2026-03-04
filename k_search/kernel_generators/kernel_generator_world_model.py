@@ -658,6 +658,8 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                 attempt_idx = rounds_consumed + 1
                 round_num = cycle_start_round + rounds_consumed
                 print(f"\n=== Optimization Round {round_num}/{max_opt_rounds} ===")
+                if session_best_speedup is not None:
+                    logger.info(f"[SEARCH] session_best_speedup={session_best_speedup}")
                 _emit(
                     f"[CYCLE] action_node_id={chosen_leaf} attempt={attempt_idx} "
                     f"parent_is_root={'yes' if parent_is_root else 'no'} "
@@ -1079,11 +1081,6 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                     session_best_speedup is None or cycle_speedup > session_best_speedup
                 ):
                     session_best_speedup = cycle_speedup
-                logger.info(
-                    "[SEARCH] cycle complete, speedup_factor=%s, session_best_speedup=%s",
-                    cycle_speedup,
-                    session_best_speedup,
-                )
                 _stage(
                     f"cycle end: attach+refine best PASSED (round {cycle_best_round}, score={cycle_best_score:.3f})"
                 )
