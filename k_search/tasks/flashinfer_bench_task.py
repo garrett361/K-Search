@@ -12,6 +12,7 @@ evaluators (e.g. GPUMode) without rewriting the loop logic.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -20,6 +21,8 @@ from .task_base import EvalResult
 from .task_base import Solution as TaskSolution
 from .task_base import SourceFile as TaskSourceFile
 from .task_base import SupportedLanguages as TaskSupportedLanguages
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -533,7 +536,7 @@ Reference Implementation:
                 eval_info += f"Reference latency: {trace.evaluation.performance.reference_latency_ms}ms\n"
                 eval_info += f"Speedup factor: {trace.evaluation.performance.speedup_factor}x\n"
 
-            print(eval_info)
+            logger.info(eval_info)
             return str(eval_info or "").strip()
         except Exception:
             # Best effort: do not block prompting.
@@ -650,9 +653,8 @@ Reference Implementation:
                 except Exception:
                     sol_name = ""
                 if sol_name:
-                    print(
-                        f"\n[STAGE] benchmark continue-from solution to seed base score: {sol_name}",
-                        flush=True,
+                    logger.info(
+                        f"[STAGE] benchmark continue-from solution to seed base score: {sol_name}"
                     )
                 seed_eval = self.run_benchmark(
                     solution=base_solution,
@@ -777,8 +779,8 @@ Reference Implementation:
                 f"No workloads found for definition '{self.name}' in the provided TraceSet"
             )
 
-        print(f"Generating optimized solution for {self.name}")
-        print("Using workloads for optimization feedback: " + ", ".join(out))
+        logger.info(f"Generating optimized solution for {self.name}")
+        logger.info("Using workloads for optimization feedback: " + ", ".join(out))
 
         return out
 
@@ -1266,10 +1268,9 @@ Reference Implementation:
         except Exception:
             self._last_round_trace_logs_for_prompt = ""
 
-        # Preserve prior logging: print the summary line once per benchmark.
         try:
             if self._last_round_summary_line.strip():
-                print(self._last_round_summary_line, flush=True)
+                logger.info(self._last_round_summary_line)
         except Exception:
             pass
 
@@ -1576,14 +1577,12 @@ Reference Implementation:
                 wl_rows = list(row.get("workloads", []) or [])
                 if not sol_name or not wl_rows:
                     continue
-                print(f"[{def_name}] Final eval per-workload results for solution: {sol_name}", flush=True)
-                print(
-                    "workload_uuid                      | axes                                             | status   | speedup(x) | latency(ms) | ref_latency(ms) | vs_base(x)",
-                    flush=True,
+                logger.info(f"[{def_name}] Final eval per-workload results for solution: {sol_name}")
+                logger.info(
+                    "workload_uuid                      | axes                                             | status   | speedup(x) | latency(ms) | ref_latency(ms) | vs_base(x)"
                 )
-                print(
-                    "-----------------------------------+--------------------------------------------------+----------+------------+------------+----------------+-----------",
-                    flush=True,
+                logger.info(
+                    "-----------------------------------+--------------------------------------------------+----------+------------+------------+----------------+-----------"
                 )
                 for wr in wl_rows:
                     wl_uuid = str(wr.get("workload_uuid", "") or "")
@@ -1605,8 +1604,8 @@ Reference Implementation:
                     line = (
                         f"{wl_uuid:<35} | {axes_str:<50} | {st:<8} | {sp_s:>10} | {lat_s:>10} | {ref_s:>14} | {vb_s:>9}"
                     )
-                    print(line, flush=True)
-                print("", flush=True)
+                    logger.info(line)
+                logger.info("")
             except Exception:
                 continue
 
@@ -1623,10 +1622,9 @@ Reference Implementation:
                 mvb_text = f"{float(mvb):.2f}x" if isinstance(mvb, (int, float)) else "-"
                 sp_text = f"{float(avg_speedup):.2f}x" if isinstance(avg_speedup, (int, float)) else "-"
                 lat_text = f"{float(avg_latency):.3f} ms" if isinstance(avg_latency, (int, float)) else "-"
-                print(
+                logger.info(
                     f"[{def_name}] Final eval for {sol_name}: workloads={passed_workloads}/{total_workloads} "
-                    f"({pass_rate:.1f}%) | mean_speedup={sp_text} | mean_latency={lat_text} | mean_vs_base={mvb_text}",
-                    flush=True,
+                    f"({pass_rate:.1f}%) | mean_speedup={sp_text} | mean_latency={lat_text} | mean_vs_base={mvb_text}"
                 )
             except Exception:
                 continue

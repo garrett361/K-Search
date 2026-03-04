@@ -4,6 +4,7 @@ import dataclasses
 import datetime
 import functools
 import json
+import logging
 import os
 import shlex
 import shutil
@@ -16,6 +17,8 @@ from types import NoneType
 from typing import Optional, Protocol, Union
 
 from .consts import CUDA_FLAGS, ExitCode, Timeout
+
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
@@ -306,7 +309,7 @@ def run_program(
     multi_gpu: bool = False,
     extra_env: Optional[dict[str, str]] = None,
 ) -> RunResult:
-    print("[Running]")
+    logger.info("[Running]")
     # set up a pipe so the tester can communicate its verdict with us
     env = os.environ.copy()
     if extra_env is not None:

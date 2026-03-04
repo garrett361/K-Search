@@ -209,13 +209,13 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
             m = (msg or "").strip()
             if not m:
                 return
-            print(f"\n[STAGE] {m}", flush=True)
+            logger.info(f"[STAGE] {m}")
 
         def _emit(text: str) -> None:
             t = (text or "").strip("\n")
             if not t:
                 return
-            print(t, flush=True)
+            logger.info(t)
 
         def _code_for_wm_from_raw(raw: Any) -> str:
             return task.code_for_world_model_from_raw(raw=raw, language=self.language)
@@ -416,13 +416,13 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
             m = (msg or "").strip()
             if not m:
                 return
-            print(f"\n[STAGE] {m}", flush=True)
+            logger.info(f"[STAGE] {m}")
 
         def _emit(text: str) -> None:
             t = (text or "").strip("\n")
             if not t:
                 return
-            print(t, flush=True)
+            logger.info(t)
 
         def _append_baseline_hint(p: str) -> str:
             if not baseline_targets_text:
@@ -651,7 +651,7 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                     break
                 attempt_idx = rounds_consumed + 1
                 round_num = cycle_start_round + rounds_consumed
-                print(f"\n=== Optimization Round {round_num}/{max_opt_rounds} ===")
+                logger.info(f"=== Optimization Round {round_num}/{max_opt_rounds} ===")
                 if session_best_speedup is not None:
                     logger.info(f"[SEARCH] session_best_speedup={session_best_speedup}")
                 _emit(

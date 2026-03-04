@@ -1,3 +1,4 @@
+import logging
 import random
 import re
 import tempfile
@@ -6,6 +7,7 @@ from typing import Any, Dict, List, Optional
 import os
 
 import openai
+
 from .kernel_generator_prompts import (
     get_optimization_prompt_from_definition_text,
     get_prompt_from_definition_text,
@@ -18,6 +20,8 @@ try:
     import wandb  # type: ignore
 except Exception:  # pragma: no cover
     wandb = None
+
+logger = logging.getLogger(__name__)
 
 
 def get_code_from_solution(language: str, solution: Any):
@@ -101,7 +105,7 @@ class KernelGenerator:
                 content = match.group(1).strip()
                 files[filename] = content
             else:
-                print(f"Warning: Could not find {filename} in generated code")
+                logger.warning(f"Could not find {filename} in generated code")
 
         return files
 
@@ -149,7 +153,7 @@ class KernelGenerator:
 
                 code = code.replace(hex_float, decimal_val)
             except Exception as e:
-                print(f"Warning: Could not convert hex float {hex_float}: {e}")
+                logger.warning(f"Could not convert hex float {hex_float}: {e}")
                 code = code.replace(hex_float, "1.0")
 
         return code
@@ -201,11 +205,11 @@ class KernelGenerator:
             except Exception as e:
                 last_err = e
                 if is_cuda and attempt < max_parse_retries:
-                    print(
-                        f"[WARN] CUDA XML parse failed ({e}); retrying generation ({attempt}/{max_parse_retries})..."
+                    logger.warning(
+                        f"CUDA XML parse failed ({e}); retrying generation ({attempt}/{max_parse_retries})..."
                     )
                     continue
-                print(f"Error while generating code: {e}")
+                logger.error(f"Error while generating code: {e}")
                 raise
 
         # Unreachable, but keeps type-checkers happy.
@@ -373,7 +377,7 @@ class KernelGenerator:
                     per_task_requirement=per_req,
                 )
             prompt = _append_baseline_hint(prompt)
-            print(prompt)
+            logger.info(f"Initial prompt:\n{prompt}")
             code_result = self._generate_code_from_prompt(prompt)
             current_code = code_result["cleaned"]
             current_raw_code = code_result["raw"]
@@ -384,7 +388,7 @@ class KernelGenerator:
         best_raw_code: Optional[str] = None
 
         for round_num in range(1, max_opt_rounds + 1):
-            print(f"\n=== Optimization Round {round_num}/{max_opt_rounds} ===")
+            logger.info(f"=== Optimization Round {round_num}/{max_opt_rounds} ===")
 
             # Use the provided seed solution on the first round if available
             if round_num == 1 and seed_solution is not None:
@@ -397,7 +401,7 @@ class KernelGenerator:
                     round_num=int(round_num),
                 )
 
-            print("Evaluating solution...")
+            logger.info("Evaluating solution...")
             eval_result = task.run_benchmark(
                 solution=solution, dump_traces=False, round_num=int(round_num)
             )
@@ -655,8 +659,8 @@ class KernelGenerator:
                         per_task_requirement=per_req,
                     )
                 opt_prompt = _append_baseline_hint(opt_prompt)
-                print(opt_prompt)
-                print(f"Generating optimized code for round {round_num + 1}...")
+                logger.info(f"Optimization prompt:\n{opt_prompt}")
+                logger.info(f"Generating optimized code for round {round_num + 1}...")
                 code_result = self._generate_code_from_prompt(opt_prompt)
                 current_code = code_result["cleaned"]
                 current_raw_code = code_result["raw"]

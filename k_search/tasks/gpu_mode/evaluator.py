@@ -11,13 +11,14 @@ This evaluator follows the upstream flow:
 
 from __future__ import annotations
 
-import json
-import os
 import dataclasses
-from dataclasses import dataclass
-from pathlib import Path
+import json
+import logging
+import os
 import shutil
 import tempfile
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Optional
 
 from k_search.tasks.gpu_mode.code_utils import (
@@ -32,6 +33,8 @@ from k_search.tasks.gpu_mode.libkernelbot.task import (
     build_task_config,
     make_task_definition,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -293,7 +296,7 @@ def evaluate_gpu_mode_submission(
 
     if verbose:
         kept = "" if cleanup else " (kept)"
-        print(
+        logger.info(
             f"[gpumode] status={status} run_key={run_key} latency_ms={latency_ms} tmpdir={run_dir}{kept}"
         )
 

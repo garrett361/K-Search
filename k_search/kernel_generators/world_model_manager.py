@@ -1679,7 +1679,7 @@ class WorldModelManager:
                 "skipped_delete_not_allowed": int(skipped_delete_not_allowed),
             }
             self._last_apply_ops_report = report
-            print(
+            logger.info(
                 "[WM] apply_edit_ops:"
                 f" ops={report['ops']}"
                 f" updates={report['updates']}"
@@ -1704,7 +1704,7 @@ class WorldModelManager:
                 or report["skipped_split_invalid_children"]
                 or report["skipped_delete_not_allowed"]
             ):
-                print("[WM][WARN] edit-ops had skipped operations; refine will retry if this was a refine call.")
+                logger.warning("[WM] edit-ops had skipped operations; refine will retry if this was a refine call.")
         except Exception:
             pass
 

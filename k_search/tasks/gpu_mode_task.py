@@ -376,7 +376,7 @@ class GpuModeTriMulTask:
                     f"latency=- | score=- | mode={self._cfg.mode}"
                 )
                 if self._last_round_summary_line.strip():
-                    print(self._last_round_summary_line, flush=True)
+                    logger.info(self._last_round_summary_line)
             except Exception:
                 pass
             return EvalResult(
@@ -474,7 +474,7 @@ class GpuModeTriMulTask:
                 f"latency={lat_text} | {score_label}={score_text} | mode={self._cfg.mode}"
             )
             if self._last_round_summary_line.strip():
-                print(self._last_round_summary_line, flush=True)
+                logger.info(self._last_round_summary_line)
             if not getattr(er, "is_passed", lambda: False)():
                 le = str(getattr(er, "log_excerpt", "") or "").strip()
                 if le:
@@ -485,7 +485,7 @@ class GpuModeTriMulTask:
                         max_chars = 800
                     if len(le) > max_chars:
                         le = le[:max_chars] + "...<truncated>..."
-                    print(f"[{self._name}] Failure excerpt:\n{le}", flush=True)
+                    logger.info(f"[{self._name}] Failure excerpt:\n{le}")
         except Exception:
             pass
 
