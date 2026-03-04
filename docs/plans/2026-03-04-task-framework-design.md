@@ -391,13 +391,37 @@ def load_task_definition(task_dir: Path) -> TaskDefinition:
 
 ## Integration Points
 
-When ready to integrate with generators, these files change:
+### With V1 (Current Loop)
+
+When ready to integrate with existing generators, these files change:
 
 | File | Change | Complexity |
 |------|--------|------------|
 | `kernel_generator_world_model.py` | Accept `TaskDefinition` instead of `Task` | Low |
 | `world_model_manager.py` | Use `feedback_provider.for_world_model()` | Low |
 | `gpu_mode_task.py` | No changes (wrapped by adapter) | None |
+
+V1 adoption is incremental — wrap existing tasks in adapters, gradually replace direct field access with protocol methods.
+
+### With V2 (Search Rewrite)
+
+The `search_v2` module (see `2026-03-04-search-v2-design.md`) uses task_framework as its foundation:
+
+```
+task_framework                      search_v2
+─────────────────                   ─────────────────
+TaskDefinition      ──────────────► SearchOrchestrator.task
+Evaluator           ──────────────► SearchOrchestrator.evaluator
+EvalOutcome         ──────────────► Used throughout
+FeedbackProvider    ──────────────► Metrics extraction + retry feedback
+Scorer              ──────────────► SolutionTree.get_best_solution()
+```
+
+**Key point**: `FeedbackProvider` and V2's `StateFormatter` serve different purposes:
+- `FeedbackProvider.for_world_model()`: Extract metrics from single outcome → store in tree node
+- `StateFormatter.format_tree()`: Format entire tree for P_world prompt
+
+Both V1 and V2 can use task_framework simultaneously during migration.
 
 ## Design Decisions
 
@@ -426,3 +450,4 @@ Before implementation, verify:
 - Info routing: `docs/llm-info-routing.md`
 - Per-task structure: `k_search/tasks/gpu_mode/causal_conv1d/`
 - Future extensions: `docs/plans/2026-03-04-task-framework-extensions.md`
+- Search V2 (uses this framework): `docs/plans/2026-03-04-search-v2-design.md`
