@@ -180,7 +180,7 @@ class ParallelEvaluator:
 
     def evaluate_batch(
         self,
-        solutions: list[SolutionArtifact],
+        solutions: list[Implementation],
     ) -> list[EvaluationResult]:
         """
         Run up to len(worker_ids) solutions in parallel.
@@ -314,7 +314,7 @@ from typing import Any
 class Evaluator(Protocol):
     def evaluate(
         self,
-        solution: SolutionArtifact,
+        solution: Implementation,
         *,
         timeout_secs: int | None = None,
         context: dict[str, Any] | None = None,
@@ -324,7 +324,7 @@ class Evaluator(Protocol):
 
     async def evaluate_async(
         self,
-        solution: SolutionArtifact,
+        solution: Implementation,
         *,
         timeout_secs: int | None = None,
         context: dict[str, Any] | None = None,
@@ -378,7 +378,7 @@ class PipelinedExecutor:
 
     async def run_pipeline(
         self,
-        generate_fn: Callable[[str], Awaitable[SolutionArtifact]],
+        generate_fn: Callable[[str], Awaitable[Implementation]],
         feedback_fn: Callable[[EvalOutcome], str],
         initial_prompt: str,
         max_rounds: int,
@@ -419,7 +419,7 @@ Combine pipelining with multiple workers:
 async def multi_worker_pipeline(
     evaluator: Evaluator,
     worker_ids: list[int | str],
-    generate_fn: Callable[[str], Awaitable[SolutionArtifact]],
+    generate_fn: Callable[[str], Awaitable[Implementation]],
     ...
 ) -> AsyncIterator[EvalOutcome]:
     """Run independent pipelines per worker, merge results."""
@@ -474,7 +474,7 @@ class Analyzer(Protocol):
 
     def analyze(
         self,
-        solution: SolutionArtifact,
+        solution: Implementation,
         result: EvaluationResult,
     ) -> AnalysisResult:
         ...
@@ -493,7 +493,7 @@ And extend `EvalOutcome`:
 ```python
 @dataclass
 class EvalOutcome:
-    solution: SolutionArtifact
+    impl: Implementation
     result: EvaluationResult
     analysis: AnalysisResult | None = None  # Populated when analyzer runs
 ```
@@ -515,7 +515,7 @@ class NcuAnalyzer:
             "sm__warps_active.avg.pct_of_peak_sustained_active",
         ]
 
-    def analyze(self, solution: SolutionArtifact, result: EvaluationResult) -> AnalysisResult:
+    def analyze(self, solution: Implementation, result: EvaluationResult) -> AnalysisResult:
         if not result.is_success():
             return AnalysisResult(summary="Skipped (eval failed)", metrics={})
 
@@ -550,7 +550,7 @@ class NcuAnalyzer:
 class StaticAnalyzer:
     """Static analysis of generated code."""
 
-    def analyze(self, solution: SolutionArtifact, result: EvaluationResult) -> AnalysisResult:
+    def analyze(self, solution: Implementation, result: EvaluationResult) -> AnalysisResult:
         issues = []
 
         # solution.content is task-specific; GPU mode returns source files
@@ -585,7 +585,7 @@ class CompositeAnalyzer:
     def __init__(self, analyzers: list[Analyzer]):
         self.analyzers = analyzers
 
-    def analyze(self, solution: SolutionArtifact, result: EvaluationResult) -> AnalysisResult:
+    def analyze(self, solution: Implementation, result: EvaluationResult) -> AnalysisResult:
         summaries = []
         all_metrics = {}
 
@@ -690,7 +690,7 @@ class ConfigurableEvaluator:
         self.base = base_evaluator
         self.limits = limits
 
-    def evaluate(self, solution: SolutionArtifact, **kwargs) -> EvaluationResult:
+    def evaluate(self, solution: Implementation, **kwargs) -> EvaluationResult:
         # Pass limits via context
         context = kwargs.pop("context", {}) or {}
         context["_output_limits"] = self.limits

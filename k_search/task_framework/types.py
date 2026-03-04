@@ -6,7 +6,10 @@ from dataclasses import dataclass, field
 from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from k_search.task_framework.protocols.results import EvaluationResult, SolutionArtifact
+    from k_search.task_framework.protocols.results import (
+        EvaluationResult,
+        Implementation,
+    )
 
 
 @dataclass
@@ -30,8 +33,8 @@ class AnalysisResult:
 
 @dataclass
 class EvalOutcome:
-    """Complete result of evaluating a solution."""
+    """Complete result of evaluating an implementation."""
 
-    solution: SolutionArtifact
+    impl: Implementation
     result: EvaluationResult
     analysis: AnalysisResult | None = None

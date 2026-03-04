@@ -43,6 +43,8 @@ class MyImpl:
     content: str  # or dict, Path, etc.
 ```
 
+**Naming convention:** Use `impl` (not `implementation`) for parameter and attribute names. Keeps code concise while remaining clear.
+
 This is intentionally flat and generic:
 - No `run()` method — Implementation is data, not behavior
 - `content` type is `Any` — adapters define what makes sense for their task
@@ -114,14 +116,14 @@ execute(impl, eval) → evaluator.evaluate(impl)
 
 ## EvalOutcome
 
-Pairs a solution with its evaluation result. Extension point for additional data (e.g., analysis results).
+Pairs an implementation with its evaluation result. Extension point for additional data (e.g., analysis results).
 
 ```python
 @dataclass
 class EvalOutcome:
-    solution: Implementation
+    impl: Implementation
     result: EvaluationResult
     # Extension fields added by subclasses or composition
 ```
 
-The `solution` field is `Implementation`, not a separate type — consistent with reference and solution being the same protocol.
+The `impl` field is `Implementation`, not a separate type — consistent with reference and solution being the same protocol.

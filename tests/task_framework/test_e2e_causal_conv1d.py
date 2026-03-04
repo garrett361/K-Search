@@ -7,7 +7,7 @@ from k_search.tasks.gpu_mode_task import GpuModeTask
 from k_search.task_framework import (
     GpuModeAdapter,
     GpuModeEvaluationResult,
-    GpuModeSolutionArtifact,
+    GpuModeImplementation,
     EvalOutcome,
 )
 
@@ -118,7 +118,7 @@ class TestTaskFrameworkE2E:
             log_excerpt="RuntimeError: CUDA error",
         )
         outcome = EvalOutcome(
-            solution=GpuModeSolutionArtifact(sol),
+            impl=GpuModeImplementation(sol),
             result=GpuModeEvaluationResult(result),
         )
 

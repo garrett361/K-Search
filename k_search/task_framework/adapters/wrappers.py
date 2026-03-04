@@ -66,22 +66,10 @@ class GpuModeEvaluationResult:
         return self._inner.perf_summary_lines(prefix=prefix)
 
 
-class GpuModeSolutionArtifact:
-    """Wraps Solution to implement SolutionArtifact protocol."""
+class GpuModeImplementation:
+    """Wrapper exposing V1 Solution as Implementation protocol."""
 
     def __init__(self, inner: Solution) -> None:
-        self._inner = inner
-
-    @property
-    def name(self) -> str:
-        return self._inner.name
-
-    @property
-    def content(self) -> Any:
-        entry = self._inner.get_entry_source()
-        return entry.content if entry else ""
-
-    # Expose inner for adapters that need full Solution
-    @property
-    def inner(self) -> Solution:
-        return self._inner
+        self.inner = inner
+        self.name = inner.name
+        self.content = inner

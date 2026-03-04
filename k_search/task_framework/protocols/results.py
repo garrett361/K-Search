@@ -19,15 +19,17 @@ class EvaluationResult(Protocol):
         ...
 
 
-class SolutionArtifact(Protocol):
-    """Generic solution container."""
+class Implementation(Protocol):
+    """Data container for code to be evaluated.
 
-    @property
-    def name(self) -> str:
-        """Solution identifier."""
-        ...
+    Format is task-specific:
+    - str: single source file
+    - dict[str, str]: multiple files {filename: content}
+    - Path: reference to file on disk
+    """
 
-    @property
-    def content(self) -> Any:
-        """Solution content (code, config, etc.)."""
-        ...
+    name: str
+    """Identifier for this implementation."""
+
+    content: Any
+    """The implementation data."""

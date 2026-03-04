@@ -26,7 +26,7 @@ k_search/task_framework/
 ├── __init__.py
 ├── protocols/
 │   ├── __init__.py
-│   ├── results.py              # EvaluationResult, SolutionArtifact
+│   ├── results.py              # EvaluationResult, Implementation
 │   ├── input_generator.py
 │   ├── correctness.py          # CorrectnessChecker, CheckResult
 │   ├── scorer.py
@@ -36,7 +36,7 @@ k_search/task_framework/
 │   └── task_definition.py
 ├── adapters/
 │   ├── __init__.py
-│   ├── wrappers.py             # GpuModeEvaluationResult, GpuModeSolutionArtifact
+│   ├── wrappers.py             # GpuModeEvaluationResult, GpuModeImplementation
 │   └── gpu_mode.py             # GpuModeAdapter
 ├── types.py                    # EvalOutcome, CheckResult
 └── loader.py
@@ -50,7 +50,7 @@ class EvaluationResult(Protocol):
     def get_metrics(self) -> dict[str, Any]: ...
     def get_log(self) -> str: ...
 
-class SolutionArtifact(Protocol):
+class Implementation(Protocol):
     @property
     def name(self) -> str: ...
     @property
@@ -66,7 +66,7 @@ class FeedbackProvider(Protocol):
 class Analyzer(Protocol):
     def analyze(
         self,
-        solution: SolutionArtifact,
+        solution: Implementation,
         result: EvaluationResult,
         context: dict[str, Any] | None = None,
     ) -> AnalysisResult: ...
@@ -180,7 +180,7 @@ class FailurePatternAnalyzer:
 
     def analyze(
         self,
-        solution: SolutionArtifact,
+        solution: Implementation,
         result: EvaluationResult,
         context: dict[str, Any] | None = None,  # tree + recent_failures
     ) -> AnalysisResult:

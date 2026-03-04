@@ -72,9 +72,9 @@ class TestGpuModeEvaluationResult:
         assert wrapper.score() == 0.5  # 1/latency
 
 
-class TestGpuModeSolutionArtifact:
+class TestGpuModeImplementation:
     def test_wraps_solution(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeSolutionArtifact
+        from k_search.task_framework.adapters.wrappers import GpuModeImplementation
 
         inner = Solution(
             name="test_sol",
@@ -89,18 +89,18 @@ class TestGpuModeSolutionArtifact:
                 SourceFile(path="submission.py", content="def custom_kernel(): pass")
             ],
         )
-        wrapper = GpuModeSolutionArtifact(inner)
+        wrapper = GpuModeImplementation(inner)
 
         assert wrapper.name == "test_sol"
-        assert "custom_kernel" in wrapper.content
+        assert "custom_kernel" in wrapper.content.sources[0].content
 
 
 class TestEvalOutcome:
-    def test_eval_outcome_holds_solution_and_result(self):
+    def test_eval_outcome_holds_impl_and_result(self):
         from k_search.task_framework.types import EvalOutcome
         from k_search.task_framework.adapters.wrappers import (
             GpuModeEvaluationResult,
-            GpuModeSolutionArtifact,
+            GpuModeImplementation,
         )
         from k_search.tasks.task_base import (
             EvalResult,
@@ -124,9 +124,9 @@ class TestEvalOutcome:
         result = EvalResult(status="passed", latency_ms=1.0)
 
         outcome = EvalOutcome(
-            solution=GpuModeSolutionArtifact(sol),
+            impl=GpuModeImplementation(sol),
             result=GpuModeEvaluationResult(result),
         )
 
-        assert outcome.solution.name == "test"
+        assert outcome.impl.name == "test"
         assert outcome.result.is_success()

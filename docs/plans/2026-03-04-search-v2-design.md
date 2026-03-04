@@ -195,7 +195,7 @@ class SolutionNode:
     id: str
     parent_id: str | None
 
-    # Solution content (references SolutionArtifact by ID or inline)
+    # Solution content (references Implementation by ID or inline)
     solution_id: str | None = None
     solution_content: Any = None
 

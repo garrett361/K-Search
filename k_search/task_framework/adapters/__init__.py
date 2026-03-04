@@ -2,12 +2,12 @@
 
 from k_search.task_framework.adapters.wrappers import (
     GpuModeEvaluationResult,
-    GpuModeSolutionArtifact,
+    GpuModeImplementation,
 )
 from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
 
 __all__ = [
     "GpuModeAdapter",
     "GpuModeEvaluationResult",
-    "GpuModeSolutionArtifact",
+    "GpuModeImplementation",
 ]

@@ -3,7 +3,7 @@
 from k_search.task_framework.types import CheckResult, AnalysisResult, EvalOutcome
 from k_search.task_framework.protocols import (
     EvaluationResult,
-    SolutionArtifact,
+    Implementation,
     InputGenerator,
     ReferenceImpl,
     CorrectnessChecker,
@@ -16,7 +16,7 @@ from k_search.task_framework.protocols import (
 from k_search.task_framework.adapters import (
     GpuModeAdapter,
     GpuModeEvaluationResult,
-    GpuModeSolutionArtifact,
+    GpuModeImplementation,
 )
 
 __all__ = [
@@ -26,7 +26,7 @@ __all__ = [
     "EvalOutcome",
     # Protocols
     "EvaluationResult",
-    "SolutionArtifact",
+    "Implementation",
     "InputGenerator",
     "ReferenceImpl",
     "CorrectnessChecker",
@@ -38,5 +38,5 @@ __all__ = [
     # Adapters
     "GpuModeAdapter",
     "GpuModeEvaluationResult",
-    "GpuModeSolutionArtifact",
+    "GpuModeImplementation",
 ]

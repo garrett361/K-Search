@@ -2,18 +2,18 @@
 
 from typing import Any, Protocol
 
-from k_search.task_framework.protocols.results import EvaluationResult, SolutionArtifact
+from k_search.task_framework.protocols.results import EvaluationResult, Implementation
 
 
 class Evaluator(Protocol):
-    """Executes a solution and produces evaluation results."""
+    """Executes an implementation and produces evaluation results."""
 
     def evaluate(
         self,
-        solution: SolutionArtifact,
+        impl: Implementation,
         *,
         timeout_secs: int | None = None,
         context: dict[str, Any] | None = None,
     ) -> EvaluationResult:
-        """Evaluate solution and return result."""
+        """Evaluate implementation and return result."""
         ...

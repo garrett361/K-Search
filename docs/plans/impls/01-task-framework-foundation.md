@@ -1,5 +1,7 @@
 # Task Framework Foundation Implementation Plan
 
+> **Note:** This plan used `SolutionArtifact` naming. Post-implementation, this was reconciled to `Implementation` per `2026-03-04-implementation-protocol.md`. See `01a-implementation-protocol-reconciliation.md`.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Build task_framework protocols and GpuModeAdapter, validated with e2e causal_conv1d tests.

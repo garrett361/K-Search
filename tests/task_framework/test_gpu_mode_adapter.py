@@ -6,7 +6,13 @@ from pathlib import Path
 from k_search.tasks.gpu_mode_task import GpuModeTask
 
 
-CAUSAL_CONV1D_DIR = Path(__file__).parent.parent.parent / "k_search" / "tasks" / "gpu_mode" / "causal_conv1d"
+CAUSAL_CONV1D_DIR = (
+    Path(__file__).parent.parent.parent
+    / "k_search"
+    / "tasks"
+    / "gpu_mode"
+    / "causal_conv1d"
+)
 
 
 @pytest.mark.cuda
@@ -86,7 +92,7 @@ class TestGpuModeAdapterFeedbackProvider:
         from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
         from k_search.task_framework.adapters.wrappers import (
             GpuModeEvaluationResult,
-            GpuModeSolutionArtifact,
+            GpuModeImplementation,
         )
         from k_search.task_framework.types import EvalOutcome
         from k_search.tasks.task_base import (
@@ -113,7 +119,7 @@ class TestGpuModeAdapterFeedbackProvider:
         )
         result = EvalResult(status="failed", log_excerpt="Error: index out of bounds")
         outcome = EvalOutcome(
-            solution=GpuModeSolutionArtifact(sol),
+            impl=GpuModeImplementation(sol),
             result=GpuModeEvaluationResult(result),
         )
 
@@ -124,7 +130,7 @@ class TestGpuModeAdapterFeedbackProvider:
         from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
         from k_search.task_framework.adapters.wrappers import (
             GpuModeEvaluationResult,
-            GpuModeSolutionArtifact,
+            GpuModeImplementation,
         )
         from k_search.task_framework.types import EvalOutcome
         from k_search.tasks.task_base import (
@@ -151,7 +157,7 @@ class TestGpuModeAdapterFeedbackProvider:
         )
         result = EvalResult(status="passed", latency_ms=1.5)
         outcome = EvalOutcome(
-            solution=GpuModeSolutionArtifact(sol),
+            impl=GpuModeImplementation(sol),
             result=GpuModeEvaluationResult(result),
         )
 

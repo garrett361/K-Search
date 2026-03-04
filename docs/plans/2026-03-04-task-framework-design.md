@@ -18,7 +18,7 @@ k_search/task_framework/           # NEW: isolated submodule
 │
 ├── protocols/
 │   ├── __init__.py
-│   ├── results.py                 # EvaluationResult, SolutionArtifact
+│   ├── results.py                 # EvaluationResult, Implementation
 │   ├── input_generator.py
 │   ├── reference_impl.py
 │   ├── correctness.py
@@ -42,7 +42,7 @@ k_search/task_framework/           # NEW: isolated submodule
 
 ## Core Protocols
 
-### EvaluationResult and SolutionArtifact
+### EvaluationResult and Implementation
 
 Framework-owned protocols — decoupled from any concrete implementation:
 
@@ -56,7 +56,7 @@ class EvaluationResult(Protocol):
     def get_metrics(self) -> dict[str, Any]: ...
     def get_log(self) -> str: ...
 
-class SolutionArtifact(Protocol):
+class Implementation(Protocol):
     """Generic solution container."""
 
     @property
@@ -170,7 +170,7 @@ class Evaluator(Protocol):
 
     def evaluate(
         self,
-        solution: SolutionArtifact,
+        impl: Implementation,
         *,
         timeout_secs: int | None = None,
         context: dict[str, Any] | None = None,  # Task-specific (device_id, etc.)
@@ -230,7 +230,7 @@ class CheckResult:
 @dataclass
 class EvalOutcome:
     """Complete result of evaluating a solution."""
-    solution: SolutionArtifact
+    impl: Implementation
     result: EvaluationResult
     # analysis: AnalysisResult | None = None  # See extensions doc
 ```
@@ -349,8 +349,8 @@ class _GpuModeEvaluationResult:
         return self._inner.log_excerpt
 
 
-class _GpuModeSolutionArtifact:
-    """Wraps Solution to implement SolutionArtifact protocol."""
+class _GpuModeImplementation:
+    """Wraps Solution to implement Implementation protocol."""
 
     def __init__(self, solution: Solution):
         self._inner = solution
@@ -436,10 +436,10 @@ k_search/task_framework/
 ├── __init__.py
 ├── protocols/
 │   ├── __init__.py
-│   └── results.py          # EvaluationResult, SolutionArtifact protocols
+│   └── results.py          # EvaluationResult, Implementation protocols
 ├── adapters/
 │   ├── __init__.py
-│   └── wrappers.py         # GpuModeEvaluationResult, GpuModeSolutionArtifact
+│   └── wrappers.py         # GpuModeEvaluationResult, GpuModeImplementation
 └── types.py                # CheckResult, EvalOutcome
 ```
 
@@ -594,7 +594,7 @@ Each phase:
 ## Design Decisions
 
 1. **Protocols over ABCs**: Structural typing allows duck-typed compatibility without inheritance
-2. **Framework-owned result protocols**: `EvaluationResult` and `SolutionArtifact` decouple framework from concrete types
+2. **Framework-owned result protocols**: `EvaluationResult` and `Implementation` decouple framework from concrete types
 3. **Adapter pattern**: Wraps existing code without modification; handles type conversion
 4. **Evaluation external to TaskDefinition**: TaskDefinition defines *what*, execution layer defines *how*
 5. **FeedbackProvider handles routing**: Single place for codegen vs world model info routing logic
