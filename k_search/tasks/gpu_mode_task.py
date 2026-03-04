@@ -27,7 +27,7 @@ from k_search.tasks.task_base import (
 from k_search.tasks.gpu_mode.code_utils import normalize_cuda_sources
 from k_search.tasks.gpu_mode.evaluator import (
     benchmark_reference,
-    evaluate_trimul_submission,
+    evaluate_gpu_mode_submission,
 )
 from k_search.tasks.gpu_mode import DEFAULT_TRIMUL_TASK_DIR
 
@@ -335,7 +335,7 @@ class GpuModeTriMulTask:
             submission_code = (entry_src.content if entry_src else "") or ""
 
         try:
-            summary = evaluate_trimul_submission(
+            summary = evaluate_gpu_mode_submission(
                 submission_code=submission_code,
                 mode=self._cfg.mode,
                 language=lang or "python",

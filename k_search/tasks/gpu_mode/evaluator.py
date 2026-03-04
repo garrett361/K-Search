@@ -1,4 +1,4 @@
-"""GPUMode TriMul evaluator (vendored).
+"""GPUMode submission evaluator (vendored).
 
 We vendor the relevant pieces of `discover/gpu_mode` into this repository so we do NOT depend on an
 external discover checkout at runtime.
@@ -105,7 +105,7 @@ from reference import ref_kernel
 def custom_kernel(data):
     return ref_kernel(data)
 """
-    return evaluate_trimul_submission(
+    return evaluate_gpu_mode_submission(
         submission_code=reference_submission,
         mode=mode,
         language="python",
@@ -115,7 +115,7 @@ def custom_kernel(data):
     )
 
 
-def evaluate_trimul_submission(
+def evaluate_gpu_mode_submission(
     *,
     submission_code: Any,
     mode: str = "benchmark",
