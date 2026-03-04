@@ -151,7 +151,8 @@ def evaluate_gpu_mode_submission(
         os.makedirs(run_dir, exist_ok=True)
         cleanup = False
     else:
-        run_dir = tempfile.mkdtemp(prefix="ksearch_trimul_")
+        task_name = task_dir.name.replace("-", "_").replace(" ", "_")
+        run_dir = tempfile.mkdtemp(prefix=f"ksearch_{task_name}_")
         cleanup = not bool(keep_tmp)
 
     old_cwd = os.getcwd()
