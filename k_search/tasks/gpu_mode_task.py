@@ -47,14 +47,17 @@ def _load_spec_from_task_dir(task_dir: Path) -> tuple[str, str]:
     module = importlib.util.module_from_spec(spec_module)
     spec_module.loader.exec_module(module)
 
-    # Try task-specific naming first, fall back to TRIMUL naming for backwards compat
-    triton_spec = getattr(module, "CAUSAL_CONV1D_SPEC_TEXT_TRITON", None)
-    cuda_spec = getattr(module, "CAUSAL_CONV1D_SPEC_TEXT_CUDA", None)
+    # Look for any *_SPEC_TEXT_TRITON / *_SPEC_TEXT_CUDA attribute
+    triton_spec = None
+    cuda_spec = None
+    for attr in dir(module):
+        if attr.endswith("_SPEC_TEXT_TRITON") and triton_spec is None:
+            triton_spec = getattr(module, attr, None)
+        elif attr.endswith("_SPEC_TEXT_CUDA") and cuda_spec is None:
+            cuda_spec = getattr(module, attr, None)
 
-    if triton_spec is None:
-        triton_spec = getattr(module, "TRIMUL_SPEC_TEXT_TRITON", "")
     if cuda_spec is None:
-        cuda_spec = getattr(module, "TRIMUL_SPEC_TEXT_CUDA", triton_spec)
+        cuda_spec = triton_spec
 
     return str(triton_spec or ""), str(cuda_spec or "")
 
