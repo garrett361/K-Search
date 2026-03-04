@@ -46,6 +46,7 @@ from k_search.utils.paths import get_ksearch_artifacts_dir
 
 logger = logging.getLogger(__name__)
 
+
 class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
     """Baseline-aware generator variant that maintains and injects a persistent world model."""
 
@@ -125,7 +126,9 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
         self._artifacts_dir = artifacts_dir
 
         def _llm_call(prompt: str) -> str:
-            logger.info(f"[LLM] Starting call: model={self.model_name}, prompt_len={len(prompt)}, reasoning={self.use_reasoning_api}")
+            logger.info(
+                f"[LLM] Starting call: model={self.model_name}, prompt_len={len(prompt)}, reasoning={self.use_reasoning_api}"
+            )
             t0 = time.perf_counter()
             try:
                 if self.use_reasoning_api:
@@ -137,7 +140,8 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                     result = (response.output_text or "").strip()
                 else:
                     response = self.client.chat.completions.create(
-                        model=self.model_name, messages=[{"role": "user", "content": prompt}]
+                        model=self.model_name,
+                        messages=[{"role": "user", "content": prompt}],
                     )
                     result = (response.choices[0].message.content or "").strip()
                 dt = time.perf_counter() - t0
@@ -465,6 +469,7 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
         best_solution: Optional[Any] = None
         best_eval: Optional[EvalResult] = None
         best_score: float = -1.0
+        session_best_speedup: Optional[float] = None
 
         current_raw_code: Any = str(initial_raw_code or "")
         last_solution: Optional[Any] = None
@@ -889,7 +894,7 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                 last_eval = round_eval
 
                 logger.info(
-                    '[EVAL] round=%d status=%s latency_ms=%s speedup_factor=%s',
+                    "[EVAL] round=%d status=%s latency_ms=%s speedup_factor=%s",
                     round_num,
                     round_eval.status,
                     round_eval.latency_ms,
@@ -1052,15 +1057,22 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                     or no_improve_over_base_streak >= stagnation_window
                 ):
                     logger.info(
-                        '[SEARCH] no_improve_streak=%d/%d',
-                        no_improve_streak, stagnation_window,
+                        "[SEARCH] no_improve_streak=%d/%d",
+                        no_improve_streak,
+                        stagnation_window,
                     )
                     break
 
             if cycle_best_solution is not None and cycle_best_eval is not None:
+                cycle_speedup = cycle_best_eval.speedup_factor
+                if cycle_speedup is not None and (
+                    session_best_speedup is None or cycle_speedup > session_best_speedup
+                ):
+                    session_best_speedup = cycle_speedup
                 logger.info(
-                    '[SEARCH] cycle complete, best speedup_factor=%s',
-                    cycle_best_eval.speedup_factor,
+                    "[SEARCH] cycle complete, speedup_factor=%s, session_best_speedup=%s",
+                    cycle_speedup,
+                    session_best_speedup,
                 )
                 _stage(
                     f"cycle end: attach+refine best PASSED (round {cycle_best_round}, score={cycle_best_score:.3f})"
@@ -1100,7 +1112,7 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                 _emit(render_world_model_status(self._wm.get(task.name)))
                 self._persist_world_model_snapshot(task=task)
             else:
-                logger.info('[SEARCH] cycle complete, no passing solution')
+                logger.info("[SEARCH] cycle complete, no passing solution")
                 _stage("cycle end: no PASSED solution; mark action too hard")
                 try:
                     er_fail = None
