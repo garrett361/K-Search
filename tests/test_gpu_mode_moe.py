@@ -118,6 +118,18 @@ class TestGenerateInput:
         assert num_tokens_per_expert.min().item() == total_tokens // num_experts
         assert num_tokens_per_expert.max().item() <= total_tokens // num_experts + 1
 
+    def test_generate_input_all_tensors_on_cuda(self):
+        """Verify all input tensors are on CUDA."""
+        x, w1, w2, w3, num_tokens_per_expert, config = generate_input(
+            seq_tokens=64, top_k=2, dim=32, hidden_dim=64, num_experts=4, seed=42
+        )
+
+        assert x.is_cuda, f"x should be on CUDA, got {x.device}"
+        assert w1.is_cuda, f"w1 should be on CUDA, got {w1.device}"
+        assert w2.is_cuda, f"w2 should be on CUDA, got {w2.device}"
+        assert w3.is_cuda, f"w3 should be on CUDA, got {w3.device}"
+        assert num_tokens_per_expert.is_cuda, f"num_tokens_per_expert should be on CUDA, got {num_tokens_per_expert.device}"
+
 
 @pytest.mark.cuda
 class TestReference:
