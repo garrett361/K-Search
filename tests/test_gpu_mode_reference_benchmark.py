@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from k_search.tasks.gpu_mode.evaluator import benchmark_reference
-from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
+from k_search.tasks.gpu_mode_task import GpuModeTask
 
 _TASK_DIR = (
     Path(__file__).parent.parent / "k_search" / "tasks" / "gpu_mode" / "causal_conv1d"
@@ -35,7 +35,7 @@ class TestBenchmarkReference:
 class TestSpeedupFactor:
     def test_speedup_factor_populated(self):
         """Verify EvalResult.speedup_factor is numeric after run_benchmark()."""
-        task = GpuModeTriMulTask(task_dir=_TASK_DIR, mode="benchmark")
+        task = GpuModeTask(task_dir=_TASK_DIR, mode="benchmark")
 
         # Load baseline submission
         submission_path = _TASK_DIR / "submission.py"
@@ -68,7 +68,7 @@ class TestSpeedupFactor:
 
     def test_reference_latency_cached(self):
         """Verify subsequent run_benchmark() calls use cached reference latency."""
-        task = GpuModeTriMulTask(task_dir=_TASK_DIR, mode="benchmark")
+        task = GpuModeTask(task_dir=_TASK_DIR, mode="benchmark")
 
         submission_path = _TASK_DIR / "submission.py"
         submission_code = submission_path.read_text()

@@ -60,7 +60,7 @@ def _load_spec_from_task_dir(task_dir: Path) -> tuple[str, str]:
 
 
 @dataclass(frozen=True)
-class GpuModeTriMulTaskConfig:
+class GpuModeTaskConfig:
     mode: str = "benchmark"
     keep_tmp: bool = False
     task_dir: Path = DEFAULT_TRIMUL_TASK_DIR
@@ -70,7 +70,7 @@ class GpuModeTriMulTaskConfig:
     )
 
 
-class GpuModeTriMulTask:
+class GpuModeTask:
     """Task wrapper around GPUMode task evaluation."""
 
     def __init__(
@@ -91,7 +91,7 @@ class GpuModeTriMulTask:
         if name is None:
             name = f"gpumode_{resolved_task_dir.name}"
         self._name = str(name)
-        self._cfg = GpuModeTriMulTaskConfig(
+        self._cfg = GpuModeTaskConfig(
             mode=str(mode or "benchmark"),
             keep_tmp=bool(keep_tmp),
             task_dir=resolved_task_dir,

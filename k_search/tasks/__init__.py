@@ -26,10 +26,10 @@ except Exception:
     FlashInferBenchTask = None  # type: ignore
 
 try:  # pragma: no cover
-    from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
+    from k_search.tasks.gpu_mode_task import GpuModeTask
 
-    __all__.append("GpuModeTriMulTask")
+    __all__.append("GpuModeTask")
 except Exception:
-    GpuModeTriMulTask = None  # type: ignore
+    GpuModeTask = None  # type: ignore
 
 

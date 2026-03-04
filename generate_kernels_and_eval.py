@@ -487,9 +487,9 @@ def main():
             artifacts_dir=args.artifacts_dir,
         )
     elif task_source == "gpumode":
-        from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
+        from k_search.tasks.gpu_mode_task import GpuModeTask
 
-        task = GpuModeTriMulTask(
+        task = GpuModeTask(
             mode=str(args.gpumode_mode or "benchmark"),
             keep_tmp=bool(args.gpumode_keep_tmp),
             task_dir=(str(args.gpumode_task_dir) if args.gpumode_task_dir else None),
