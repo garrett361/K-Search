@@ -129,8 +129,7 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
 
         def _llm_call(prompt: str) -> str:
             logger.info(
-                "[LLM] Starting call: model=%s, prompt_chars=%d, reasoning=%s",
-                self.model_name, len(prompt), self.use_reasoning_api
+                f"[LLM] Starting call: model={self.model_name}, prompt_chars={len(prompt)}, reasoning={self.use_reasoning_api}"
             )
             t0 = time.perf_counter()
             try:
@@ -151,11 +150,10 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                 usage = getattr(response, "usage", None)
                 if usage:
                     logger.info(
-                        "[LLM] Completed in %.2fs, prompt_tokens=%s, completion_tokens=%s",
-                        dt, getattr(usage, "prompt_tokens", "?"), getattr(usage, "completion_tokens", "?")
+                        f"[LLM] Completed in {dt:.2f}s, prompt_tokens={getattr(usage, 'prompt_tokens', '?')}, completion_tokens={getattr(usage, 'completion_tokens', '?')}"
                     )
                 else:
-                    logger.info("[LLM] Completed in %.2fs, response_chars=%d", dt, len(result))
+                    logger.info(f"[LLM] Completed in {dt:.2f}s, response_chars={len(result)}")
                 return result
             except Exception as e:
                 dt = time.perf_counter() - t0
@@ -541,11 +539,7 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
 
             action = node_obj["action"]
             logger.info(
-                '[SEARCH] action: "%s" score_0_to_1=%s difficulty=%s expected_speedup=%sx',
-                action["title"],
-                action["score_0_to_1"],
-                action["difficulty_1_to_5"],
-                action["expected_vs_baseline_factor"],
+                f'[SEARCH] action: "{action["title"]}" score_0_to_1={action["score_0_to_1"]} difficulty={action["difficulty_1_to_5"]} expected_speedup={action["expected_vs_baseline_factor"]}x'
             )
 
             parent_id = str((node_obj or {}).get("parent_id") or "root")
@@ -906,11 +900,7 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                 last_eval = round_eval
 
                 logger.info(
-                    "[EVAL] round=%d status=%s latency_ms=%s speedup_factor=%s",
-                    round_num,
-                    round_eval.status,
-                    round_eval.latency_ms,
-                    round_eval.speedup_factor,
+                    f"[EVAL] round={round_num} status={round_eval.status} latency_ms={round_eval.latency_ms} speedup_factor={round_eval.speedup_factor}"
                 )
 
                 # If all workloads passed in this round, log a W&B artifact containing the generated code
@@ -1069,9 +1059,7 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                     or no_improve_over_base_streak >= stagnation_window
                 ):
                     logger.info(
-                        "[SEARCH] no_improve_streak=%d/%d",
-                        no_improve_streak,
-                        stagnation_window,
+                        f"[SEARCH] no_improve_streak={no_improve_streak}/{stagnation_window}"
                     )
                     break
 

@@ -340,9 +340,7 @@ class GpuModeTriMulTask:
                 raise RuntimeError("Reference benchmark returned no latency")
             self._reference_latency_ms = float(ref_summary.latency_ms)
             logger.info(
-                "[REF] reference_latency_ms=%.4f task=%s",
-                self._reference_latency_ms,
-                self._name,
+                f"[REF] reference_latency_ms={self._reference_latency_ms:.4f} task={self._name}"
             )
 
         # Convert k-search Solution sources to the evaluator input format.
