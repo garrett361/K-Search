@@ -8,7 +8,9 @@ from k_search.kernel_generators.kernel_generator import KernelGenerator
 
 
 @pytest.mark.skipif(
-    not os.getenv("RITS_API_KEY") or not os.getenv("RITS_BASE_URL"),
+    not os.getenv("RITS_API_KEY")
+    or not os.getenv("RITS_BASE_URL")
+    or not os.getenv("RITS_MODEL_NAME"),
     reason="RITS credentials not available",
 )
 class TestRITSAPIIntegration:
@@ -17,9 +19,9 @@ class TestRITSAPIIntegration:
     def test_reasoning_api_produces_reasoning_tokens(self):
         """Verify responses.create() produces reasoning tokens."""
         gen = KernelGenerator(
-            model_name="openai/gpt-oss-120b",
-            api_key=os.getenv("RITS_API_KEY"),
-            base_url=os.getenv("RITS_BASE_URL"),
+            model_name=os.environ["RITS_MODEL_NAME"],
+            api_key=os.environ["RITS_API_KEY"],
+            base_url=os.environ["RITS_BASE_URL"],
             use_reasoning_api=True,
         )
 
@@ -45,9 +47,9 @@ class TestRITSAPIIntegration:
     def test_chat_completions_no_reasoning_tokens(self):
         """Verify chat.completions.create() does not produce reasoning tokens."""
         gen = KernelGenerator(
-            model_name="openai/gpt-oss-120b",
-            api_key=os.getenv("RITS_API_KEY"),
-            base_url=os.getenv("RITS_BASE_URL"),
+            model_name=os.environ["RITS_MODEL_NAME"],
+            api_key=os.environ["RITS_API_KEY"],
+            base_url=os.environ["RITS_BASE_URL"],
             use_reasoning_api=False,
         )
 
