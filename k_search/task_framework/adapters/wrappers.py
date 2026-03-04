@@ -1,0 +1,87 @@
+"""Wrappers adapting GpuMode types to task_framework protocols."""
+
+from typing import Any
+
+from k_search.tasks.task_base import EvalResult, Solution
+
+
+class GpuModeEvaluationResult:
+    """Wraps EvalResult to implement EvaluationResult protocol + backwards compat."""
+
+    def __init__(self, inner: EvalResult) -> None:
+        self._inner = inner
+
+    # New protocol methods
+    def is_success(self) -> bool:
+        return self._inner.is_passed()
+
+    def get_metrics(self) -> dict[str, Any]:
+        return self._inner.to_dict(include_log_excerpt=False)
+
+    def get_log(self) -> str:
+        return self._inner.log_excerpt
+
+    # Backwards compatibility with V1 interface
+    def is_passed(self) -> bool:
+        return self._inner.is_passed()
+
+    @property
+    def status(self) -> str:
+        return self._inner.status
+
+    @property
+    def latency_ms(self) -> float | None:
+        return self._inner.latency_ms
+
+    @property
+    def reference_latency_ms(self) -> float | None:
+        return self._inner.reference_latency_ms
+
+    @property
+    def mean_vs_baseline_factor(self) -> float | None:
+        return self._inner.mean_vs_baseline_factor
+
+    @property
+    def speedup_factor(self) -> float | None:
+        return self._inner.speedup_factor
+
+    @property
+    def log_excerpt(self) -> str:
+        return self._inner.log_excerpt
+
+    @property
+    def metrics(self) -> dict[str, Any]:
+        return self._inner.metrics
+
+    def to_dict(self, **kwargs: Any) -> dict[str, Any]:
+        return self._inner.to_dict(**kwargs)
+
+    def score(self) -> float:
+        return self._inner.score()
+
+    def status_code(self) -> int:
+        return self._inner.status_code()
+
+    def perf_summary_lines(self, *, prefix: str) -> list[str]:
+        return self._inner.perf_summary_lines(prefix=prefix)
+
+
+class GpuModeSolutionArtifact:
+    """Wraps Solution to implement SolutionArtifact protocol."""
+
+    def __init__(self, inner: Solution) -> None:
+        self._inner = inner
+
+    @property
+    def name(self) -> str:
+        return self._inner.name
+
+    @property
+    def content(self) -> Any:
+        entry = self._inner.get_entry_source()
+        return entry.content if entry else ""
+
+    # Expose inner for adapters that need full Solution
+    @property
+    def inner(self) -> Solution:
+        return self._inner
