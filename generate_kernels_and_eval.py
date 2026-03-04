@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 from datetime import datetime
 import uuid
@@ -6,6 +7,11 @@ from pathlib import Path
 from typing import Any, List, Optional
 import json
 import torch
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(name)s: %(message)s'
+)
 
 
 def _persist_ksearch_solution(

@@ -10,6 +10,8 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from pathlib import Path
+import logging
+import time
 
 from k_search.kernel_generators.kernel_generator import KernelGenerator
 from k_search.tasks.task_base import code_from_solution
@@ -42,6 +44,7 @@ from k_search.kernel_generators.world_model import (
 from k_search.utils.solution_db import SolutionDB
 from k_search.utils.paths import get_ksearch_artifacts_dir
 
+logger = logging.getLogger(__name__)
 
 class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
     """Baseline-aware generator variant that maintains and injects a persistent world model."""
@@ -122,17 +125,28 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
         self._artifacts_dir = artifacts_dir
 
         def _llm_call(prompt: str) -> str:
-            if self.use_reasoning_api:
-                response = self.client.responses.create(
-                    model=self.model_name,
-                    input=prompt,
-                    reasoning={"effort": self.reasoning_effort},
-                )
-                return (response.output_text or "").strip()
-            response = self.client.chat.completions.create(
-                model=self.model_name, messages=[{"role": "user", "content": prompt}]
-            )
-            return (response.choices[0].message.content or "").strip()
+            logger.info(f"[LLM] Starting call: model={self.model_name}, prompt_len={len(prompt)}, reasoning={self.use_reasoning_api}")
+            t0 = time.perf_counter()
+            try:
+                if self.use_reasoning_api:
+                    response = self.client.responses.create(
+                        model=self.model_name,
+                        input=prompt,
+                        reasoning={"effort": self.reasoning_effort},
+                    )
+                    result = (response.output_text or "").strip()
+                else:
+                    response = self.client.chat.completions.create(
+                        model=self.model_name, messages=[{"role": "user", "content": prompt}]
+                    )
+                    result = (response.choices[0].message.content or "").strip()
+                dt = time.perf_counter() - t0
+                logger.info(f"[LLM] Completed in {dt:.2f}s, response_len={len(result)}")
+                return result
+            except Exception as e:
+                dt = time.perf_counter() - t0
+                logger.error(f"[LLM] Failed after {dt:.2f}s: {e}")
+                raise
 
         selection_policy = WorldModelSelectionPolicy()
         if wm_max_difficulty is not None:
@@ -510,6 +524,15 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                 chosen_action_text = blk.strip()
                 _emit(chosen_action_text)
 
+            action = node_obj["action"]
+            logger.info(
+                '[SEARCH] action: "%s" score_0_to_1=%s difficulty=%s expected_speedup=%sx',
+                action["title"],
+                action["score_0_to_1"],
+                action["difficulty_1_to_5"],
+                action["expected_vs_baseline_factor"],
+            )
+
             parent_id = str((node_obj or {}).get("parent_id") or "root")
             parent_is_root = parent_id == "root"
             base_raw_code = ""
@@ -865,6 +888,14 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                 # Save as "last attempt" for the next debug prompt
                 last_eval = round_eval
 
+                logger.info(
+                    '[EVAL] round=%d status=%s latency_ms=%s speedup_factor=%s',
+                    round_num,
+                    round_eval.status,
+                    round_eval.latency_ms,
+                    round_eval.speedup_factor,
+                )
+
                 # If all workloads passed in this round, log a W&B artifact containing the generated code
                 # (and a WM snapshot) for traceability.
                 if (
@@ -1020,9 +1051,17 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                     no_improve_streak >= stagnation_window
                     or no_improve_over_base_streak >= stagnation_window
                 ):
+                    logger.info(
+                        '[SEARCH] no_improve_streak=%d/%d',
+                        no_improve_streak, stagnation_window,
+                    )
                     break
 
             if cycle_best_solution is not None and cycle_best_eval is not None:
+                logger.info(
+                    '[SEARCH] cycle complete, best speedup_factor=%s',
+                    cycle_best_eval.speedup_factor,
+                )
                 _stage(
                     f"cycle end: attach+refine best PASSED (round {cycle_best_round}, score={cycle_best_score:.3f})"
                 )
@@ -1061,6 +1100,7 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                 _emit(render_world_model_status(self._wm.get(task.name)))
                 self._persist_world_model_snapshot(task=task)
             else:
+                logger.info('[SEARCH] cycle complete, no passing solution')
                 _stage("cycle end: no PASSED solution; mark action too hard")
                 try:
                     er_fail = None
