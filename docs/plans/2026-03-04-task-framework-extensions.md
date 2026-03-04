@@ -8,7 +8,134 @@ Future capabilities building on the core task framework. Each section can be imp
 - `GpuModeAdapter` validated against existing GPU Mode tasks
 - Existing tests passing with adapter-wrapped tasks
 
-## 1. Parallel Evaluation
+## 0. Executor Protocol (Foundation for Parallel/Async)
+
+Before implementing parallel or async evaluation, add the Executor abstraction.
+
+### Separation of Concerns
+
+| Component | Responsibility |
+|-----------|---------------|
+| **Evaluator** | WHAT: evaluation logic (input gen, run solution, check correctness, score) |
+| **Executor** | HOW: execution strategy (sequential, parallel, pipelined, retry) |
+
+### Protocol
+
+```python
+from typing import Any, Protocol
+
+class Executor(Protocol):
+    """Executes evaluations with configurable strategy."""
+
+    def execute(
+        self,
+        solution: Solution,
+        evaluator: Evaluator,
+        *,
+        context: dict[str, Any] | None = None,
+    ) -> EvalResult:
+        """
+        Execute evaluation of solution.
+
+        Args:
+            solution: The Solution to evaluate
+            evaluator: The Evaluator that knows how to evaluate this task
+            context: Execution context (worker_id, timeout, etc.)
+
+        Returns:
+            EvalResult with status, metrics, log_excerpt
+        """
+        ...
+```
+
+Uses existing types only:
+- `Solution` from `task_base.py`
+- `EvalResult` from `task_base.py`
+- `Evaluator` from task_framework protocols
+
+### Sequential Implementation
+
+```python
+class SequentialExecutor:
+    """Single-threaded sequential execution."""
+
+    def __init__(self, config: ExecutorConfig | None = None):
+        self.config = config or ExecutorConfig()
+
+    def execute(
+        self,
+        solution: Solution,
+        evaluator: Evaluator,
+        *,
+        context: dict[str, Any] | None = None,
+    ) -> EvalResult:
+        return evaluator.evaluate(solution, context=context)
+```
+
+### Configuration
+
+```python
+@dataclass
+class ExecutorConfig:
+    timeout_secs: int = 60
+    # Extended by ParallelConfig, PipelineConfig
+```
+
+### Integration
+
+**V1 migration:**
+```python
+# Before (V1)
+result = task.run_benchmark(solution=solution)
+
+# After (with Executor)
+result = executor.execute(solution, evaluator)
+```
+
+**V2 SearchOrchestrator:**
+```python
+class SearchOrchestrator:
+    def __init__(self, evaluator: Evaluator, executor: Executor, ...):
+        self.evaluator = evaluator
+        self.executor = executor
+
+    def _execute_action(self, action: ActionNode) -> EvalResult:
+        solution = self._generate_code(action)
+        return self.executor.execute(solution, self.evaluator)
+```
+
+### Parallel Extension
+
+```python
+class ParallelExecutor:
+    def __init__(self, config: ParallelConfig):
+        self.config = config  # includes worker_ids
+
+    def execute_batch(
+        self,
+        solutions: list[Solution],
+        evaluator: Evaluator,
+    ) -> list[EvalResult]:
+        # Distribute across workers
+        ...
+```
+
+### Async Extension
+
+```python
+class PipelinedExecutor:
+    async def execute_async(
+        self,
+        solution: Solution,
+        evaluator: Evaluator,
+    ) -> EvalResult:
+        # For overlapping LLM gen + eval
+        ...
+```
+
+---
+
+## 1. Parallel Evaluation (requires §0)
 
 Run multiple evaluations across workers simultaneously.
 
