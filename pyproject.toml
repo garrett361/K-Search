@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ty", "ruff"]
+dev = ["pytest>=8.0", "pytest-timeout", "ty", "ruff"]
 flashinfer = [
     "flashinfer-bench-ksearch @ git+https://github.com/caoshiyi/flashinfer-bench-ksearch.git",
 ]

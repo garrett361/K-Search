@@ -30,6 +30,7 @@ def real_init_prompt() -> str:
     return prompts.init_prompt
 
 
+@pytest.mark.timeout(180)
 @pytest.mark.skipif(
     not os.getenv("RITS_API_KEY")
     or not os.getenv("RITS_BASE_URL")
