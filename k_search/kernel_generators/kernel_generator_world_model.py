@@ -991,6 +991,12 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                         cycle_best_wm_code = str(current_wm_code or "")
                         cycle_best_round = int(round_num)
                         no_improve_streak = 0
+                        round_speedup = er.speedup_factor
+                        if round_speedup is not None and (
+                            session_best_speedup is None
+                            or round_speedup > session_best_speedup
+                        ):
+                            session_best_speedup = round_speedup
                     else:
                         no_improve_streak += 1
                 else:
@@ -1064,11 +1070,6 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                     break
 
             if cycle_best_solution is not None and cycle_best_eval is not None:
-                cycle_speedup = cycle_best_eval.speedup_factor
-                if cycle_speedup is not None and (
-                    session_best_speedup is None or cycle_speedup > session_best_speedup
-                ):
-                    session_best_speedup = cycle_speedup
                 _stage(
                     f"cycle end: attach+refine best PASSED (round {cycle_best_round}, score={cycle_best_score:.3f})"
                 )
