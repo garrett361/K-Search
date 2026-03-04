@@ -93,3 +93,40 @@ class TestGpuModeSolutionArtifact:
 
         assert wrapper.name == "test_sol"
         assert "custom_kernel" in wrapper.content
+
+
+class TestEvalOutcome:
+    def test_eval_outcome_holds_solution_and_result(self):
+        from k_search.task_framework.types import EvalOutcome
+        from k_search.task_framework.adapters.wrappers import (
+            GpuModeEvaluationResult,
+            GpuModeSolutionArtifact,
+        )
+        from k_search.tasks.task_base import (
+            EvalResult,
+            Solution,
+            BuildSpec,
+            SourceFile,
+            SupportedLanguages,
+        )
+
+        sol = Solution(
+            name="test",
+            definition="def",
+            author="author",
+            spec=BuildSpec(
+                language=SupportedLanguages.TRITON,
+                target_hardware=["H100"],
+                entry_point="submission.py::custom_kernel",
+            ),
+            sources=[SourceFile(path="submission.py", content="code")],
+        )
+        result = EvalResult(status="passed", latency_ms=1.0)
+
+        outcome = EvalOutcome(
+            solution=GpuModeSolutionArtifact(sol),
+            result=GpuModeEvaluationResult(result),
+        )
+
+        assert outcome.solution.name == "test"
+        assert outcome.result.is_success()
