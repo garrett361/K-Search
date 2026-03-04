@@ -325,6 +325,26 @@ class GpuModeTriMulTask:
         dump_traces: bool = False,
         round_num: int | None = None,
     ) -> EvalResult:
+        # Benchmark reference on first run to enable speedup computation
+        if self._reference_latency_ms is None:
+            ref_summary = benchmark_reference(
+                task_dir=self._cfg.task_dir,
+                mode=self._cfg.mode,
+                verbose=False,
+            )
+            if ref_summary.status != "passed":
+                raise RuntimeError(
+                    f"Reference benchmark failed: {ref_summary.log_excerpt}"
+                )
+            if ref_summary.latency_ms is None:
+                raise RuntimeError("Reference benchmark returned no latency")
+            self._reference_latency_ms = float(ref_summary.latency_ms)
+            logger.info(
+                "[REF] reference_latency_ms=%.4f task=%s",
+                self._reference_latency_ms,
+                self._name,
+            )
+
         # Convert k-search Solution sources to the evaluator input format.
         lang = str(getattr(solution.spec, "language", "") or "").strip().lower()
         entry_src = solution.get_entry_source()
@@ -389,26 +409,6 @@ class GpuModeTriMulTask:
             and float(latency_ms_f) > 0
         ):
             score = 1.0 / float(latency_ms_f)
-
-        # Benchmark reference on first run to enable speedup computation
-        if self._reference_latency_ms is None:
-            ref_summary = benchmark_reference(
-                task_dir=self._cfg.task_dir,
-                mode=self._cfg.mode,
-                verbose=False,
-            )
-            if ref_summary.status != "passed":
-                raise RuntimeError(
-                    f"Reference benchmark failed: {ref_summary.log_excerpt}"
-                )
-            if ref_summary.latency_ms is None:
-                raise RuntimeError("Reference benchmark returned no latency")
-            self._reference_latency_ms = float(ref_summary.latency_ms)
-            logger.info(
-                "[REF] reference_latency_ms=%.4f task=%s",
-                self._reference_latency_ms,
-                self._name,
-            )
 
         assert latency_ms_f is not None or not passed, (
             "passed benchmark must have latency"
