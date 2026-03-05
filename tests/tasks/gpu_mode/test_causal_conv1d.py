@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import torch
 
-_TASK_DIR = Path(__file__).parent.parent / "k_search" / "tasks" / "gpu_mode" / "causal_conv1d"
+_TASK_DIR = Path(__file__).parent.parent.parent.parent / "k_search" / "tasks" / "gpu_mode" / "causal_conv1d"
 sys.path.insert(0, str(_TASK_DIR))
 
 from reference import check_implementation, generate_input, ref_kernel  # noqa: E402  # ty: ignore[unresolved-import]

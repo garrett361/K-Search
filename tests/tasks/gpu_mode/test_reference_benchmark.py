@@ -9,7 +9,7 @@ from k_search.tasks.gpu_mode.evaluator import benchmark_reference
 from k_search.tasks.gpu_mode_task import GpuModeTask
 
 _TASK_DIR = (
-    Path(__file__).parent.parent / "k_search" / "tasks" / "gpu_mode" / "causal_conv1d"
+    Path(__file__).parent.parent.parent.parent / "k_search" / "tasks" / "gpu_mode" / "causal_conv1d"
 )
 sys.path.insert(0, str(_TASK_DIR))
 
