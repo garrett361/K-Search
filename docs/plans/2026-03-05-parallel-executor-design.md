@@ -51,7 +51,7 @@ open → in_progress → closed
 |--------|---------|
 | `open` | Available for selection by executor |
 | `in_progress` | In pipeline (queued, LLM generating, or evaluating) |
-| `closed` | Done — check attached `EvalOutcome` for pass/fail |
+| `closed` | Done — check attached `Round` for pass/fail |
 
 World model's `get_next_action()` only considers `open` actions. Executor marks `in_progress` immediately upon selection.
 
@@ -73,7 +73,7 @@ Queue depth controls buffering at each stage. Tune ratio to keep eval saturated.
 ```python
 @dataclass
 class ExecutorResult:
-    best_outcome: EvalOutcome | None
+    best_outcome: Round | None
     rounds_completed: int
     metrics: dict[str, Any]
 
@@ -119,14 +119,14 @@ class WorldModel(Protocol):
         """Return next action to try, or None if done."""
         ...
 
-    def update(self, tree: SolutionTree, action: ActionNode, outcome: EvalOutcome) -> None:
+    def update(self, tree: SolutionTree, action: ActionNode, outcome: Round) -> None:
         """Incorporate result into tree."""
         ...
 
 # Async version (Stage 3 - pipeline)
 class AsyncWorldModel(Protocol):
     async def get_next_action(self, tree: SolutionTree) -> ActionNode | None: ...
-    async def update(self, tree: SolutionTree, action: ActionNode, outcome: EvalOutcome) -> None: ...
+    async def update(self, tree: SolutionTree, action: ActionNode, outcome: Round) -> None: ...
 ```
 
 Simple single-action interface. Executor calls repeatedly to fill queue. Pipeline executor uses async variant.
@@ -183,7 +183,7 @@ class PipelineExecutor:
             try:
                 # Eval stays sync (GPU work), wrap in to_thread
                 result = await asyncio.to_thread(self.evaluator.evaluate, impl)
-                outcome = EvalOutcome(impl=impl, result=result)
+                outcome = Round(impl=impl, result=result)
                 action.outcome = outcome
                 action.status = "closed"
                 await self.world_model.update(self.tree, action, outcome)  # async
@@ -224,7 +224,7 @@ Hard failures (GPU OOM, API auth revoked) will fail repeatedly — observable fr
 ## Module Structure
 
 ```
-k_search/search_v2/
+k_search/modular/
 ├── executors/
 │   ├── __init__.py
 │   ├── protocol.py       # Executor protocol, ExecutorResult
@@ -256,7 +256,7 @@ k_search/search_v2/
 
   class AsyncWorldModel(Protocol):
       async def get_next_action(self, tree: SolutionTree) -> ActionNode | None: ...
-      async def update(self, tree: SolutionTree, action: ActionNode, outcome: EvalOutcome) -> None: ...
+      async def update(self, tree: SolutionTree, action: ActionNode, outcome: Round) -> None: ...
   ```
 - `PipelineExecutor` with async internals (no `to_thread()` wrappers needed)
 - `PipelineConfig` (queue depths)

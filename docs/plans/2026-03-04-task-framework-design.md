@@ -13,7 +13,7 @@ Core abstraction layer for code optimization tasks. Provides composable protocol
 ## Module Structure
 
 ```
-k_search/task_framework/           # NEW: isolated submodule
+k_search/modular/           # NEW: isolated submodule
 ├── __init__.py                    # Public exports
 │
 ├── protocols/
@@ -37,7 +37,7 @@ k_search/task_framework/           # NEW: isolated submodule
 │
 ├── config.py                      # ExecutionConfig
 ├── loader.py                      # Directory-based discovery
-└── types.py                       # EvalOutcome, CheckResult
+└── types.py                       # Round, CheckResult
 ```
 
 ## Core Protocols
@@ -140,7 +140,7 @@ class FeedbackProvider(Protocol):
 
     def for_codegen(
         self,
-        outcomes: EvalOutcome | list[EvalOutcome],
+        outcomes: Round | list[Round],
     ) -> str:
         """
         Aggregate outcomes into feedback for codegen LLM.
@@ -150,7 +150,7 @@ class FeedbackProvider(Protocol):
 
     def for_world_model(
         self,
-        outcomes: EvalOutcome | list[EvalOutcome],
+        outcomes: Round | list[Round],
     ) -> list[dict[str, Any]]:
         """
         Format outcomes for world model tree.
@@ -228,7 +228,7 @@ class CheckResult:
     criteria: dict[str, Any] | None = None  # rtol, atol, etc. if relevant
 
 @dataclass
-class EvalOutcome:
+class Round:
     """Complete result of evaluating a solution."""
     impl: Implementation
     result: EvaluationResult
@@ -316,18 +316,18 @@ class _GpuModeFeedbackProvider:
 
     def for_codegen(
         self,
-        outcomes: EvalOutcome | list[EvalOutcome],
+        outcomes: Round | list[Round],
     ) -> str:
-        if isinstance(outcomes, EvalOutcome):
+        if isinstance(outcomes, Round):
             outcomes = [outcomes]
         # Include full logs for debugging
         return "\n\n".join(o.result.get_log() for o in outcomes)
 
     def for_world_model(
         self,
-        outcomes: EvalOutcome | list[EvalOutcome],
+        outcomes: Round | list[Round],
     ) -> list[dict[str, Any]]:
-        if isinstance(outcomes, EvalOutcome):
+        if isinstance(outcomes, Round):
             outcomes = [outcomes]
         # Numeric metrics only
         return [o.result.get_metrics() for o in outcomes]
@@ -405,14 +405,14 @@ V1 adoption is incremental — wrap existing tasks in adapters, gradually replac
 
 ### With V2 (Search Rewrite)
 
-The `search_v2` module (see `2026-03-04-search-v2-design.md`) uses task_framework as its foundation:
+The `modular` module (see `2026-03-04-search-v2-design.md`) uses modular as its foundation:
 
 ```
-task_framework                      search_v2
+modular                      modular
 ─────────────────                   ─────────────────
 TaskDefinition      ──────────────► SearchOrchestrator.task
 Evaluator           ──────────────► SearchOrchestrator.evaluator
-EvalOutcome         ──────────────► Used throughout
+Round         ──────────────► Used throughout
 FeedbackProvider    ──────────────► Metrics extraction + retry feedback
 Scorer              ──────────────► SolutionTree.get_best_solution()
 ```
@@ -421,7 +421,7 @@ Scorer              ──────────────► SolutionTree.g
 - `FeedbackProvider.for_world_model()`: Extract metrics from single outcome → store in tree node
 - `StateFormatter.format_tree()`: Format entire tree for P_world prompt
 
-Both V1 and V2 can use task_framework simultaneously during migration.
+Both V1 and V2 can use modular simultaneously during migration.
 
 ## Incremental Implementation
 
@@ -432,7 +432,7 @@ Adapter-first approach: wrap existing `GpuModeTask` without modifying task files
 **Files to create:**
 
 ```
-k_search/task_framework/
+k_search/modular/
 ├── __init__.py
 ├── protocols/
 │   ├── __init__.py
@@ -440,7 +440,7 @@ k_search/task_framework/
 ├── adapters/
 │   ├── __init__.py
 │   └── wrappers.py         # GpuModeEvaluationResult, GpuModeImplementation
-└── types.py                # CheckResult, EvalOutcome
+└── types.py                # CheckResult, Round
 ```
 
 **V1 files modified:**
@@ -509,7 +509,7 @@ class GpuModeEvaluationResult:
 **Files to create:**
 
 ```
-k_search/task_framework/protocols/
+k_search/modular/protocols/
 ├── input_generator.py
 ├── reference_impl.py
 ├── correctness.py
@@ -531,7 +531,7 @@ k_search/task_framework/protocols/
 **Files to create:**
 
 ```
-k_search/task_framework/protocols/
+k_search/modular/protocols/
 ├── feedback_provider.py
 └── evaluator.py
 ```
@@ -552,7 +552,7 @@ k_search/task_framework/protocols/
 **Files to create:**
 
 ```
-k_search/task_framework/
+k_search/modular/
 ├── protocols/task_definition.py
 ├── adapters/gpu_mode.py        # GpuModeAdapter
 ├── config.py
@@ -577,7 +577,7 @@ results                clean      for V2
 ```
 
 Each phase:
-1. Create new files in `task_framework/`
+1. Create new files in `modular/`
 2. Add tests
 3. Optionally integrate with V1 (transparent or explicit)
 4. V1 continues working throughout

@@ -22,11 +22,11 @@ World model integration (SearchOrchestrator, tree structures) is a separate foll
 
 ## Extension Path
 
-FeedbackProvider/Analyzer hook into prompt building via EvalOutcome:
+FeedbackProvider/Analyzer hook into prompt building via Round:
 
 ```
 Round N completes
-    ├─► EvalOutcome(impl, result, analysis=None)
+    ├─► Round(impl, result, analysis=None)
     ├─► [optional] Analyzer populates analysis
     └─► FeedbackProvider.for_codegen(outcome) → prompt feedback
 ```

@@ -22,7 +22,7 @@ Build protocols and adapters. V1 code unchanged—GpuModeTask wrapped via adapte
 ### Module Structure
 
 ```
-k_search/task_framework/
+k_search/modular/
 ├── __init__.py
 ├── protocols/
 │   ├── __init__.py
@@ -38,7 +38,7 @@ k_search/task_framework/
 │   ├── __init__.py
 │   ├── wrappers.py             # GpuModeEvaluationResult, GpuModeImplementation
 │   └── gpu_mode.py             # GpuModeAdapter
-├── types.py                    # EvalOutcome, CheckResult
+├── types.py                    # Round, CheckResult
 └── loader.py
 ```
 
@@ -60,8 +60,8 @@ class Scorer(Protocol):
     def score(self, result: EvaluationResult) -> float: ...
 
 class FeedbackProvider(Protocol):
-    def for_codegen(self, outcomes: EvalOutcome | list[EvalOutcome]) -> str: ...
-    def for_world_model(self, outcomes: EvalOutcome | list[EvalOutcome]) -> list[dict[str, Any]]: ...
+    def for_codegen(self, outcomes: Round | list[Round]) -> str: ...
+    def for_world_model(self, outcomes: Round | list[Round]) -> list[dict[str, Any]]: ...
 
 class Analyzer(Protocol):
     def analyze(
@@ -79,7 +79,7 @@ Simple analyzers ignore context. Advanced analyzers (like FailurePatternAnalyzer
 ```python
 context = {
     'tree': SolutionTree,
-    'recent_failures': list[EvalOutcome],
+    'recent_failures': list[Round],
 }
 ```
 
@@ -101,7 +101,7 @@ class AnalysisResult:
 ### Module Structure
 
 ```
-k_search/search_v2/
+k_search/modular/
 ├── __init__.py
 ├── model/
 │   ├── node.py                 # SolutionNode, ActionNode

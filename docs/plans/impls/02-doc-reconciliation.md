@@ -4,15 +4,15 @@ Fix naming inconsistencies across design docs to align with implemented code.
 
 ## Prerequisites
 
-- Priority 1 (task_framework) complete
+- Priority 1 (modular) complete
 
 ## Changes
 
 | Find | Replace |
 |------|---------|
 | `SolutionArtifact` | `Implementation` |
-| `EvalOutcome.solution` | `EvalOutcome.impl` |
-| `.solution` (in EvalOutcome context) | `.impl` |
+| `Round.solution` | `Round.impl` |
+| `.solution` (in Round context) | `.impl` |
 
 ## Files to Modify
 
@@ -31,12 +31,12 @@ Fix naming inconsistencies across design docs to align with implemented code.
 
 ### 1. Update search-v2-design.md
 - [ ] Replace `SolutionArtifact` with `Implementation`
-- [ ] Replace `.solution` with `.impl` in EvalOutcome references
+- [ ] Replace `.solution` with `.impl` in Round references
 - [ ] Verify code examples use correct naming
 
 ### 2. Update task-framework-design.md
 - [ ] Replace `SolutionArtifact` with `Implementation`
-- [ ] Replace `.solution` with `.impl` in EvalOutcome references
+- [ ] Replace `.solution` with `.impl` in Round references
 
 ### 3. Update task-framework-north-star.md
 - [ ] Replace naming in architecture diagrams
@@ -48,7 +48,7 @@ Fix naming inconsistencies across design docs to align with implemented code.
 
 ### 5. Verify changes
 - [ ] `grep -r SolutionArtifact docs/plans/` returns only 01a reconciliation doc
-- [ ] `grep -r "\.solution" docs/plans/` shows no EvalOutcome.solution references
+- [ ] `grep -r "\.solution" docs/plans/` shows no Round.solution references
 
 ## Validation
 
@@ -56,8 +56,8 @@ Fix naming inconsistencies across design docs to align with implemented code.
 # Should return only 01a-implementation-protocol-reconciliation.md
 grep -r "SolutionArtifact" K-Search/docs/plans/
 
-# Should return 0 matches for EvalOutcome.solution pattern
-grep -r "EvalOutcome\.solution\|outcome\.solution" K-Search/docs/plans/
+# Should return 0 matches for Round.solution pattern
+grep -r "Round\.solution\|outcome\.solution" K-Search/docs/plans/
 ```
 
 ## Estimated Effort

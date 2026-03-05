@@ -4,7 +4,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Build task_framework protocols and GpuModeAdapter, validated with e2e causal_conv1d tests.
+**Goal:** Build modular protocols and GpuModeAdapter, validated with e2e causal_conv1d tests.
 
 **Architecture:** Protocol-first design with adapter pattern. Define protocols in `protocols/`, create wrapper classes that implement both new protocols and backwards-compatible V1 interface, then compose into GpuModeAdapter. V1 code unchanged.
 
@@ -15,19 +15,19 @@
 ## Task 1: Create Module Structure
 
 **Files:**
-- Create: `k_search/task_framework/__init__.py`
-- Create: `k_search/task_framework/protocols/__init__.py`
-- Create: `k_search/task_framework/adapters/__init__.py`
-- Create: `k_search/task_framework/types.py`
+- Create: `k_search/modular/__init__.py`
+- Create: `k_search/modular/protocols/__init__.py`
+- Create: `k_search/modular/adapters/__init__.py`
+- Create: `k_search/modular/types.py`
 
 **Step 1: Create directory structure**
 
 ```bash
-mkdir -p K-Search/k_search/task_framework/protocols
-mkdir -p K-Search/k_search/task_framework/adapters
+mkdir -p K-Search/k_search/modular/protocols
+mkdir -p K-Search/k_search/modular/adapters
 ```
 
-**Step 2: Create task_framework/__init__.py**
+**Step 2: Create modular/__init__.py**
 
 ```python
 """Task framework: protocol-based abstractions for code optimization tasks."""
@@ -75,14 +75,14 @@ class AnalysisResult:
 
 **Step 6: Verify imports work**
 
-Run: `cd K-Search && python -c "from k_search.task_framework.types import CheckResult, AnalysisResult; print('OK')"`
+Run: `cd K-Search && python -c "from k_search.modular.types import CheckResult, AnalysisResult; print('OK')"`
 Expected: `OK`
 
 **Step 7: Commit**
 
 ```bash
-git add k_search/task_framework/
-cd K-Search && git add k_search/task_framework/ && git commit -m "feat(task_framework): create module structure with core types"
+git add k_search/modular/
+cd K-Search && git add k_search/modular/ && git commit -m "feat(modular): create module structure with core types"
 ```
 
 ---
@@ -90,13 +90,13 @@ cd K-Search && git add k_search/task_framework/ && git commit -m "feat(task_fram
 ## Task 2: Result Protocols
 
 **Files:**
-- Create: `k_search/task_framework/protocols/results.py`
+- Create: `k_search/modular/protocols/results.py`
 
 **Step 1: Create test directory**
 
 ```bash
-mkdir -p K-Search/tests/task_framework
-touch K-Search/tests/task_framework/__init__.py
+mkdir -p K-Search/tests/modular
+touch K-Search/tests/modular/__init__.py
 ```
 
 **Step 2: Implement protocols**
@@ -139,13 +139,13 @@ class SolutionArtifact(Protocol):
 
 **Step 3: Verify imports work**
 
-Run: `cd K-Search && python -c "from k_search.task_framework.protocols.results import EvaluationResult, SolutionArtifact; print('OK')"`
+Run: `cd K-Search && python -c "from k_search.modular.protocols.results import EvaluationResult, SolutionArtifact; print('OK')"`
 Expected: `OK`
 
 **Step 4: Commit**
 
 ```bash
-cd K-Search && git add k_search/task_framework/protocols/results.py && git commit -m "feat(task_framework): add EvaluationResult and SolutionArtifact protocols"
+cd K-Search && git add k_search/modular/protocols/results.py && git commit -m "feat(modular): add EvaluationResult and SolutionArtifact protocols"
 ```
 
 ---
@@ -153,8 +153,8 @@ cd K-Search && git add k_search/task_framework/protocols/results.py && git commi
 ## Task 3: Result Wrappers for GpuMode
 
 **Files:**
-- Create: `k_search/task_framework/adapters/wrappers.py`
-- Test: `tests/task_framework/test_wrappers.py`
+- Create: `k_search/modular/adapters/wrappers.py`
+- Test: `tests/modular/test_wrappers.py`
 
 **Step 1: Create test file**
 
@@ -167,7 +167,7 @@ from k_search.tasks.task_base import EvalResult, Solution, BuildSpec, SourceFile
 
 class TestGpuModeEvaluationResult:
     def test_wraps_eval_result(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
+        from k_search.modular.adapters.wrappers import GpuModeEvaluationResult
 
         inner = EvalResult(status="passed", latency_ms=1.5, log_excerpt="test log")
         wrapper = GpuModeEvaluationResult(inner)
@@ -176,7 +176,7 @@ class TestGpuModeEvaluationResult:
         assert wrapper.get_log() == "test log"
 
     def test_is_success_false_for_failed(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
+        from k_search.modular.adapters.wrappers import GpuModeEvaluationResult
 
         inner = EvalResult(status="failed", log_excerpt="error")
         wrapper = GpuModeEvaluationResult(inner)
@@ -184,7 +184,7 @@ class TestGpuModeEvaluationResult:
         assert wrapper.is_success() is False
 
     def test_get_metrics_excludes_log(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
+        from k_search.modular.adapters.wrappers import GpuModeEvaluationResult
 
         inner = EvalResult(
             status="passed",
@@ -199,7 +199,7 @@ class TestGpuModeEvaluationResult:
         assert "log_excerpt" not in metrics
 
     def test_backwards_compat_is_passed(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
+        from k_search.modular.adapters.wrappers import GpuModeEvaluationResult
 
         inner = EvalResult(status="passed", latency_ms=1.0)
         wrapper = GpuModeEvaluationResult(inner)
@@ -210,7 +210,7 @@ class TestGpuModeEvaluationResult:
         assert wrapper.status == "passed"
 
     def test_backwards_compat_to_dict(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
+        from k_search.modular.adapters.wrappers import GpuModeEvaluationResult
 
         inner = EvalResult(status="passed", latency_ms=1.0, log_excerpt="log")
         wrapper = GpuModeEvaluationResult(inner)
@@ -220,7 +220,7 @@ class TestGpuModeEvaluationResult:
         assert d["latency_ms"] == 1.0
 
     def test_backwards_compat_score(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
+        from k_search.modular.adapters.wrappers import GpuModeEvaluationResult
 
         inner = EvalResult(status="passed", latency_ms=2.0)
         wrapper = GpuModeEvaluationResult(inner)
@@ -230,7 +230,7 @@ class TestGpuModeEvaluationResult:
 
 class TestGpuModeSolutionArtifact:
     def test_wraps_solution(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeSolutionArtifact
+        from k_search.modular.adapters.wrappers import GpuModeSolutionArtifact
 
         inner = Solution(
             name="test_sol",
@@ -251,13 +251,13 @@ class TestGpuModeSolutionArtifact:
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd K-Search && python -m pytest tests/task_framework/test_wrappers.py -v`
+Run: `cd K-Search && python -m pytest tests/modular/test_wrappers.py -v`
 Expected: FAIL with import error
 
 **Step 3: Implement wrappers**
 
 ```python
-"""Wrappers adapting GpuMode types to task_framework protocols."""
+"""Wrappers adapting GpuMode types to modular protocols."""
 
 from typing import Any
 
@@ -348,37 +348,37 @@ class GpuModeSolutionArtifact:
 
 **Step 4: Run tests to verify they pass**
 
-Run: `cd K-Search && python -m pytest tests/task_framework/test_wrappers.py -v`
+Run: `cd K-Search && python -m pytest tests/modular/test_wrappers.py -v`
 Expected: PASS
 
 **Step 5: Run lint checks**
 
-Run: `cd K-Search && ruff check k_search/task_framework/ tests/task_framework/ && ruff format --check k_search/task_framework/ tests/task_framework/`
+Run: `cd K-Search && ruff check k_search/modular/ tests/modular/ && ruff format --check k_search/modular/ tests/modular/`
 Expected: No errors (fix any issues before committing)
 
 **Step 6: Commit**
 
 ```bash
-cd K-Search && git add k_search/task_framework/adapters/wrappers.py tests/task_framework/test_wrappers.py && git commit -m "feat(task_framework): add GpuMode result wrappers with backwards compat"
+cd K-Search && git add k_search/modular/adapters/wrappers.py tests/modular/test_wrappers.py && git commit -m "feat(modular): add GpuMode result wrappers with backwards compat"
 ```
 
 ---
 
-## Task 4: EvalOutcome Type
+## Task 4: Round Type
 
 **Files:**
-- Modify: `k_search/task_framework/types.py`
-- Modify: `tests/task_framework/test_wrappers.py`
+- Modify: `k_search/modular/types.py`
+- Modify: `tests/modular/test_wrappers.py`
 
-**Step 1: Add test for EvalOutcome**
+**Step 1: Add test for Round**
 
 ```python
-# Add to tests/task_framework/test_wrappers.py
+# Add to tests/modular/test_wrappers.py
 
-class TestEvalOutcome:
+class TestRound:
     def test_eval_outcome_holds_solution_and_result(self):
-        from k_search.task_framework.types import EvalOutcome
-        from k_search.task_framework.adapters.wrappers import (
+        from k_search.modular.types import Round
+        from k_search.modular.adapters.wrappers import (
             GpuModeEvaluationResult,
             GpuModeSolutionArtifact,
         )
@@ -403,7 +403,7 @@ class TestEvalOutcome:
         )
         result = EvalResult(status="passed", latency_ms=1.0)
 
-        outcome = EvalOutcome(
+        outcome = Round(
             solution=GpuModeSolutionArtifact(sol),
             result=GpuModeEvaluationResult(result),
         )
@@ -414,19 +414,19 @@ class TestEvalOutcome:
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd K-Search && python -m pytest tests/task_framework/test_wrappers.py::TestEvalOutcome -v`
+Run: `cd K-Search && python -m pytest tests/modular/test_wrappers.py::TestRound -v`
 Expected: FAIL (class doesn't exist yet)
 
-**Step 3: Add EvalOutcome to types.py**
+**Step 3: Add Round to types.py**
 
 ```python
-# Add to k_search/task_framework/types.py after existing imports
+# Add to k_search/modular/types.py after existing imports
 
-from k_search.task_framework.protocols.results import EvaluationResult, SolutionArtifact
+from k_search.modular.protocols.results import EvaluationResult, SolutionArtifact
 
 
 @dataclass
-class EvalOutcome:
+class Round:
     """Complete result of evaluating a solution."""
 
     solution: SolutionArtifact
@@ -436,13 +436,13 @@ class EvalOutcome:
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd K-Search && python -m pytest tests/task_framework/test_wrappers.py::TestEvalOutcome -v`
+Run: `cd K-Search && python -m pytest tests/modular/test_wrappers.py::TestRound -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-cd K-Search && git add k_search/task_framework/types.py tests/task_framework/test_wrappers.py && git commit -m "feat(task_framework): add EvalOutcome type"
+cd K-Search && git add k_search/modular/types.py tests/modular/test_wrappers.py && git commit -m "feat(modular): add Round type"
 ```
 
 ---
@@ -450,10 +450,10 @@ cd K-Search && git add k_search/task_framework/types.py tests/task_framework/tes
 ## Task 5: Atomic Protocols
 
 **Files:**
-- Create: `k_search/task_framework/protocols/input_generator.py`
-- Create: `k_search/task_framework/protocols/reference_impl.py`
-- Create: `k_search/task_framework/protocols/correctness.py`
-- Create: `k_search/task_framework/protocols/scorer.py`
+- Create: `k_search/modular/protocols/input_generator.py`
+- Create: `k_search/modular/protocols/reference_impl.py`
+- Create: `k_search/modular/protocols/correctness.py`
+- Create: `k_search/modular/protocols/scorer.py`
 
 **Step 1: Add tests**
 
@@ -496,7 +496,7 @@ class ReferenceImpl(Protocol):
 
 from typing import Any, Protocol
 
-from k_search.task_framework.types import CheckResult
+from k_search.modular.types import CheckResult
 
 
 class CorrectnessChecker(Protocol):
@@ -514,7 +514,7 @@ class CorrectnessChecker(Protocol):
 
 from typing import Protocol
 
-from k_search.task_framework.protocols.results import EvaluationResult
+from k_search.modular.protocols.results import EvaluationResult
 
 
 class Scorer(Protocol):
@@ -527,13 +527,13 @@ class Scorer(Protocol):
 
 **Step 5: Verify imports work**
 
-Run: `cd K-Search && python -c "from k_search.task_framework.protocols.input_generator import InputGenerator; from k_search.task_framework.protocols.scorer import Scorer; print('OK')"`
+Run: `cd K-Search && python -c "from k_search.modular.protocols.input_generator import InputGenerator; from k_search.modular.protocols.scorer import Scorer; print('OK')"`
 Expected: `OK`
 
 **Step 6: Commit**
 
 ```bash
-cd K-Search && git add k_search/task_framework/protocols/ && git commit -m "feat(task_framework): add atomic protocols (InputGenerator, ReferenceImpl, CorrectnessChecker, Scorer)"
+cd K-Search && git add k_search/modular/protocols/ && git commit -m "feat(modular): add atomic protocols (InputGenerator, ReferenceImpl, CorrectnessChecker, Scorer)"
 ```
 
 ---
@@ -541,9 +541,9 @@ cd K-Search && git add k_search/task_framework/protocols/ && git commit -m "feat
 ## Task 6: Integration Protocols
 
 **Files:**
-- Create: `k_search/task_framework/protocols/feedback_provider.py`
-- Create: `k_search/task_framework/protocols/evaluator.py`
-- Create: `k_search/task_framework/protocols/analyzer.py`
+- Create: `k_search/modular/protocols/feedback_provider.py`
+- Create: `k_search/modular/protocols/evaluator.py`
+- Create: `k_search/modular/protocols/analyzer.py`
 
 **Step 1: Create feedback_provider.py**
 
@@ -552,18 +552,18 @@ cd K-Search && git add k_search/task_framework/protocols/ && git commit -m "feat
 
 from typing import Any, Protocol
 
-from k_search.task_framework.types import EvalOutcome
+from k_search.modular.types import Round
 
 
 class FeedbackProvider(Protocol):
     """Routes evaluation feedback to different LLM consumers."""
 
-    def for_codegen(self, outcomes: EvalOutcome | list[EvalOutcome]) -> str:
+    def for_codegen(self, outcomes: Round | list[Round]) -> str:
         """Format outcomes as feedback for codegen LLM."""
         ...
 
     def for_world_model(
-        self, outcomes: EvalOutcome | list[EvalOutcome]
+        self, outcomes: Round | list[Round]
     ) -> list[dict[str, Any]]:
         """Format outcomes for world model. Returns one dict per outcome."""
         ...
@@ -576,7 +576,7 @@ class FeedbackProvider(Protocol):
 
 from typing import Any, Protocol
 
-from k_search.task_framework.protocols.results import EvaluationResult, SolutionArtifact
+from k_search.modular.protocols.results import EvaluationResult, SolutionArtifact
 
 
 class Evaluator(Protocol):
@@ -600,8 +600,8 @@ class Evaluator(Protocol):
 
 from typing import Any, Protocol
 
-from k_search.task_framework.protocols.results import EvaluationResult, SolutionArtifact
-from k_search.task_framework.types import AnalysisResult
+from k_search.modular.protocols.results import EvaluationResult, SolutionArtifact
+from k_search.modular.types import AnalysisResult
 
 
 class Analyzer(Protocol):
@@ -618,20 +618,20 @@ class Analyzer(Protocol):
 
         Context may contain:
         - 'tree': SolutionTree for tree-aware analysis
-        - 'recent_failures': list[EvalOutcome] for pattern detection
+        - 'recent_failures': list[Round] for pattern detection
         """
         ...
 ```
 
 **Step 4: Verify imports work**
 
-Run: `cd K-Search && python -c "from k_search.task_framework.protocols.feedback_provider import FeedbackProvider; from k_search.task_framework.protocols.analyzer import Analyzer; print('OK')"`
+Run: `cd K-Search && python -c "from k_search.modular.protocols.feedback_provider import FeedbackProvider; from k_search.modular.protocols.analyzer import Analyzer; print('OK')"`
 Expected: `OK`
 
 **Step 5: Commit**
 
 ```bash
-cd K-Search && git add k_search/task_framework/protocols/ && git commit -m "feat(task_framework): add integration protocols (FeedbackProvider, Evaluator, Analyzer)"
+cd K-Search && git add k_search/modular/protocols/ && git commit -m "feat(modular): add integration protocols (FeedbackProvider, Evaluator, Analyzer)"
 ```
 
 ---
@@ -639,8 +639,8 @@ cd K-Search && git add k_search/task_framework/protocols/ && git commit -m "feat
 ## Task 7: TaskDefinition Protocol
 
 **Files:**
-- Create: `k_search/task_framework/protocols/task_definition.py`
-- Modify: `k_search/task_framework/protocols/__init__.py`
+- Create: `k_search/modular/protocols/task_definition.py`
+- Modify: `k_search/modular/protocols/__init__.py`
 
 **Step 1: Create task_definition.py**
 
@@ -649,11 +649,11 @@ cd K-Search && git add k_search/task_framework/protocols/ && git commit -m "feat
 
 from typing import Any, Protocol
 
-from k_search.task_framework.protocols.input_generator import InputGenerator
-from k_search.task_framework.protocols.reference_impl import ReferenceImpl
-from k_search.task_framework.protocols.correctness import CorrectnessChecker
-from k_search.task_framework.protocols.scorer import Scorer
-from k_search.task_framework.protocols.feedback_provider import FeedbackProvider
+from k_search.modular.protocols.input_generator import InputGenerator
+from k_search.modular.protocols.reference_impl import ReferenceImpl
+from k_search.modular.protocols.correctness import CorrectnessChecker
+from k_search.modular.protocols.scorer import Scorer
+from k_search.modular.protocols.feedback_provider import FeedbackProvider
 
 
 class TaskDefinition(Protocol):
@@ -681,15 +681,15 @@ class TaskDefinition(Protocol):
 ```python
 """Protocol definitions for task framework."""
 
-from k_search.task_framework.protocols.results import EvaluationResult, SolutionArtifact
-from k_search.task_framework.protocols.input_generator import InputGenerator
-from k_search.task_framework.protocols.reference_impl import ReferenceImpl
-from k_search.task_framework.protocols.correctness import CorrectnessChecker
-from k_search.task_framework.protocols.scorer import Scorer
-from k_search.task_framework.protocols.feedback_provider import FeedbackProvider
-from k_search.task_framework.protocols.evaluator import Evaluator
-from k_search.task_framework.protocols.analyzer import Analyzer
-from k_search.task_framework.protocols.task_definition import TaskDefinition
+from k_search.modular.protocols.results import EvaluationResult, SolutionArtifact
+from k_search.modular.protocols.input_generator import InputGenerator
+from k_search.modular.protocols.reference_impl import ReferenceImpl
+from k_search.modular.protocols.correctness import CorrectnessChecker
+from k_search.modular.protocols.scorer import Scorer
+from k_search.modular.protocols.feedback_provider import FeedbackProvider
+from k_search.modular.protocols.evaluator import Evaluator
+from k_search.modular.protocols.analyzer import Analyzer
+from k_search.modular.protocols.task_definition import TaskDefinition
 
 __all__ = [
     "EvaluationResult",
@@ -707,13 +707,13 @@ __all__ = [
 
 **Step 3: Verify imports work**
 
-Run: `cd K-Search && python -c "from k_search.task_framework.protocols import TaskDefinition; print('OK')"`
+Run: `cd K-Search && python -c "from k_search.modular.protocols import TaskDefinition; print('OK')"`
 Expected: `OK`
 
 **Step 4: Commit**
 
 ```bash
-cd K-Search && git add k_search/task_framework/protocols/ && git commit -m "feat(task_framework): add TaskDefinition composite protocol"
+cd K-Search && git add k_search/modular/protocols/ && git commit -m "feat(modular): add TaskDefinition composite protocol"
 ```
 
 ---
@@ -721,8 +721,8 @@ cd K-Search && git add k_search/task_framework/protocols/ && git commit -m "feat
 ## Task 8: GpuModeAdapter Implementation
 
 **Files:**
-- Create: `k_search/task_framework/adapters/gpu_mode.py`
-- Create: `tests/task_framework/test_gpu_mode_adapter.py`
+- Create: `k_search/modular/adapters/gpu_mode.py`
+- Create: `tests/modular/test_gpu_mode_adapter.py`
 
 **Step 1: Create test file**
 
@@ -740,7 +740,7 @@ CAUSAL_CONV1D_DIR = Path(__file__).parent.parent.parent / "k_search" / "tasks" /
 
 class TestGpuModeAdapterConstruction:
     def test_adapter_wraps_gpu_mode_task(self):
-        from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
+        from k_search.modular.adapters.gpu_mode import GpuModeAdapter
 
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
@@ -748,7 +748,7 @@ class TestGpuModeAdapterConstruction:
         assert adapter.name == task.name
 
     def test_adapter_has_required_components(self):
-        from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
+        from k_search.modular.adapters.gpu_mode import GpuModeAdapter
 
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
@@ -760,7 +760,7 @@ class TestGpuModeAdapterConstruction:
         assert adapter.reference_impl is not None
 
     def test_get_prompt_text_returns_spec(self):
-        from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
+        from k_search.modular.adapters.gpu_mode import GpuModeAdapter
 
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
@@ -770,7 +770,7 @@ class TestGpuModeAdapterConstruction:
         assert len(prompt) > 100
 
     def test_get_prompt_text_respects_language(self):
-        from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
+        from k_search.modular.adapters.gpu_mode import GpuModeAdapter
 
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
@@ -781,8 +781,8 @@ class TestGpuModeAdapterConstruction:
 
 class TestGpuModeAdapterScorer:
     def test_scorer_returns_positive_for_passed(self):
-        from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
-        from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
+        from k_search.modular.adapters.gpu_mode import GpuModeAdapter
+        from k_search.modular.adapters.wrappers import GpuModeEvaluationResult
         from k_search.tasks.task_base import EvalResult
 
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
@@ -794,8 +794,8 @@ class TestGpuModeAdapterScorer:
         assert score > 0
 
     def test_scorer_returns_negative_for_failed(self):
-        from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
-        from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
+        from k_search.modular.adapters.gpu_mode import GpuModeAdapter
+        from k_search.modular.adapters.wrappers import GpuModeEvaluationResult
         from k_search.tasks.task_base import EvalResult
 
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
@@ -809,12 +809,12 @@ class TestGpuModeAdapterScorer:
 
 class TestGpuModeAdapterFeedbackProvider:
     def test_for_codegen_returns_log(self):
-        from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
-        from k_search.task_framework.adapters.wrappers import (
+        from k_search.modular.adapters.gpu_mode import GpuModeAdapter
+        from k_search.modular.adapters.wrappers import (
             GpuModeEvaluationResult,
             GpuModeSolutionArtifact,
         )
-        from k_search.task_framework.types import EvalOutcome
+        from k_search.modular.types import Round
         from k_search.tasks.task_base import (
             EvalResult,
             Solution,
@@ -838,7 +838,7 @@ class TestGpuModeAdapterFeedbackProvider:
             sources=[SourceFile(path="submission.py", content="code")],
         )
         result = EvalResult(status="failed", log_excerpt="Error: index out of bounds")
-        outcome = EvalOutcome(
+        outcome = Round(
             solution=GpuModeSolutionArtifact(sol),
             result=GpuModeEvaluationResult(result),
         )
@@ -847,12 +847,12 @@ class TestGpuModeAdapterFeedbackProvider:
         assert "index out of bounds" in feedback
 
     def test_for_world_model_returns_metrics(self):
-        from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
-        from k_search.task_framework.adapters.wrappers import (
+        from k_search.modular.adapters.gpu_mode import GpuModeAdapter
+        from k_search.modular.adapters.wrappers import (
             GpuModeEvaluationResult,
             GpuModeSolutionArtifact,
         )
-        from k_search.task_framework.types import EvalOutcome
+        from k_search.modular.types import Round
         from k_search.tasks.task_base import (
             EvalResult,
             Solution,
@@ -876,7 +876,7 @@ class TestGpuModeAdapterFeedbackProvider:
             sources=[SourceFile(path="submission.py", content="code")],
         )
         result = EvalResult(status="passed", latency_ms=1.5)
-        outcome = EvalOutcome(
+        outcome = Round(
             solution=GpuModeSolutionArtifact(sol),
             result=GpuModeEvaluationResult(result),
         )
@@ -888,7 +888,7 @@ class TestGpuModeAdapterFeedbackProvider:
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd K-Search && python -m pytest tests/task_framework/test_gpu_mode_adapter.py -v`
+Run: `cd K-Search && python -m pytest tests/modular/test_gpu_mode_adapter.py -v`
 Expected: FAIL
 
 **Step 3: Implement GpuModeAdapter**
@@ -899,8 +899,8 @@ Expected: FAIL
 from typing import Any
 
 from k_search.tasks.gpu_mode_task import GpuModeTask
-from k_search.task_framework.protocols.results import EvaluationResult, SolutionArtifact
-from k_search.task_framework.types import CheckResult, EvalOutcome
+from k_search.modular.protocols.results import EvaluationResult, SolutionArtifact
+from k_search.modular.types import CheckResult, Round
 
 
 class _GpuModeInputGenerator:
@@ -986,17 +986,17 @@ class _GpuModeScorer:
 
 
 class _GpuModeFeedbackProvider:
-    """Routes feedback per task_framework design."""
+    """Routes feedback per modular design."""
 
-    def for_codegen(self, outcomes: EvalOutcome | list[EvalOutcome]) -> str:
-        if isinstance(outcomes, EvalOutcome):
+    def for_codegen(self, outcomes: Round | list[Round]) -> str:
+        if isinstance(outcomes, Round):
             outcomes = [outcomes]
         return "\n\n".join(o.result.get_log() for o in outcomes)
 
     def for_world_model(
-        self, outcomes: EvalOutcome | list[EvalOutcome]
+        self, outcomes: Round | list[Round]
     ) -> list[dict[str, Any]]:
-        if isinstance(outcomes, EvalOutcome):
+        if isinstance(outcomes, Round):
             outcomes = [outcomes]
         return [o.result.get_metrics() for o in outcomes]
 
@@ -1029,18 +1029,18 @@ class GpuModeAdapter:
 
 **Step 4: Run tests to verify they pass**
 
-Run: `cd K-Search && python -m pytest tests/task_framework/test_gpu_mode_adapter.py -v`
+Run: `cd K-Search && python -m pytest tests/modular/test_gpu_mode_adapter.py -v`
 Expected: PASS
 
 **Step 5: Run lint and type checks**
 
-Run: `cd K-Search && ruff check k_search/task_framework/ tests/task_framework/ && ty check k_search/task_framework/`
+Run: `cd K-Search && ruff check k_search/modular/ tests/modular/ && ty check k_search/modular/`
 Expected: No errors (fix any issues before committing)
 
 **Step 6: Commit**
 
 ```bash
-cd K-Search && git add k_search/task_framework/adapters/gpu_mode.py tests/task_framework/test_gpu_mode_adapter.py && git commit -m "feat(task_framework): add GpuModeAdapter implementing TaskDefinition"
+cd K-Search && git add k_search/modular/adapters/gpu_mode.py tests/modular/test_gpu_mode_adapter.py && git commit -m "feat(modular): add GpuModeAdapter implementing TaskDefinition"
 ```
 
 ---
@@ -1048,15 +1048,15 @@ cd K-Search && git add k_search/task_framework/adapters/gpu_mode.py tests/task_f
 ## Task 9: Update Module Exports
 
 **Files:**
-- Modify: `k_search/task_framework/__init__.py`
-- Modify: `k_search/task_framework/adapters/__init__.py`
+- Modify: `k_search/modular/__init__.py`
+- Modify: `k_search/modular/adapters/__init__.py`
 
-**Step 1: Update task_framework/__init__.py**
+**Step 1: Update modular/__init__.py**
 
 ```python
 """Task framework: protocol-based abstractions for code optimization tasks."""
 
-from k_search.task_framework.protocols import (
+from k_search.modular.protocols import (
     EvaluationResult,
     SolutionArtifact,
     InputGenerator,
@@ -1068,12 +1068,12 @@ from k_search.task_framework.protocols import (
     Analyzer,
     TaskDefinition,
 )
-from k_search.task_framework.types import CheckResult, AnalysisResult, EvalOutcome
-from k_search.task_framework.adapters.wrappers import (
+from k_search.modular.types import CheckResult, AnalysisResult, Round
+from k_search.modular.adapters.wrappers import (
     GpuModeEvaluationResult,
     GpuModeSolutionArtifact,
 )
-from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
+from k_search.modular.adapters.gpu_mode import GpuModeAdapter
 
 __all__ = [
     # Protocols
@@ -1090,7 +1090,7 @@ __all__ = [
     # Types
     "CheckResult",
     "AnalysisResult",
-    "EvalOutcome",
+    "Round",
     # Adapters
     "GpuModeEvaluationResult",
     "GpuModeSolutionArtifact",
@@ -1103,11 +1103,11 @@ __all__ = [
 ```python
 """Adapters wrapping existing task implementations."""
 
-from k_search.task_framework.adapters.wrappers import (
+from k_search.modular.adapters.wrappers import (
     GpuModeEvaluationResult,
     GpuModeSolutionArtifact,
 )
-from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
+from k_search.modular.adapters.gpu_mode import GpuModeAdapter
 
 __all__ = [
     "GpuModeEvaluationResult",
@@ -1118,13 +1118,13 @@ __all__ = [
 
 **Step 3: Verify imports work**
 
-Run: `cd K-Search && python -c "from k_search.task_framework import GpuModeAdapter, TaskDefinition, EvalOutcome; print('OK')"`
+Run: `cd K-Search && python -c "from k_search.modular import GpuModeAdapter, TaskDefinition, Round; print('OK')"`
 Expected: `OK`
 
 **Step 4: Commit**
 
 ```bash
-cd K-Search && git add k_search/task_framework/__init__.py k_search/task_framework/adapters/__init__.py && git commit -m "feat(task_framework): update module exports"
+cd K-Search && git add k_search/modular/__init__.py k_search/modular/adapters/__init__.py && git commit -m "feat(modular): update module exports"
 ```
 
 ---
@@ -1132,22 +1132,22 @@ cd K-Search && git add k_search/task_framework/__init__.py k_search/task_framewo
 ## Task 10: E2E Integration Test with causal_conv1d
 
 **Files:**
-- Create: `tests/task_framework/test_e2e_causal_conv1d.py`
+- Create: `tests/modular/test_e2e_causal_conv1d.py`
 
 **Step 1: Create e2e test**
 
 ```python
-"""E2E integration test: task_framework with causal_conv1d task."""
+"""E2E integration test: modular with causal_conv1d task."""
 
 import pytest
 from pathlib import Path
 
 from k_search.tasks.gpu_mode_task import GpuModeTask
-from k_search.task_framework import (
+from k_search.modular import (
     GpuModeAdapter,
     GpuModeEvaluationResult,
     GpuModeSolutionArtifact,
-    EvalOutcome,
+    Round,
 )
 
 
@@ -1155,7 +1155,7 @@ CAUSAL_CONV1D_DIR = Path(__file__).parent.parent.parent / "k_search" / "tasks" /
 
 
 class TestTaskFrameworkE2E:
-    """E2E tests validating task_framework works with real causal_conv1d task."""
+    """E2E tests validating modular works with real causal_conv1d task."""
 
     def test_adapter_loads_causal_conv1d(self):
         """Verify adapter can wrap causal_conv1d task."""
@@ -1221,7 +1221,7 @@ class TestTaskFrameworkE2E:
         assert score == 0.5  # 1/2.0
 
     def test_feedback_provider_formats_outcome(self):
-        """Verify feedback provider formats EvalOutcome correctly."""
+        """Verify feedback provider formats Round correctly."""
         from k_search.tasks.task_base import (
             EvalResult,
             Solution,
@@ -1248,7 +1248,7 @@ class TestTaskFrameworkE2E:
             status="failed",
             log_excerpt="RuntimeError: CUDA error",
         )
-        outcome = EvalOutcome(
+        outcome = Round(
             solution=GpuModeSolutionArtifact(sol),
             result=GpuModeEvaluationResult(result),
         )
@@ -1284,42 +1284,42 @@ class TestTaskFrameworkE2E:
 
 **Step 2: Run tests**
 
-Run: `cd K-Search && python -m pytest tests/task_framework/test_e2e_causal_conv1d.py -v`
+Run: `cd K-Search && python -m pytest tests/modular/test_e2e_causal_conv1d.py -v`
 Expected: PASS (non-CUDA tests pass, CUDA tests skip if no GPU)
 
 **Step 3: Run CUDA tests if GPU available**
 
-Run: `cd K-Search && python -m pytest tests/task_framework/test_e2e_causal_conv1d.py -v -m cuda`
+Run: `cd K-Search && python -m pytest tests/modular/test_e2e_causal_conv1d.py -v -m cuda`
 Expected: PASS (if GPU available)
 
 **Step 4: Commit**
 
 ```bash
-cd K-Search && git add tests/task_framework/test_e2e_causal_conv1d.py && git commit -m "test(task_framework): add e2e integration tests with causal_conv1d"
+cd K-Search && git add tests/modular/test_e2e_causal_conv1d.py && git commit -m "test(modular): add e2e integration tests with causal_conv1d"
 ```
 
 ---
 
 ## Task 11: Final Verification
 
-**Step 1: Run all task_framework tests**
+**Step 1: Run all modular tests**
 
-Run: `cd K-Search && python -m pytest tests/task_framework/ -v`
+Run: `cd K-Search && python -m pytest tests/modular/ -v`
 Expected: All PASS
 
 **Step 2: Run ruff checks**
 
-Run: `cd K-Search && ruff check k_search/task_framework/ tests/task_framework/`
+Run: `cd K-Search && ruff check k_search/modular/ tests/modular/`
 Expected: No errors
 
 **Step 3: Run type checks**
 
-Run: `cd K-Search && ty check k_search/task_framework/`
+Run: `cd K-Search && ty check k_search/modular/`
 Expected: No errors (or acceptable warnings)
 
 **Step 4: Verify imports from top-level**
 
-Run: `cd K-Search && python -c "from k_search.task_framework import *; print('All exports OK')"`
+Run: `cd K-Search && python -c "from k_search.modular import *; print('All exports OK')"`
 Expected: `All exports OK`
 
 **Step 5: Run e2e runme causal_conv1d to verify V1 still works**
@@ -1327,12 +1327,12 @@ Expected: `All exports OK`
 Run: `runme run-bash run_causal_conv1d_e2e max_opt_rounds=1`
 Expected: K-search loop runs without import errors, completes at least 1 round
 
-This verifies that adding task_framework doesn't break the existing V1 workflow.
+This verifies that adding modular doesn't break the existing V1 workflow.
 
 **Step 6: Final commit if any fixes needed**
 
 ```bash
-cd K-Search && git add -A && git commit -m "chore(task_framework): fix lint/type issues"
+cd K-Search && git add -A && git commit -m "chore(modular): fix lint/type issues"
 ```
 
 ---
@@ -1342,9 +1342,9 @@ cd K-Search && git add -A && git commit -m "chore(task_framework): fix lint/type
 After completing all tasks, you will have:
 
 ```
-k_search/task_framework/
+k_search/modular/
 ├── __init__.py                 # Public exports
-├── types.py                    # CheckResult, AnalysisResult, EvalOutcome
+├── types.py                    # CheckResult, AnalysisResult, Round
 ├── protocols/
 │   ├── __init__.py             # Protocol exports
 │   ├── results.py              # EvaluationResult, SolutionArtifact
@@ -1361,9 +1361,9 @@ k_search/task_framework/
     ├── wrappers.py             # GpuModeEvaluationResult, GpuModeSolutionArtifact
     └── gpu_mode.py             # GpuModeAdapter
 
-tests/task_framework/
+tests/modular/
 ├── __init__.py
-├── test_wrappers.py            # Wrapper tests with backwards compat + EvalOutcome
+├── test_wrappers.py            # Wrapper tests with backwards compat + Round
 ├── test_gpu_mode_adapter.py    # Adapter construction and component tests
 └── test_e2e_causal_conv1d.py   # E2E integration tests
 ```

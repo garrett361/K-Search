@@ -1,11 +1,11 @@
 # Modular Restructure Design
 
-Consolidate `task_framework/` and `search_v2/` into a unified `modular/` module with consistent naming.
+Consolidate `modular/` and `modular/` into a unified `modular/` module with consistent naming.
 
 ## Goals
 
-1. Merge artificially separated modules (`task_framework` + `search_v2`) into one cohesive unit
-2. Fix confusing naming (`EvalOutcome` → `Round`, generic `types.py` → descriptive names)
+1. Merge artificially separated modules (`modular` + `modular`) into one cohesive unit
+2. Fix confusing naming (`Round` → `Round`, generic `types.py` → descriptive names)
 3. Align test structure with source structure
 4. Update documentation references
 
@@ -21,9 +21,9 @@ Consolidate `task_framework/` and `search_v2/` into a unified `modular/` module 
 
 ```
 k_search/
-├── task_framework/
+├── modular/
 │   ├── __init__.py
-│   ├── types.py                    # CheckResult, AnalysisResult, EvalOutcome
+│   ├── types.py                    # CheckResult, AnalysisResult, Round
 │   ├── llm_utils.py
 │   ├── protocols/
 │   │   ├── results.py              # EvaluationResult, Implementation
@@ -40,7 +40,7 @@ k_search/
 │           ├── types.py            # GpuModeEvaluationResult, GpuModeImplementation
 │           ├── task_definition.py
 │           └── evaluator.py
-├── search_v2/
+├── modular/
 │   ├── __init__.py
 │   ├── loop.py
 │   ├── config.py
@@ -108,7 +108,7 @@ k_search/
 
 ## Class Changes
 
-### `Round` (formerly `EvalOutcome`)
+### `Round` (formerly `Round`)
 
 Expanded to contain complete round information:
 
@@ -135,7 +135,7 @@ This allows downstream consumers (`FeedbackProvider`, `ArtifactStore`, metrics) 
 
 | From | To | Rationale |
 |------|-----|-----------|
-| `task_framework/types.py` | `modular/round.py` + `modular/results.py` | Split: Round container vs operation results |
+| `modular/types.py` | `modular/round.py` + `modular/results.py` | Split: Round container vs operation results |
 | `protocols/results.py` | `protocols/eval_result.py` + `protocols/impl.py` | Split: distinct protocols get own files |
 | `metrics/protocol.py` | `metrics/tracker.py` | Name matches protocol (MetricsTracker) |
 | `artifacts/protocol.py` | `artifacts/store.py` | Name matches protocol (ArtifactStore) |
@@ -147,11 +147,11 @@ This allows downstream consumers (`FeedbackProvider`, `ArtifactStore`, metrics) 
 
 ```
 tests/
-├── task_framework/
+├── modular/
 │   ├── test_wrappers.py
 │   ├── test_gpu_mode_task_definition.py
 │   └── test_e2e_causal_conv1d.py
-├── search_v2/
+├── modular/
 │   ├── test_loop.py
 │   ├── test_e2e_search.py
 │   ├── test_metrics.py
@@ -191,14 +191,14 @@ tests/
 
 | From | To |
 |------|-----|
-| `k_search.task_framework` | `k_search.modular` |
-| `k_search.task_framework.types.EvalOutcome` | `k_search.modular.round.Round` |
-| `k_search.task_framework.types.CheckResult` | `k_search.modular.results.CheckResult` |
-| `k_search.task_framework.protocols.results.EvaluationResult` | `k_search.modular.protocols.eval_result.EvaluationResult` |
-| `k_search.task_framework.protocols.results.Implementation` | `k_search.modular.protocols.impl.Implementation` |
-| `k_search.search_v2` | `k_search.modular` |
-| `k_search.search_v2.loop.run_search` | `k_search.modular.loop.run_search` |
-| `k_search.search_v2.config.SearchConfig` | `k_search.modular.config.SearchConfig` |
+| `k_search.modular` | `k_search.modular` |
+| `k_search.modular.types.Round` | `k_search.modular.round.Round` |
+| `k_search.modular.types.CheckResult` | `k_search.modular.results.CheckResult` |
+| `k_search.modular.protocols.results.EvaluationResult` | `k_search.modular.protocols.eval_result.EvaluationResult` |
+| `k_search.modular.protocols.results.Implementation` | `k_search.modular.protocols.impl.Implementation` |
+| `k_search.modular` | `k_search.modular` |
+| `k_search.modular.loop.run_search` | `k_search.modular.loop.run_search` |
+| `k_search.modular.config.SearchConfig` | `k_search.modular.config.SearchConfig` |
 
 ## Documentation Updates
 
@@ -210,11 +210,11 @@ tests/
 4. **docs/llm-info-routing.md** - Update file references
 
 Search patterns for find/replace:
-- `task_framework` → `modular`
-- `search_v2` → `modular`
-- `EvalOutcome` → `Round`
-- `from k_search.task_framework` → `from k_search.modular`
-- `from k_search.search_v2` → `from k_search.modular`
+- `modular` → `modular`
+- `modular` → `modular`
+- `Round` → `Round`
+- `from k_search.modular` → `from k_search.modular`
+- `from k_search.modular` → `from k_search.modular`
 
 ## Migration Strategy
 
@@ -223,11 +223,11 @@ Search patterns for find/replace:
 3. Update all imports within `modular/`
 4. Expand `Round` class with new fields
 5. Update `loop.py` to construct full `Round`
-6. Update `run_search_v2.py` entry point
+6. Update `run_modular.py` entry point
 7. Move and rename test files
 8. Update test imports
 9. Update documentation
-10. Delete empty `task_framework/` and `search_v2/` directories
+10. Delete empty `modular/` and `modular/` directories
 
 ## Risks
 

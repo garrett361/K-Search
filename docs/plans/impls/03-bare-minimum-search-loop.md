@@ -1,22 +1,22 @@
 # Implementation Plan: Bare Minimum V2 Search Loop
 
-Simple sequential optimization loop using task_framework protocols.
+Simple sequential optimization loop using modular protocols.
 
 ## Prerequisites
 
-- Priority 1 (task_framework) complete
+- Priority 1 (modular) complete
 - Doc reconciliation (02) complete
 
 ## Module Structure
 
 ```
-k_search/search_v2/
+k_search/modular/
 ├── __init__.py
 ├── config.py               # SearchConfig dataclass
 ├── loop.py                 # run_search() function
 └── prompts.py              # Prompt formatting helpers
 
-k_search/task_framework/adapters/
+k_search/modular/adapters/
 └── gpu_mode_evaluator.py   # GpuModeEvaluator (new)
 ```
 
@@ -24,7 +24,7 @@ k_search/task_framework/adapters/
 
 ### 1. Create GpuModeEvaluator
 
-**File**: `k_search/task_framework/adapters/gpu_mode_evaluator.py`
+**File**: `k_search/modular/adapters/gpu_mode_evaluator.py`
 
 ```python
 class GpuModeEvaluator:
@@ -46,19 +46,19 @@ class GpuModeEvaluator:
 ```
 
 - [ ] Create `gpu_mode_evaluator.py`
-- [ ] Export from `task_framework/adapters/__init__.py`
-- [ ] Add unit tests in `tests/task_framework/test_gpu_mode_evaluator.py`
+- [ ] Export from `modular/adapters/__init__.py`
+- [ ] Add unit tests in `tests/modular/test_gpu_mode_evaluator.py`
 
-### 2. Create search_v2 package structure
+### 2. Create modular package structure
 
-- [ ] Create `k_search/search_v2/__init__.py`
-- [ ] Create `k_search/search_v2/config.py`
-- [ ] Create `k_search/search_v2/loop.py`
-- [ ] Create `k_search/search_v2/prompts.py`
+- [ ] Create `k_search/modular/__init__.py`
+- [ ] Create `k_search/modular/config.py`
+- [ ] Create `k_search/modular/loop.py`
+- [ ] Create `k_search/modular/prompts.py`
 
 ### 3. Implement SearchConfig
 
-**File**: `k_search/search_v2/config.py`
+**File**: `k_search/modular/config.py`
 
 ```python
 @dataclass
@@ -79,12 +79,12 @@ class SearchResult:
 
 ### 4. Implement prompt building
 
-**File**: `k_search/search_v2/prompts.py`
+**File**: `k_search/modular/prompts.py`
 
 ```python
 def build_prompt(
     task: TaskDefinition,
-    last_outcome: EvalOutcome | None,
+    last_outcome: Round | None,
 ) -> str:
     base = task.get_prompt_text()
     if last_outcome:
@@ -102,7 +102,7 @@ def create_implementation(code: str, round_idx: int) -> Implementation:
 
 ### 5. Implement run_search
 
-**File**: `k_search/search_v2/loop.py`
+**File**: `k_search/modular/loop.py`
 
 ```python
 LLMCall = Callable[[str], str]
@@ -135,7 +135,7 @@ def run_search(
         round_start = time.perf_counter()
 
         # Build prompt, generate, evaluate
-        outcome = EvalOutcome(impl=best_impl, result=best_result) if best_impl else None
+        outcome = Round(impl=best_impl, result=best_result) if best_impl else None
         prompt = build_prompt(task, outcome)
         code = llm(prompt)
         impl = create_implementation(code, round_idx)
@@ -161,11 +161,11 @@ def run_search(
 ```
 
 - [ ] Implement `run_search()` with logging
-- [ ] Handle EvalOutcome construction
+- [ ] Handle Round construction
 
 ### 6. Add unit tests
 
-**File**: `tests/search_v2/test_loop.py`
+**File**: `tests/modular/test_loop.py`
 
 - [ ] Test `run_search()` with mock LLM and evaluator
 - [ ] Test logging output
@@ -174,7 +174,7 @@ def run_search(
 
 ### 7. Add integration test
 
-**File**: `tests/search_v2/test_e2e_search.py`
+**File**: `tests/modular/test_e2e_search.py`
 
 - [ ] Test with real GpuModeTask (causal_conv1d)
 - [ ] Test with mock LLM returning valid Triton code
@@ -182,12 +182,12 @@ def run_search(
 
 ### 8. Export from __init__.py
 
-- [ ] Export `run_search`, `SearchConfig`, `SearchResult` from `search_v2/__init__.py`
-- [ ] Export `GpuModeEvaluator` from `task_framework/adapters/__init__.py`
+- [ ] Export `run_search`, `SearchConfig`, `SearchResult` from `modular/__init__.py`
+- [ ] Export `GpuModeEvaluator` from `modular/adapters/__init__.py`
 
 ### 9. Create V2 entry point script
 
-**File**: `run_search_v2.py` (or integrate into existing `generate_kernels_and_eval.py`)
+**File**: `run_modular.py` (or integrate into existing `generate_kernels_and_eval.py`)
 
 - [ ] CLI argument parsing (task, model, max_rounds, etc.)
 - [ ] LLM client construction (OpenAI-compatible)
@@ -199,12 +199,12 @@ def run_search(
 **File**: `k_search_expr/runme.yaml`
 
 ```yaml
-run_search_v2:
+run_modular:
   - recipe: validate_api_env
   - recipe: check_api
   - default: |
       cd {k_search_dir}
-      python run_search_v2.py \
+      python run_modular.py \
         --task {task} \
         --language {language} \
         --model-name {model_name} \
@@ -213,8 +213,8 @@ run_search_v2:
         --api-key "$RITS_API_KEY"
 ```
 
-- [ ] Add `run_search_v2` recipe
-- [ ] Add `run_search_v2_causal_conv1d_e2e` convenience recipe
+- [ ] Add `run_modular` recipe
+- [ ] Add `run_modular_causal_conv1d_e2e` convenience recipe
 
 ### 11. Manual e2e testing via runme
 
@@ -232,33 +232,33 @@ runme run-bash validate_api_env
 runme run-bash check_api
 
 # Run V2 search on causal_conv1d (3 rounds, quick test)
-runme run-bash run_search_v2 task=causal_conv1d max_rounds=3
+runme run-bash run_modular task=causal_conv1d max_rounds=3
 
 # Run V2 search on trimul (full 10 rounds)
-runme run-bash run_search_v2 task=trimul max_rounds=10
+runme run-bash run_modular task=trimul max_rounds=10
 
 # Compare V1 vs V2 on same task
 runme run-bash run_causal_conv1d_e2e  # V1
-runme run-bash run_search_v2 task=causal_conv1d max_rounds=10  # V2
+runme run-bash run_modular task=causal_conv1d max_rounds=10  # V2
 ```
 
 **Success criteria**:
 - [ ] V2 completes without errors
 - [ ] Logs show round progress with timing and speedup
 - [ ] Final solution achieves comparable score to V1 (within 10%)
-- [ ] No regressions in task_framework behavior
+- [ ] No regressions in modular behavior
 
 ## Validation
 
 ```bash
 # Unit tests pass
-pytest tests/search_v2/test_loop.py -v
+pytest tests/modular/test_loop.py -v
 
 # Integration test passes
-pytest tests/search_v2/test_e2e_search.py -v
+pytest tests/modular/test_e2e_search.py -v
 
-# All task_framework tests still pass
-pytest tests/task_framework/ -v
+# All modular tests still pass
+pytest tests/modular/ -v
 ```
 
 ## Estimated Effort
@@ -268,9 +268,9 @@ pytest tests/task_framework/ -v
 ## Dependencies
 
 ```
-task_framework (complete)
+modular (complete)
     └─► GpuModeEvaluator
-            └─► search_v2/loop.py
+            └─► modular/loop.py
                     └─► Unit tests
                     └─► Integration test
                     └─► Entry point script

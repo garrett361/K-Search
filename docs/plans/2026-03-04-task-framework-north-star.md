@@ -4,7 +4,7 @@ Single-source visual reference consolidating `2026-03-04-task-framework-design.m
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                        SearchOrchestrator (search_v2)                        │
+│                        SearchOrchestrator (modular)                        │
 │                                                                              │
 │  __init__(                                                                   │
 │    task: TaskDefinition,                                                     │
@@ -22,7 +22,7 @@ Single-source visual reference consolidating `2026-03-04-task-framework-design.m
 │    2. prompt: str = formatter.format_tree(tree) + task.get_prompt_text()     │
 │    3. code: str = codegen_llm(prompt)                                        │
 │    4. impl: Implementation = parse_code_to_impl(code)                        │
-│    5. outcome: EvalOutcome = executor.execute(impl)                          │
+│    5. outcome: Round = executor.execute(impl)                          │
 │    6. selector.update(tree, action, outcome)                                 │
 └─────────────────────────────────────────────────────────────────────────────┘
           │                    │                      │
@@ -30,7 +30,7 @@ Single-source visual reference consolidating `2026-03-04-task-framework-design.m
           ▼                    ▼                      ▼
 ┌──────────────────┐  ┌─────────────────┐  ┌──────────────────────────────────┐
 │ ActionSelector   │  │ StateFormatter  │  │ TaskDefinition + Executor        │
-│ (Protocol)       │  │ (Protocol)      │  │ (from task_framework)            │
+│ (Protocol)       │  │ (Protocol)      │  │ (from modular)            │
 │                  │  │                 │  │                                  │
 │ propose_actions( │  │ format_tree(    │  │ See below                        │
 │   tree: SolTree, │  │   tree: SolTree,│  │                                  │
@@ -56,7 +56,7 @@ Single-source visual reference consolidating `2026-03-04-task-framework-design.m
 
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                       SolutionTree (search_v2/model)                         │
+│                       SolutionTree (modular/model)                         │
 │  (Dataclass)                                                                 │
 │                                                                              │
 │  solutions: dict[str, SolutionNode]                                          │
@@ -111,13 +111,13 @@ Single-source visual reference consolidating `2026-03-04-task-framework-design.m
 │  │  │ Scorer (Protocol)         │  │ FeedbackProvider (Protocol)   │    │   │
 │  │  │                           │  │                               │    │   │
 │  │  │ score(                    │  │ for_codegen(                  │    │   │
-│  │  │   result: EvaluationResult│  │   outcomes: EvalOutcome |     │    │   │
-│  │  │ ) -> float                │  │            list[EvalOutcome]  │    │   │
+│  │  │   result: EvaluationResult│  │   outcomes: Round |     │    │   │
+│  │  │ ) -> float                │  │            list[Round]  │    │   │
 │  │  │                           │  │ ) -> str                      │    │   │
 │  │  │                           │  │                               │    │   │
 │  │  │                           │  │ for_world_model(              │    │   │
-│  │  │                           │  │   outcomes: EvalOutcome |     │    │   │
-│  │  │                           │  │            list[EvalOutcome]  │    │   │
+│  │  │                           │  │   outcomes: Round |     │    │   │
+│  │  │                           │  │            list[Round]  │    │   │
 │  │  │                           │  │ ) -> list[dict[str, Any]]     │    │   │
 │  │  └───────────────────────────┘  └───────────────────────────────┘    │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
@@ -134,7 +134,7 @@ Single-source visual reference consolidating `2026-03-04-task-framework-design.m
 │                                                                              │
 │  __init__(evaluator: Evaluator, config: ExecutionConfig)                     │
 │                                                                              │
-│  execute(impl: Implementation) -> EvalOutcome                                │
+│  execute(impl: Implementation) -> Round                                │
 └─────────────────────────────────────────────────────────────────────────────┘
           │
           │ holds internally, delegates to
@@ -179,7 +179,7 @@ Single-source visual reference consolidating `2026-03-04-task-framework-design.m
 │  └─────────────────────────────────┘  └─────────────────────────────────┘   │
 │                                                                              │
 │  ┌─────────────────────────────────┐                                        │
-│  │ EvalOutcome (dataclass)         │                                        │
+│  │ Round (dataclass)         │                                        │
 │  │                                 │                                        │
 │  │ solution: Implementation        │                                        │
 │  │ result: EvaluationResult        │                                        │
@@ -208,7 +208,7 @@ Single-source visual reference consolidating `2026-03-04-task-framework-design.m
 │  Evaluator wraps CheckResult + timing -> EvaluationResult                    │
 │       │                                                                      │
 │       ▼                                                                      │
-│  Executor wraps (impl: Implementation, result: EvaluationResult) -> EvalOutcome│
+│  Executor wraps (impl: Implementation, result: EvaluationResult) -> Round│
 │                                                                              │
 │                                                                              │
 │  POST-EVALUATION PHASE (consumed by SearchOrchestrator and protocols)        │
@@ -218,7 +218,7 @@ Single-source visual reference consolidating `2026-03-04-task-framework-design.m
 │       ├───────────────────────────────────────┐                              │
 │       │                                       │                              │
 │       ▼                                       ▼                              │
-│  Scorer.score(                         EvalOutcome(solution, result)         │
+│  Scorer.score(                         Round(solution, result)         │
 │    result: EvaluationResult                   │                              │
 │  ) -> float                                   │                              │
 │       │                                       ├────────────────────────┐     │

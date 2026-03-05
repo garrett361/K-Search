@@ -21,7 +21,7 @@ Both use protocol injection with no-op defaults. Wandb is opt-in via config flag
 │      prompt = build_prompt(...)                                      │
 │      code = llm(prompt)                                              │
 │      result = evaluator.evaluate(impl)                               │
-│      outcome = EvalOutcome(impl, result)                             │
+│      outcome = Round(impl, result)                             │
 │                                                                      │
 │      for tracker in metrics_trackers:                                │
 │          tracker.log({...}, step=round)       ◄── SCALAR METRICS     │
@@ -56,10 +56,10 @@ class MetricsTracker(Protocol):
 
 ```python
 class ArtifactStore(Protocol):
-    def store(self, outcome: EvalOutcome, round_idx: int) -> None: ...
+    def store(self, outcome: Round, round_idx: int) -> None: ...
 ```
 
-`EvalOutcome` already contains:
+`Round` already contains:
 - `impl: Implementation` → code content via `impl.content`
 - `result: EvaluationResult` → metrics via `result.get_metrics()`, status via `result.is_success()`
 
@@ -296,7 +296,7 @@ Same pattern for `WandbArtifactStore`.
 ## Module Structure
 
 ```
-k_search/search_v2/
+k_search/modular/
 ├── __init__.py
 ├── config.py              # SearchConfig, MetricsConfig, ArtifactConfig
 ├── loop.py                # run_search()
@@ -337,10 +337,10 @@ k_search/search_v2/
 ## Usage Example
 
 ```python
-from k_search.search_v2 import run_search, SearchConfig
-from k_search.search_v2.config import MetricsConfig, ArtifactConfig
-from k_search.search_v2.metrics import create_metrics_trackers
-from k_search.search_v2.artifacts import create_artifact_stores
+from k_search.modular import run_search, SearchConfig
+from k_search.modular.config import MetricsConfig, ArtifactConfig
+from k_search.modular.metrics import create_metrics_trackers
+from k_search.modular.artifacts import create_artifact_stores
 
 # With wandb
 import wandb
@@ -366,4 +366,4 @@ result = run_search(
 
 - V1 wandb usage: `k_search/kernel_generators/kernel_generator_world_model.py`
 - Extensions doc: `docs/plans/2026-03-04-task-framework-extensions.md` (§8, §9)
-- V2 loop: `k_search/search_v2/loop.py`
+- V2 loop: `k_search/modular/loop.py`

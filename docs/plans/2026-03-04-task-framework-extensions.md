@@ -51,7 +51,7 @@ class Executor(Protocol):
 Uses existing types only:
 - `Solution` from `task_base.py`
 - `EvalResult` from `task_base.py`
-- `Evaluator` from task_framework protocols
+- `Evaluator` from modular protocols
 
 ### Sequential Implementation
 
@@ -293,7 +293,7 @@ def choose_top_K_actions(
 
 | File | Change |
 |------|--------|
-| `task_framework/execution/parallel.py` | New file |
+| `modular/execution/parallel.py` | New file |
 | `kernel_generator_world_model.py` | Use `ParallelEvaluator`, batch dispatch |
 | `world_model_manager.py` | Add `choose_top_K_actions()` |
 
@@ -379,12 +379,12 @@ class PipelinedExecutor:
     async def run_pipeline(
         self,
         generate_fn: Callable[[str], Awaitable[Implementation]],
-        feedback_fn: Callable[[EvalOutcome], str],
+        feedback_fn: Callable[[Round], str],
         initial_prompt: str,
         max_rounds: int,
-    ) -> AsyncIterator[EvalOutcome]:
+    ) -> AsyncIterator[Round]:
         """
-        Yields EvalOutcomes as they complete.
+        Yields Rounds as they complete.
         Overlaps generation N+1 with evaluation N.
         """
         prompt = initial_prompt
@@ -421,7 +421,7 @@ async def multi_worker_pipeline(
     worker_ids: list[int | str],
     generate_fn: Callable[[str], Awaitable[Implementation]],
     ...
-) -> AsyncIterator[EvalOutcome]:
+) -> AsyncIterator[Round]:
     """Run independent pipelines per worker, merge results."""
 
     async def single_pipeline(worker_id: int | str):
@@ -439,7 +439,7 @@ async def multi_worker_pipeline(
 
 | File | Change |
 |------|--------|
-| `task_framework/execution/pipeline.py` | New file |
+| `modular/execution/pipeline.py` | New file |
 | `kernel_generator_world_model.py` | Optional async entry point |
 
 ---
@@ -488,11 +488,11 @@ class TaskDefinition(Protocol):
     analyzer: Analyzer | None  # Optional
 ```
 
-And extend `EvalOutcome`:
+And extend `Round`:
 
 ```python
 @dataclass
-class EvalOutcome:
+class Round:
     impl: Implementation
     result: EvaluationResult
     analysis: AnalysisResult | None = None  # Populated when analyzer runs
@@ -503,7 +503,7 @@ class EvalOutcome:
 ```python
 # analyzers/ncu.py
 import subprocess
-from k_search.task_framework.types import AnalysisResult
+from k_search.modular.types import AnalysisResult
 
 class NcuAnalyzer:
     """Nsight Compute profiling."""
@@ -604,10 +604,10 @@ class CompositeAnalyzer:
 
 | File | Purpose |
 |------|---------|
-| `task_framework/analyzers/__init__.py` | Exports |
-| `task_framework/analyzers/ncu.py` | NCU profiling |
-| `task_framework/analyzers/static.py` | Static analysis |
-| `task_framework/analyzers/composite.py` | Combine multiple |
+| `modular/analyzers/__init__.py` | Exports |
+| `modular/analyzers/ncu.py` | NCU profiling |
+| `modular/analyzers/static.py` | Static analysis |
+| `modular/analyzers/composite.py` | Combine multiple |
 
 ---
 
@@ -623,9 +623,9 @@ class SmartFeedbackProvider:
 
     def for_codegen(
         self,
-        outcomes: EvalOutcome | list[EvalOutcome],
+        outcomes: Round | list[Round],
     ) -> str:
-        if isinstance(outcomes, EvalOutcome):
+        if isinstance(outcomes, Round):
             return self._single_feedback(outcomes)
 
         # Analyze patterns
@@ -646,10 +646,10 @@ class SmartFeedbackProvider:
 
     def _group_by_error(
         self,
-        outcomes: list[EvalOutcome],
-    ) -> dict[str, list[EvalOutcome]]:
+        outcomes: list[Round],
+    ) -> dict[str, list[Round]]:
         """Group outcomes by error signature."""
-        groups: dict[str, list[EvalOutcome]] = {}
+        groups: dict[str, list[Round]] = {}
         for o in outcomes:
             sig = self._error_signature(o.result.get_log())
             groups.setdefault(sig, []).append(o)
@@ -657,7 +657,7 @@ class SmartFeedbackProvider:
 
     def _summarize_failures(
         self,
-        groups: dict[str, list[EvalOutcome]],
+        groups: dict[str, list[Round]],
     ) -> str:
         """Summarize failure patterns."""
         lines = [f"Failures ({sum(len(g) for g in groups.values())} total):"]

@@ -15,22 +15,22 @@
 ## Task 1: MetricsConfig and MetricsTracker protocol
 
 **Files:**
-- Modify: `k_search/search_v2/config.py`
-- Create: `k_search/search_v2/metrics/__init__.py`
-- Create: `k_search/search_v2/metrics/protocol.py`
-- Test: `tests/search_v2/metrics/__init__.py`
-- Test: `tests/search_v2/metrics/test_protocol.py`
+- Modify: `k_search/modular/config.py`
+- Create: `k_search/modular/metrics/__init__.py`
+- Create: `k_search/modular/metrics/protocol.py`
+- Test: `tests/modular/metrics/__init__.py`
+- Test: `tests/modular/metrics/test_protocol.py`
 
 **Step 1: Write the failing test**
 
-Create `tests/search_v2/metrics/__init__.py` (empty).
+Create `tests/modular/metrics/__init__.py` (empty).
 
-Create `tests/search_v2/metrics/test_protocol.py`:
+Create `tests/modular/metrics/test_protocol.py`:
 
 ```python
 """Tests for MetricsTracker protocol."""
 
-from k_search.search_v2.metrics.protocol import MetricsTracker
+from k_search.modular.metrics.protocol import MetricsTracker
 
 
 def test_custom_class_implements_protocol():
@@ -43,12 +43,12 @@ def test_custom_class_implements_protocol():
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/metrics/test_protocol.py -v`
-Expected: FAIL with "No module named 'k_search.search_v2.metrics'"
+Run: `cd K-Search && python -m pytest tests/modular/metrics/test_protocol.py -v`
+Expected: FAIL with "No module named 'k_search.modular.metrics'"
 
 **Step 3: Write implementation**
 
-Add to `k_search/search_v2/config.py`:
+Add to `k_search/modular/config.py`:
 
 ```python
 @dataclass
@@ -59,7 +59,7 @@ class MetricsConfig:
     wandb: bool = False
 ```
 
-Create `k_search/search_v2/metrics/protocol.py`:
+Create `k_search/modular/metrics/protocol.py`:
 
 ```python
 """MetricsTracker protocol definition."""
@@ -75,26 +75,26 @@ class MetricsTracker(Protocol):
         ...
 ```
 
-Create `k_search/search_v2/metrics/__init__.py`:
+Create `k_search/modular/metrics/__init__.py`:
 
 ```python
-"""Metrics tracking for search_v2."""
+"""Metrics tracking for modular."""
 
-from k_search.search_v2.metrics.protocol import MetricsTracker
+from k_search.modular.metrics.protocol import MetricsTracker
 
 __all__ = ["MetricsTracker"]
 ```
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/metrics/test_protocol.py -v`
+Run: `cd K-Search && python -m pytest tests/modular/metrics/test_protocol.py -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-cd K-Search && git add k_search/search_v2/ tests/search_v2/
-git commit -m "feat(search_v2): add MetricsConfig and MetricsTracker protocol"
+cd K-Search && git add k_search/modular/ tests/modular/
+git commit -m "feat(modular): add MetricsConfig and MetricsTracker protocol"
 ```
 
 ---
@@ -102,14 +102,14 @@ git commit -m "feat(search_v2): add MetricsConfig and MetricsTracker protocol"
 ## Task 2: NoOpMetricsTracker and WandbMetricsTracker
 
 **Files:**
-- Create: `k_search/search_v2/metrics/noop.py`
-- Create: `k_search/search_v2/metrics/wandb.py`
-- Modify: `k_search/search_v2/metrics/__init__.py`
-- Test: `tests/search_v2/metrics/test_trackers.py`
+- Create: `k_search/modular/metrics/noop.py`
+- Create: `k_search/modular/metrics/wandb.py`
+- Modify: `k_search/modular/metrics/__init__.py`
+- Test: `tests/modular/metrics/test_trackers.py`
 
 **Step 1: Write the failing test**
 
-Create `tests/search_v2/metrics/test_trackers.py`:
+Create `tests/modular/metrics/test_trackers.py`:
 
 ```python
 """Tests for MetricsTracker implementations."""
@@ -118,18 +118,18 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from k_search.search_v2.config import MetricsConfig
-from k_search.search_v2.metrics.protocol import MetricsTracker
+from k_search.modular.config import MetricsConfig
+from k_search.modular.metrics.protocol import MetricsTracker
 
 
 class TestNoOpMetricsTracker:
     def test_implements_protocol(self):
-        from k_search.search_v2.metrics.noop import NoOpMetricsTracker
+        from k_search.modular.metrics.noop import NoOpMetricsTracker
 
         assert isinstance(NoOpMetricsTracker(), MetricsTracker)
 
     def test_log_does_not_raise(self):
-        from k_search.search_v2.metrics.noop import NoOpMetricsTracker
+        from k_search.modular.metrics.noop import NoOpMetricsTracker
 
         tracker = NoOpMetricsTracker()
         tracker.log({"score": 0.5}, step=0)
@@ -138,24 +138,24 @@ class TestNoOpMetricsTracker:
 
 class TestWandbMetricsTracker:
     def test_implements_protocol(self):
-        from k_search.search_v2.metrics.wandb import WandbMetricsTracker
+        from k_search.modular.metrics.wandb import WandbMetricsTracker
 
-        with patch("k_search.search_v2.metrics.wandb.wandb") as mock_wandb:
+        with patch("k_search.modular.metrics.wandb.wandb") as mock_wandb:
             mock_wandb.run = MagicMock()
             assert isinstance(WandbMetricsTracker(MetricsConfig(wandb=True)), MetricsTracker)
 
     def test_raises_if_no_active_run(self):
-        from k_search.search_v2.metrics.wandb import WandbMetricsTracker
+        from k_search.modular.metrics.wandb import WandbMetricsTracker
 
-        with patch("k_search.search_v2.metrics.wandb.wandb") as mock_wandb:
+        with patch("k_search.modular.metrics.wandb.wandb") as mock_wandb:
             mock_wandb.run = None
             with pytest.raises(RuntimeError, match="no active run"):
                 WandbMetricsTracker(MetricsConfig(wandb=True))
 
     def test_log_calls_wandb_log(self):
-        from k_search.search_v2.metrics.wandb import WandbMetricsTracker
+        from k_search.modular.metrics.wandb import WandbMetricsTracker
 
-        with patch("k_search.search_v2.metrics.wandb.wandb") as mock_wandb:
+        with patch("k_search.modular.metrics.wandb.wandb") as mock_wandb:
             mock_wandb.run = MagicMock()
             tracker = WandbMetricsTracker(MetricsConfig(wandb=True))
 
@@ -166,12 +166,12 @@ class TestWandbMetricsTracker:
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/metrics/test_trackers.py -v`
+Run: `cd K-Search && python -m pytest tests/modular/metrics/test_trackers.py -v`
 Expected: FAIL
 
 **Step 3: Write implementation**
 
-Create `k_search/search_v2/metrics/noop.py`:
+Create `k_search/modular/metrics/noop.py`:
 
 ```python
 """No-op metrics tracker implementation."""
@@ -184,12 +184,12 @@ class NoOpMetricsTracker:
         pass
 ```
 
-Create `k_search/search_v2/metrics/wandb.py`:
+Create `k_search/modular/metrics/wandb.py`:
 
 ```python
 """Wandb metrics tracker implementation."""
 
-from k_search.search_v2.config import MetricsConfig
+from k_search.modular.config import MetricsConfig
 
 
 class WandbMetricsTracker:
@@ -212,28 +212,28 @@ class WandbMetricsTracker:
         self._wandb.log(metrics, step=step)
 ```
 
-Update `k_search/search_v2/metrics/__init__.py`:
+Update `k_search/modular/metrics/__init__.py`:
 
 ```python
-"""Metrics tracking for search_v2."""
+"""Metrics tracking for modular."""
 
-from k_search.search_v2.metrics.noop import NoOpMetricsTracker
-from k_search.search_v2.metrics.protocol import MetricsTracker
-from k_search.search_v2.metrics.wandb import WandbMetricsTracker
+from k_search.modular.metrics.noop import NoOpMetricsTracker
+from k_search.modular.metrics.protocol import MetricsTracker
+from k_search.modular.metrics.wandb import WandbMetricsTracker
 
 __all__ = ["MetricsTracker", "NoOpMetricsTracker", "WandbMetricsTracker"]
 ```
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/metrics/test_trackers.py -v`
+Run: `cd K-Search && python -m pytest tests/modular/metrics/test_trackers.py -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-cd K-Search && git add k_search/search_v2/metrics/ tests/search_v2/metrics/
-git commit -m "feat(search_v2): add NoOpMetricsTracker and WandbMetricsTracker"
+cd K-Search && git add k_search/modular/metrics/ tests/modular/metrics/
+git commit -m "feat(modular): add NoOpMetricsTracker and WandbMetricsTracker"
 ```
 
 ---
@@ -241,28 +241,28 @@ git commit -m "feat(search_v2): add NoOpMetricsTracker and WandbMetricsTracker"
 ## Task 3: create_metrics_trackers factory
 
 **Files:**
-- Modify: `k_search/search_v2/metrics/__init__.py`
-- Test: `tests/search_v2/metrics/test_trackers.py`
+- Modify: `k_search/modular/metrics/__init__.py`
+- Test: `tests/modular/metrics/test_trackers.py`
 
 **Step 1: Write the failing test**
 
-Add to `tests/search_v2/metrics/test_trackers.py`:
+Add to `tests/modular/metrics/test_trackers.py`:
 
 ```python
 class TestCreateMetricsTrackers:
     def test_returns_noop_by_default(self):
-        from k_search.search_v2.metrics import create_metrics_trackers
-        from k_search.search_v2.metrics.noop import NoOpMetricsTracker
+        from k_search.modular.metrics import create_metrics_trackers
+        from k_search.modular.metrics.noop import NoOpMetricsTracker
 
         trackers = create_metrics_trackers()
         assert len(trackers) == 1
         assert isinstance(trackers[0], NoOpMetricsTracker)
 
     def test_returns_wandb_when_enabled(self):
-        from k_search.search_v2.metrics import create_metrics_trackers
-        from k_search.search_v2.metrics.wandb import WandbMetricsTracker
+        from k_search.modular.metrics import create_metrics_trackers
+        from k_search.modular.metrics.wandb import WandbMetricsTracker
 
-        with patch("k_search.search_v2.metrics.wandb.wandb") as mock_wandb:
+        with patch("k_search.modular.metrics.wandb.wandb") as mock_wandb:
             mock_wandb.run = MagicMock()
             trackers = create_metrics_trackers(MetricsConfig(wandb=True))
             assert len(trackers) == 1
@@ -271,20 +271,20 @@ class TestCreateMetricsTrackers:
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/metrics/test_trackers.py::TestCreateMetricsTrackers -v`
+Run: `cd K-Search && python -m pytest tests/modular/metrics/test_trackers.py::TestCreateMetricsTrackers -v`
 Expected: FAIL with "cannot import name 'create_metrics_trackers'"
 
 **Step 3: Write implementation**
 
-Update `k_search/search_v2/metrics/__init__.py`:
+Update `k_search/modular/metrics/__init__.py`:
 
 ```python
-"""Metrics tracking for search_v2."""
+"""Metrics tracking for modular."""
 
-from k_search.search_v2.config import MetricsConfig
-from k_search.search_v2.metrics.noop import NoOpMetricsTracker
-from k_search.search_v2.metrics.protocol import MetricsTracker
-from k_search.search_v2.metrics.wandb import WandbMetricsTracker
+from k_search.modular.config import MetricsConfig
+from k_search.modular.metrics.noop import NoOpMetricsTracker
+from k_search.modular.metrics.protocol import MetricsTracker
+from k_search.modular.metrics.wandb import WandbMetricsTracker
 
 
 def create_metrics_trackers(config: MetricsConfig | None = None) -> list[MetricsTracker]:
@@ -304,14 +304,14 @@ __all__ = [
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/metrics/test_trackers.py::TestCreateMetricsTrackers -v`
+Run: `cd K-Search && python -m pytest tests/modular/metrics/test_trackers.py::TestCreateMetricsTrackers -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-cd K-Search && git add k_search/search_v2/metrics/
-git commit -m "feat(search_v2): add create_metrics_trackers factory"
+cd K-Search && git add k_search/modular/metrics/
+git commit -m "feat(modular): add create_metrics_trackers factory"
 ```
 
 ---
@@ -319,17 +319,17 @@ git commit -m "feat(search_v2): add create_metrics_trackers factory"
 ## Task 4: _build_round_metrics helper
 
 **Files:**
-- Modify: `k_search/search_v2/loop.py`
-- Test: `tests/search_v2/test_loop.py`
+- Modify: `k_search/modular/loop.py`
+- Test: `tests/modular/test_loop.py`
 
 **Step 1: Write the failing test**
 
-Add to `tests/search_v2/test_loop.py`:
+Add to `tests/modular/test_loop.py`:
 
 ```python
 class TestBuildRoundMetrics:
     def test_basic_metrics(self):
-        from k_search.search_v2.loop import _build_round_metrics
+        from k_search.modular.loop import _build_round_metrics
 
         result = make_eval_result_mock(
             is_success=True, metrics={"latency_ms": 5.0, "speedup_factor": 2.0}
@@ -355,7 +355,7 @@ class TestBuildRoundMetrics:
         assert metrics["speedup_factor"] == 2.0
 
     def test_filters_non_numeric_and_bool(self):
-        from k_search.search_v2.loop import _build_round_metrics
+        from k_search.modular.loop import _build_round_metrics
 
         result = make_eval_result_mock(
             is_success=True,
@@ -374,15 +374,15 @@ class TestBuildRoundMetrics:
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/test_loop.py::TestBuildRoundMetrics -v`
+Run: `cd K-Search && python -m pytest tests/modular/test_loop.py::TestBuildRoundMetrics -v`
 Expected: FAIL with "cannot import name '_build_round_metrics'"
 
 **Step 3: Write implementation**
 
-Add to `k_search/search_v2/loop.py` after imports:
+Add to `k_search/modular/loop.py` after imports:
 
 ```python
-from k_search.task_framework.protocols.results import EvaluationResult
+from k_search.modular.protocols.results import EvaluationResult
 
 
 def _build_round_metrics(
@@ -412,14 +412,14 @@ def _build_round_metrics(
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/test_loop.py::TestBuildRoundMetrics -v`
+Run: `cd K-Search && python -m pytest tests/modular/test_loop.py::TestBuildRoundMetrics -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-cd K-Search && git add k_search/search_v2/loop.py tests/search_v2/test_loop.py
-git commit -m "feat(search_v2): add _build_round_metrics helper"
+cd K-Search && git add k_search/modular/loop.py tests/modular/test_loop.py
+git commit -m "feat(modular): add _build_round_metrics helper"
 ```
 
 ---
@@ -427,13 +427,13 @@ git commit -m "feat(search_v2): add _build_round_metrics helper"
 ## Task 5: Integrate metrics_trackers into run_search
 
 **Files:**
-- Modify: `k_search/search_v2/loop.py`
-- Modify: `k_search/search_v2/__init__.py`
-- Test: `tests/search_v2/test_loop.py`
+- Modify: `k_search/modular/loop.py`
+- Modify: `k_search/modular/__init__.py`
+- Test: `tests/modular/test_loop.py`
 
 **Step 1: Write the failing test**
 
-Add to `tests/search_v2/test_loop.py`:
+Add to `tests/modular/test_loop.py`:
 
 ```python
 class TestRunSearchWithMetrics:
@@ -524,12 +524,12 @@ class TestRunSearchWithMetrics:
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/test_loop.py::TestRunSearchWithMetrics -v`
+Run: `cd K-Search && python -m pytest tests/modular/test_loop.py::TestRunSearchWithMetrics -v`
 Expected: FAIL with "unexpected keyword argument 'metrics_trackers'"
 
 **Step 3: Write implementation**
 
-Update `k_search/search_v2/loop.py` - add `metrics_config` param and use `chars_per_token`:
+Update `k_search/modular/loop.py` - add `metrics_config` param and use `chars_per_token`:
 
 ```python
 """Core search loop implementation."""
@@ -538,13 +538,13 @@ import logging
 import time
 from typing import Callable
 
-from k_search.search_v2.config import MetricsConfig, SearchConfig, SearchResult
-from k_search.search_v2.metrics import MetricsTracker, NoOpMetricsTracker
-from k_search.search_v2.prompts import build_prompt, create_implementation
-from k_search.task_framework.protocols.evaluator import Evaluator
-from k_search.task_framework.protocols.results import EvaluationResult
-from k_search.task_framework.protocols.task_definition import TaskDefinition
-from k_search.task_framework.types import EvalOutcome
+from k_search.modular.config import MetricsConfig, SearchConfig, SearchResult
+from k_search.modular.metrics import MetricsTracker, NoOpMetricsTracker
+from k_search.modular.prompts import build_prompt, create_implementation
+from k_search.modular.protocols.evaluator import Evaluator
+from k_search.modular.protocols.results import EvaluationResult
+from k_search.modular.protocols.task_definition import TaskDefinition
+from k_search.modular.types import Round
 
 logger = logging.getLogger(__name__)
 
@@ -615,7 +615,7 @@ def run_search(
 
         best_outcome = None
         if best_impl and best_result:
-            best_outcome = EvalOutcome(impl=best_impl, result=best_result)
+            best_outcome = Round(impl=best_impl, result=best_result)
 
         prompt = build_prompt(task, best_outcome)
         code = llm(prompt)
@@ -656,32 +656,32 @@ def run_search(
     )
 ```
 
-Update `k_search/search_v2/__init__.py`:
+Update `k_search/modular/__init__.py`:
 
 ```python
 """Search V2 module."""
 
-from k_search.search_v2.config import MetricsConfig, SearchConfig, SearchResult
-from k_search.search_v2.loop import run_search
+from k_search.modular.config import MetricsConfig, SearchConfig, SearchResult
+from k_search.modular.loop import run_search
 
 __all__ = ["run_search", "SearchConfig", "SearchResult", "MetricsConfig"]
 ```
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/test_loop.py::TestRunSearchWithMetrics -v`
+Run: `cd K-Search && python -m pytest tests/modular/test_loop.py::TestRunSearchWithMetrics -v`
 Expected: PASS
 
 **Step 5: Run all tests**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/ -v`
+Run: `cd K-Search && python -m pytest tests/modular/ -v`
 Expected: All PASS
 
 **Step 6: Commit**
 
 ```bash
-cd K-Search && git add k_search/search_v2/ tests/search_v2/
-git commit -m "feat(search_v2): integrate metrics_trackers into run_search"
+cd K-Search && git add k_search/modular/ tests/modular/
+git commit -m "feat(modular): integrate metrics_trackers into run_search"
 ```
 
 ---
@@ -689,6 +689,6 @@ git commit -m "feat(search_v2): integrate metrics_trackers into run_search"
 ## Validation
 
 ```bash
-cd K-Search && python -m pytest tests/search_v2/ -v
-cd K-Search && ruff check k_search/search_v2/
+cd K-Search && python -m pytest tests/modular/ -v
+cd K-Search && ruff check k_search/modular/
 ```

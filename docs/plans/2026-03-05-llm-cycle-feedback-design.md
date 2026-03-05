@@ -35,7 +35,7 @@ Codegen prompt with "Previous Issues" section
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | Integration point | LLMAnalyzer implementing Analyzer protocol | Matches existing extension point, testable in isolation |
-| Cycle state | Local `list[EvalOutcome]` passed via context | Simple, no new dataclass needed for MVP |
+| Cycle state | Local `list[Round]` passed via context | Simple, no new dataclass needed for MVP |
 | LLM for summarization | Same as codegen model | No separate model needed initially |
 | Analyzer configuration | Optional, default none | Explicit opt-in, no magic defaults |
 | Trigger | After each failed round | Progressive summary, cumulative history |
@@ -44,7 +44,7 @@ Codegen prompt with "Previous Issues" section
 
 ### AnalysisResult Refactor
 
-**File:** `k_search/task_framework/types.py`
+**File:** `k_search/modular/types.py`
 
 Current specialized fields replaced with generic container:
 
@@ -60,7 +60,7 @@ All fields optional. The `kind` field enables FeedbackProvider to route differen
 
 ### LLMFailureAnalyzer
 
-**File:** `k_search/search_v2/analyzers/llm_failure_analyzer.py` (new)
+**File:** `k_search/modular/analyzers/llm_failure_analyzer.py` (new)
 
 ```python
 @dataclass
@@ -109,7 +109,7 @@ class LLMFailureAnalyzer:
             data={"failure_count": len(failures)},
         )
 
-    def _format_summarization_prompt(self, failures: list[EvalOutcome]) -> str:
+    def _format_summarization_prompt(self, failures: list[Round]) -> str:
         """Format failures into prompt for summarization LLM."""
         ...
 ```
@@ -144,12 +144,12 @@ The loop/orchestrator tracks cycle history and invokes analyzers:
 ┌─────────────────────────────────────────────────────────────────┐
 │                         run_search / Orchestrator               │
 │                                                                 │
-│   cycle_outcomes: list[EvalOutcome] = []                        │
+│   cycle_outcomes: list[Round] = []                        │
 │                                                                 │
 │   for round in cycle:                                           │
 │       impl = create_implementation(llm(prompt))                 │
 │       result = evaluator.evaluate(impl)                         │
-│       outcome = EvalOutcome(impl, result)                       │
+│       outcome = Round(impl, result)                       │
 │                                                                 │
 │       if not result.passed():                                   │
 │           cycle_outcomes.append(outcome)                        │
@@ -174,7 +174,7 @@ Analyzers are optional; configuration mechanism TBD as `run_search` evolves into
 `FeedbackProvider.for_codegen()` routes analysis by `kind`:
 
 ```python
-def for_codegen(self, outcomes: EvalOutcome | list[EvalOutcome]) -> str:
+def for_codegen(self, outcomes: Round | list[Round]) -> str:
     # ...
     for outcome in outcomes:
         if outcome.analysis:
@@ -189,7 +189,7 @@ def for_codegen(self, outcomes: EvalOutcome | list[EvalOutcome]) -> str:
 
 ### Multiple Analyzers
 
-`EvalOutcome.analysis` currently holds a single `AnalysisResult | None`. For multiple analyzers:
+`Round.analysis` currently holds a single `AnalysisResult | None`. For multiple analyzers:
 
 ```python
 # Option A: Union type

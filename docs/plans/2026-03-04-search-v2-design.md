@@ -131,7 +131,7 @@ for round in range(max_rounds):
 2. **Serialization flexibility** — decouple internal model from LLM-facing format (JSON, Markdown, etc.)
 3. **Clear logging** — every decision, parse attempt, retry, and fallback is logged
 4. **Parity first** — initial implementation matches current behavior exactly
-5. **Drop-in compatible** — works with `TaskDefinition` from task_framework
+5. **Drop-in compatible** — works with `TaskDefinition` from modular
 
 ## Non-Goals (for initial implementation)
 
@@ -142,7 +142,7 @@ for round in range(max_rounds):
 ## Module Structure
 
 ```
-k_search/search_v2/
+k_search/modular/
 ├── __init__.py
 │
 ├── model/                          # Core data model (pure dataclasses)
@@ -277,7 +277,7 @@ class StateFormatter(Protocol):
 class ActionSelector(Protocol):
     def propose_actions(self, tree: SolutionTree, context: dict | None = None) -> list[ActionNode]: ...
     def select(self, tree: SolutionTree, k: int = 1) -> list[ActionNode]: ...
-    def update(self, tree: SolutionTree, action: ActionNode, outcome: EvalOutcome) -> None: ...
+    def update(self, tree: SolutionTree, action: ActionNode, outcome: Round) -> None: ...
 
 # LLM calls: just use Callable[[str], str] — no need for a protocol
 LLMCall = Callable[[str], str]
@@ -374,20 +374,20 @@ class SearchOrchestrator:
             self.selector.update(self.tree, actions[0], outcome)
         return self.tree.get_best_solution()
 
-    def _execute_action(self, action) -> EvalOutcome:
+    def _execute_action(self, action) -> Round:
         # Generate code via P_gen, evaluate, retry on failure
         ...
 ```
 
-## Integration with task_framework
+## Integration with modular
 
-Both V1 and V2 can use task_framework. Key distinction:
+Both V1 and V2 can use modular. Key distinction:
 - `FeedbackProvider.for_world_model()` → metrics from one outcome (stored in node)
 - `StateFormatter.format_tree()` → entire tree for P_world prompt (no overlap)
 
 ### Compatibility Matrix
 
-| Component | V1 (current) | V1 + task_framework | V2 |
+| Component | V1 (current) | V1 + modular | V2 |
 |-----------|--------------|---------------------|-----|
 | Task loading | `GpuModeTask` | `GpuModeAdapter(GpuModeTask)` | `TaskDefinition` |
 | Evaluation | `task.evaluate()` | `evaluator.evaluate()` | `evaluator.evaluate()` |
@@ -399,9 +399,9 @@ Both V1 and V2 can use task_framework. Key distinction:
 
 ### Migration Path
 
-1. **task_framework foundation** — Implement protocols + GpuModeAdapter, V1 unchanged
-2. **V1 adopts task_framework** (optional) — Wrap tasks in adapter, use FeedbackProvider
-3. **V2 implementation** — Build search_v2, verify parity, switch over
+1. **modular foundation** — Implement protocols + GpuModeAdapter, V1 unchanged
+2. **V1 adopts modular** (optional) — Wrap tasks in adapter, use FeedbackProvider
+3. **V2 implementation** — Build modular, verify parity, switch over
 
 ## State Persistence
 
@@ -441,8 +441,8 @@ After parity is achieved:
 1. **New formatters**: MarkdownFormatter, NaturalLanguageFormatter
 2. **New selectors**: Pure UCB (no LLM), hybrid approaches
 3. **Parallel selection**: Select k > 1 actions, evaluate in parallel
-4. **Artifact persistence**: Integrate with ArtifactStore from task_framework extensions
-5. **LLM query mechanism**: Let LLM request additional context (top solutions, failure patterns) via QueryProvider protocol — see task_framework extensions §7
+4. **Artifact persistence**: Integrate with ArtifactStore from modular extensions
+5. **LLM query mechanism**: Let LLM request additional context (top solutions, failure patterns) via QueryProvider protocol — see modular extensions §7
 
 ## References
 

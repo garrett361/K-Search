@@ -17,13 +17,13 @@
 ## Task 1: Add artifact_dir to Implementation protocol and GpuModeImplementation
 
 **Files:**
-- Modify: `k_search/task_framework/protocols/results.py`
-- Modify: `k_search/task_framework/adapters/wrappers.py`
-- Test: `tests/task_framework/test_wrappers.py`
+- Modify: `k_search/modular/protocols/results.py`
+- Modify: `k_search/modular/adapters/wrappers.py`
+- Test: `tests/modular/test_wrappers.py`
 
 **Step 1: Write the failing test**
 
-Add to `tests/task_framework/test_wrappers.py`:
+Add to `tests/modular/test_wrappers.py`:
 
 ```python
 from pathlib import Path
@@ -31,7 +31,7 @@ from pathlib import Path
 
 class TestGpuModeImplementationArtifactDir:
     def test_yields_directory_with_source_files(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeImplementation
+        from k_search.modular.adapters.wrappers import GpuModeImplementation
         from k_search.tasks.task_base import Solution, BuildSpec, SourceFile, SupportedLanguages
 
         solution = Solution(
@@ -56,7 +56,7 @@ class TestGpuModeImplementationArtifactDir:
             assert (src_dir / "utils.py").read_text() == "# utils"
 
     def test_yields_none_when_no_sources(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeImplementation
+        from k_search.modular.adapters.wrappers import GpuModeImplementation
         from k_search.tasks.task_base import Solution, BuildSpec, SupportedLanguages
 
         solution = Solution(
@@ -76,7 +76,7 @@ class TestGpuModeImplementationArtifactDir:
             assert src_dir is None
 
     def test_cleans_up_temp_dir_after_context(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeImplementation
+        from k_search.modular.adapters.wrappers import GpuModeImplementation
         from k_search.tasks.task_base import Solution, BuildSpec, SourceFile, SupportedLanguages
 
         solution = Solution(
@@ -100,12 +100,12 @@ class TestGpuModeImplementationArtifactDir:
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd K-Search && python -m pytest tests/task_framework/test_wrappers.py::TestGpuModeImplementationArtifactDir -v`
+Run: `cd K-Search && python -m pytest tests/modular/test_wrappers.py::TestGpuModeImplementationArtifactDir -v`
 Expected: FAIL with "no attribute 'artifact_dir'"
 
 **Step 3: Write implementation**
 
-Update `k_search/task_framework/protocols/results.py` - add to Implementation protocol:
+Update `k_search/modular/protocols/results.py` - add to Implementation protocol:
 
 ```python
 from collections.abc import Iterator
@@ -131,7 +131,7 @@ class Implementation(Protocol):
         yield None
 ```
 
-Update `k_search/task_framework/adapters/wrappers.py` - add to GpuModeImplementation:
+Update `k_search/modular/adapters/wrappers.py` - add to GpuModeImplementation:
 
 ```python
 import tempfile
@@ -165,14 +165,14 @@ class GpuModeImplementation:
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd K-Search && python -m pytest tests/task_framework/test_wrappers.py::TestGpuModeImplementationArtifactDir -v`
+Run: `cd K-Search && python -m pytest tests/modular/test_wrappers.py::TestGpuModeImplementationArtifactDir -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-cd K-Search && git add k_search/task_framework/ tests/task_framework/
-git commit -m "feat(task_framework): add artifact_dir to Implementation protocol"
+cd K-Search && git add k_search/modular/ tests/modular/
+git commit -m "feat(modular): add artifact_dir to Implementation protocol"
 ```
 
 ---
@@ -180,18 +180,18 @@ git commit -m "feat(task_framework): add artifact_dir to Implementation protocol
 ## Task 2: ArtifactConfig and ArtifactStore protocol
 
 **Files:**
-- Modify: `k_search/search_v2/config.py`
-- Create: `k_search/search_v2/artifacts/__init__.py`
-- Create: `k_search/search_v2/artifacts/protocol.py`
-- Create: `k_search/search_v2/artifacts/noop.py`
-- Test: `tests/search_v2/artifacts/__init__.py`
-- Test: `tests/search_v2/artifacts/test_stores.py`
+- Modify: `k_search/modular/config.py`
+- Create: `k_search/modular/artifacts/__init__.py`
+- Create: `k_search/modular/artifacts/protocol.py`
+- Create: `k_search/modular/artifacts/noop.py`
+- Test: `tests/modular/artifacts/__init__.py`
+- Test: `tests/modular/artifacts/test_stores.py`
 
 **Step 1: Write the failing test**
 
-Create `tests/search_v2/artifacts/__init__.py` (empty).
+Create `tests/modular/artifacts/__init__.py` (empty).
 
-Create `tests/search_v2/artifacts/test_stores.py`:
+Create `tests/modular/artifacts/test_stores.py`:
 
 ```python
 """Tests for ArtifactStore implementations."""
@@ -205,8 +205,8 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from k_search.search_v2.config import ArtifactConfig
-from k_search.task_framework.types import EvalOutcome
+from k_search.modular.config import ArtifactConfig
+from k_search.modular.types import Round
 
 
 @contextmanager
@@ -230,7 +230,7 @@ def make_outcome_mock(
     name: str = "test_impl",
     metrics: dict | None = None,
     files: dict[str, str] | None = None,
-) -> EvalOutcome:
+) -> Round:
     impl = Mock()
     impl.name = name
     impl.artifact_dir = lambda: mock_artifact_dir(files or {"kernel.py": "# code"})
@@ -239,7 +239,7 @@ def make_outcome_mock(
     result.is_success.return_value = is_success
     result.get_metrics.return_value = metrics or {"latency_ms": 10.0}
 
-    return EvalOutcome(impl=impl, result=result)
+    return Round(impl=impl, result=result)
 
 
 class TestArtifactConfig:
@@ -250,7 +250,7 @@ class TestArtifactConfig:
 
 class TestNoOpArtifactStore:
     def test_store_does_not_raise(self):
-        from k_search.search_v2.artifacts.noop import NoOpArtifactStore
+        from k_search.modular.artifacts.noop import NoOpArtifactStore
 
         store = NoOpArtifactStore()
         store.store(make_outcome_mock(), round_idx=0)
@@ -258,12 +258,12 @@ class TestNoOpArtifactStore:
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/artifacts/test_stores.py -v`
+Run: `cd K-Search && python -m pytest tests/modular/artifacts/test_stores.py -v`
 Expected: FAIL
 
 **Step 3: Write implementation**
 
-Add to `k_search/search_v2/config.py`:
+Add to `k_search/modular/config.py`:
 
 ```python
 from pathlib import Path
@@ -282,59 +282,59 @@ class ArtifactConfig:
             self.output_dir = Path(self.output_dir)
 ```
 
-Create `k_search/search_v2/artifacts/protocol.py`:
+Create `k_search/modular/artifacts/protocol.py`:
 
 ```python
 """ArtifactStore protocol definition."""
 
 from typing import Protocol, runtime_checkable
 
-from k_search.task_framework.types import EvalOutcome
+from k_search.modular.types import Round
 
 
 @runtime_checkable
 class ArtifactStore(Protocol):
     """Protocol for storing artifacts during search."""
 
-    def store(self, outcome: EvalOutcome, round_idx: int) -> None: ...
+    def store(self, outcome: Round, round_idx: int) -> None: ...
 ```
 
-Create `k_search/search_v2/artifacts/noop.py`:
+Create `k_search/modular/artifacts/noop.py`:
 
 ```python
 """No-op artifact store implementation."""
 
-from k_search.task_framework.types import EvalOutcome
+from k_search.modular.types import Round
 
 
 class NoOpArtifactStore:
     """Artifact store that does nothing."""
 
-    def store(self, outcome: EvalOutcome, round_idx: int) -> None:
+    def store(self, outcome: Round, round_idx: int) -> None:
         pass
 ```
 
-Create `k_search/search_v2/artifacts/__init__.py`:
+Create `k_search/modular/artifacts/__init__.py`:
 
 ```python
-"""Artifact storage for search_v2."""
+"""Artifact storage for modular."""
 
-from k_search.search_v2.artifacts.noop import NoOpArtifactStore
-from k_search.search_v2.artifacts.protocol import ArtifactStore
+from k_search.modular.artifacts.noop import NoOpArtifactStore
+from k_search.modular.artifacts.protocol import ArtifactStore
 
 __all__ = ["ArtifactStore", "NoOpArtifactStore"]
 ```
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/artifacts/test_stores.py -v`
+Run: `cd K-Search && python -m pytest tests/modular/artifacts/test_stores.py -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-cd K-Search && git add k_search/search_v2/ tests/search_v2/artifacts/
-git commit -m "feat(search_v2): add ArtifactConfig, ArtifactStore protocol, NoOpArtifactStore"
+cd K-Search && git add k_search/modular/ tests/modular/artifacts/
+git commit -m "feat(modular): add ArtifactConfig, ArtifactStore protocol, NoOpArtifactStore"
 ```
 
 ---
@@ -342,18 +342,18 @@ git commit -m "feat(search_v2): add ArtifactConfig, ArtifactStore protocol, NoOp
 ## Task 3: LocalArtifactStore
 
 **Files:**
-- Create: `k_search/search_v2/artifacts/local.py`
-- Modify: `k_search/search_v2/artifacts/__init__.py`
-- Test: `tests/search_v2/artifacts/test_stores.py`
+- Create: `k_search/modular/artifacts/local.py`
+- Modify: `k_search/modular/artifacts/__init__.py`
+- Test: `tests/modular/artifacts/test_stores.py`
 
 **Step 1: Write the failing test**
 
-Add to `tests/search_v2/artifacts/test_stores.py`:
+Add to `tests/modular/artifacts/test_stores.py`:
 
 ```python
 class TestLocalArtifactStore:
     def test_copies_files_to_code_dir(self, tmp_path):
-        from k_search.search_v2.artifacts.local import LocalArtifactStore
+        from k_search.modular.artifacts.local import LocalArtifactStore
 
         config = ArtifactConfig(output_dir=tmp_path, only_store_successes=False)
         store = LocalArtifactStore(config)
@@ -364,7 +364,7 @@ class TestLocalArtifactStore:
         assert (tmp_path / "round_0" / "code" / "kernel.py").read_text() == "def kernel(): pass"
 
     def test_writes_metadata_json(self, tmp_path):
-        from k_search.search_v2.artifacts.local import LocalArtifactStore
+        from k_search.modular.artifacts.local import LocalArtifactStore
 
         config = ArtifactConfig(output_dir=tmp_path, only_store_successes=False)
         store = LocalArtifactStore(config)
@@ -380,7 +380,7 @@ class TestLocalArtifactStore:
         assert metadata["latency_ms"] == 5.5
 
     def test_only_store_successes_skips_failures(self, tmp_path):
-        from k_search.search_v2.artifacts.local import LocalArtifactStore
+        from k_search.modular.artifacts.local import LocalArtifactStore
 
         config = ArtifactConfig(output_dir=tmp_path, only_store_successes=True)
         store = LocalArtifactStore(config)
@@ -392,7 +392,7 @@ class TestLocalArtifactStore:
         assert (tmp_path / "round_1").is_dir()
 
     def test_handles_nested_file_paths(self, tmp_path):
-        from k_search.search_v2.artifacts.local import LocalArtifactStore
+        from k_search.modular.artifacts.local import LocalArtifactStore
 
         config = ArtifactConfig(output_dir=tmp_path, only_store_successes=False)
         store = LocalArtifactStore(config)
@@ -405,12 +405,12 @@ class TestLocalArtifactStore:
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/artifacts/test_stores.py::TestLocalArtifactStore -v`
+Run: `cd K-Search && python -m pytest tests/modular/artifacts/test_stores.py::TestLocalArtifactStore -v`
 Expected: FAIL
 
 **Step 3: Write implementation**
 
-Create `k_search/search_v2/artifacts/local.py`:
+Create `k_search/modular/artifacts/local.py`:
 
 ```python
 """Local filesystem artifact store implementation."""
@@ -419,8 +419,8 @@ import json
 import shutil
 from pathlib import Path
 
-from k_search.search_v2.config import ArtifactConfig
-from k_search.task_framework.types import EvalOutcome
+from k_search.modular.config import ArtifactConfig
+from k_search.modular.types import Round
 
 
 class LocalArtifactStore:
@@ -432,7 +432,7 @@ class LocalArtifactStore:
         self._output_dir = Path(config.output_dir)
         self._only_store_successes = config.only_store_successes
 
-    def store(self, outcome: EvalOutcome, round_idx: int) -> None:
+    def store(self, outcome: Round, round_idx: int) -> None:
         if self._only_store_successes and not outcome.result.is_success():
             return
 
@@ -454,28 +454,28 @@ class LocalArtifactStore:
         (round_dir / "metadata.json").write_text(json.dumps(metadata, indent=2))
 ```
 
-Update `k_search/search_v2/artifacts/__init__.py`:
+Update `k_search/modular/artifacts/__init__.py`:
 
 ```python
-"""Artifact storage for search_v2."""
+"""Artifact storage for modular."""
 
-from k_search.search_v2.artifacts.local import LocalArtifactStore
-from k_search.search_v2.artifacts.noop import NoOpArtifactStore
-from k_search.search_v2.artifacts.protocol import ArtifactStore
+from k_search.modular.artifacts.local import LocalArtifactStore
+from k_search.modular.artifacts.noop import NoOpArtifactStore
+from k_search.modular.artifacts.protocol import ArtifactStore
 
 __all__ = ["ArtifactStore", "NoOpArtifactStore", "LocalArtifactStore"]
 ```
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/artifacts/test_stores.py::TestLocalArtifactStore -v`
+Run: `cd K-Search && python -m pytest tests/modular/artifacts/test_stores.py::TestLocalArtifactStore -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-cd K-Search && git add k_search/search_v2/artifacts/
-git commit -m "feat(search_v2): add LocalArtifactStore"
+cd K-Search && git add k_search/modular/artifacts/
+git commit -m "feat(modular): add LocalArtifactStore"
 ```
 
 ---
@@ -483,28 +483,28 @@ git commit -m "feat(search_v2): add LocalArtifactStore"
 ## Task 4: WandbArtifactStore
 
 **Files:**
-- Create: `k_search/search_v2/artifacts/wandb.py`
-- Modify: `k_search/search_v2/artifacts/__init__.py`
-- Test: `tests/search_v2/artifacts/test_stores.py`
+- Create: `k_search/modular/artifacts/wandb.py`
+- Modify: `k_search/modular/artifacts/__init__.py`
+- Test: `tests/modular/artifacts/test_stores.py`
 
 **Step 1: Write the failing test**
 
-Add to `tests/search_v2/artifacts/test_stores.py`:
+Add to `tests/modular/artifacts/test_stores.py`:
 
 ```python
 class TestWandbArtifactStore:
     def test_raises_if_no_active_run(self):
-        from k_search.search_v2.artifacts.wandb import WandbArtifactStore
+        from k_search.modular.artifacts.wandb import WandbArtifactStore
 
-        with patch("k_search.search_v2.artifacts.wandb.wandb") as mock_wandb:
+        with patch("k_search.modular.artifacts.wandb.wandb") as mock_wandb:
             mock_wandb.run = None
             with pytest.raises(RuntimeError, match="no active run"):
                 WandbArtifactStore(ArtifactConfig(wandb=True))
 
     def test_creates_artifact_with_code_files(self):
-        from k_search.search_v2.artifacts.wandb import WandbArtifactStore
+        from k_search.modular.artifacts.wandb import WandbArtifactStore
 
-        with patch("k_search.search_v2.artifacts.wandb.wandb") as mock_wandb:
+        with patch("k_search.modular.artifacts.wandb.wandb") as mock_wandb:
             mock_wandb.run = MagicMock()
             mock_wandb.run.id = "test_run_123"
             mock_artifact = MagicMock()
@@ -522,9 +522,9 @@ class TestWandbArtifactStore:
             mock_wandb.log_artifact.assert_called_once()
 
     def test_only_store_successes_skips_failures(self):
-        from k_search.search_v2.artifacts.wandb import WandbArtifactStore
+        from k_search.modular.artifacts.wandb import WandbArtifactStore
 
-        with patch("k_search.search_v2.artifacts.wandb.wandb") as mock_wandb:
+        with patch("k_search.modular.artifacts.wandb.wandb") as mock_wandb:
             mock_wandb.run = MagicMock()
             mock_wandb.run.id = "test"
 
@@ -536,12 +536,12 @@ class TestWandbArtifactStore:
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/artifacts/test_stores.py::TestWandbArtifactStore -v`
+Run: `cd K-Search && python -m pytest tests/modular/artifacts/test_stores.py::TestWandbArtifactStore -v`
 Expected: FAIL
 
 **Step 3: Write implementation**
 
-Create `k_search/search_v2/artifacts/wandb.py`:
+Create `k_search/modular/artifacts/wandb.py`:
 
 ```python
 """Wandb artifact store implementation."""
@@ -550,8 +550,8 @@ import json
 import tempfile
 from pathlib import Path
 
-from k_search.search_v2.config import ArtifactConfig
-from k_search.task_framework.types import EvalOutcome
+from k_search.modular.config import ArtifactConfig
+from k_search.modular.types import Round
 
 
 class WandbArtifactStore:
@@ -572,7 +572,7 @@ class WandbArtifactStore:
         self._run_id = _wandb.run.id
         self._only_store_successes = config.only_store_successes
 
-    def store(self, outcome: EvalOutcome, round_idx: int) -> None:
+    def store(self, outcome: Round, round_idx: int) -> None:
         if self._only_store_successes and not outcome.result.is_success():
             return
 
@@ -606,29 +606,29 @@ class WandbArtifactStore:
         self._wandb.log_artifact(artifact)
 ```
 
-Update `k_search/search_v2/artifacts/__init__.py`:
+Update `k_search/modular/artifacts/__init__.py`:
 
 ```python
-"""Artifact storage for search_v2."""
+"""Artifact storage for modular."""
 
-from k_search.search_v2.artifacts.local import LocalArtifactStore
-from k_search.search_v2.artifacts.noop import NoOpArtifactStore
-from k_search.search_v2.artifacts.protocol import ArtifactStore
-from k_search.search_v2.artifacts.wandb import WandbArtifactStore
+from k_search.modular.artifacts.local import LocalArtifactStore
+from k_search.modular.artifacts.noop import NoOpArtifactStore
+from k_search.modular.artifacts.protocol import ArtifactStore
+from k_search.modular.artifacts.wandb import WandbArtifactStore
 
 __all__ = ["ArtifactStore", "NoOpArtifactStore", "LocalArtifactStore", "WandbArtifactStore"]
 ```
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/artifacts/test_stores.py::TestWandbArtifactStore -v`
+Run: `cd K-Search && python -m pytest tests/modular/artifacts/test_stores.py::TestWandbArtifactStore -v`
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-cd K-Search && git add k_search/search_v2/artifacts/
-git commit -m "feat(search_v2): add WandbArtifactStore"
+cd K-Search && git add k_search/modular/artifacts/
+git commit -m "feat(modular): add WandbArtifactStore"
 ```
 
 ---
@@ -636,37 +636,37 @@ git commit -m "feat(search_v2): add WandbArtifactStore"
 ## Task 5: create_artifact_stores factory and integrate into run_search
 
 **Files:**
-- Modify: `k_search/search_v2/artifacts/__init__.py`
-- Modify: `k_search/search_v2/loop.py`
-- Modify: `k_search/search_v2/__init__.py`
-- Test: `tests/search_v2/artifacts/test_stores.py`
-- Test: `tests/search_v2/test_loop.py`
+- Modify: `k_search/modular/artifacts/__init__.py`
+- Modify: `k_search/modular/loop.py`
+- Modify: `k_search/modular/__init__.py`
+- Test: `tests/modular/artifacts/test_stores.py`
+- Test: `tests/modular/test_loop.py`
 
 **Step 1: Write the failing tests**
 
-Add to `tests/search_v2/artifacts/test_stores.py`:
+Add to `tests/modular/artifacts/test_stores.py`:
 
 ```python
 class TestCreateArtifactStores:
     def test_returns_noop_by_default(self):
-        from k_search.search_v2.artifacts import create_artifact_stores
+        from k_search.modular.artifacts import create_artifact_stores
 
         stores = create_artifact_stores()
         assert len(stores) == 1
         assert isinstance(stores[0], NoOpArtifactStore)
 
     def test_returns_local_when_output_dir_set(self, tmp_path):
-        from k_search.search_v2.artifacts import create_artifact_stores
+        from k_search.modular.artifacts import create_artifact_stores
 
         stores = create_artifact_stores(ArtifactConfig(output_dir=tmp_path))
         assert len(stores) == 1
         assert isinstance(stores[0], LocalArtifactStore)
 
     def test_returns_both_when_both_configured(self, tmp_path):
-        from k_search.search_v2.artifacts import create_artifact_stores
-        from k_search.search_v2.artifacts.wandb import WandbArtifactStore
+        from k_search.modular.artifacts import create_artifact_stores
+        from k_search.modular.artifacts.wandb import WandbArtifactStore
 
-        with patch("k_search.search_v2.artifacts.wandb.wandb") as mock_wandb:
+        with patch("k_search.modular.artifacts.wandb.wandb") as mock_wandb:
             mock_wandb.run = MagicMock()
             mock_wandb.run.id = "test"
             stores = create_artifact_stores(ArtifactConfig(output_dir=tmp_path, wandb=True))
@@ -675,7 +675,7 @@ class TestCreateArtifactStores:
             assert isinstance(stores[1], WandbArtifactStore)
 ```
 
-Add to `tests/search_v2/test_loop.py`:
+Add to `tests/modular/test_loop.py`:
 
 ```python
 class TestRunSearchWithArtifacts:
@@ -707,21 +707,21 @@ class TestRunSearchWithArtifacts:
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/artifacts/test_stores.py::TestCreateArtifactStores tests/search_v2/test_loop.py::TestRunSearchWithArtifacts -v`
+Run: `cd K-Search && python -m pytest tests/modular/artifacts/test_stores.py::TestCreateArtifactStores tests/modular/test_loop.py::TestRunSearchWithArtifacts -v`
 Expected: FAIL
 
 **Step 3: Write implementation**
 
-Update `k_search/search_v2/artifacts/__init__.py`:
+Update `k_search/modular/artifacts/__init__.py`:
 
 ```python
-"""Artifact storage for search_v2."""
+"""Artifact storage for modular."""
 
-from k_search.search_v2.artifacts.local import LocalArtifactStore
-from k_search.search_v2.artifacts.noop import NoOpArtifactStore
-from k_search.search_v2.artifacts.protocol import ArtifactStore
-from k_search.search_v2.artifacts.wandb import WandbArtifactStore
-from k_search.search_v2.config import ArtifactConfig
+from k_search.modular.artifacts.local import LocalArtifactStore
+from k_search.modular.artifacts.noop import NoOpArtifactStore
+from k_search.modular.artifacts.protocol import ArtifactStore
+from k_search.modular.artifacts.wandb import WandbArtifactStore
+from k_search.modular.config import ArtifactConfig
 
 
 def create_artifact_stores(config: ArtifactConfig | None = None) -> list[ArtifactStore]:
@@ -746,10 +746,10 @@ __all__ = [
 ]
 ```
 
-Update `k_search/search_v2/loop.py` - add import and parameter:
+Update `k_search/modular/loop.py` - add import and parameter:
 
 ```python
-from k_search.search_v2.artifacts import ArtifactStore, NoOpArtifactStore
+from k_search.modular.artifacts import ArtifactStore, NoOpArtifactStore
 ```
 
 Update signature:
@@ -778,7 +778,7 @@ Add normalization after metrics normalization:
 Add after metrics logging in the loop (create outcome first):
 
 ```python
-        outcome = EvalOutcome(impl=impl, result=result)
+        outcome = Round(impl=impl, result=result)
 
         # ... metrics logging ...
 
@@ -786,24 +786,24 @@ Add after metrics logging in the loop (create outcome first):
             store.store(outcome, round_idx)
 ```
 
-Update `k_search/search_v2/__init__.py`:
+Update `k_search/modular/__init__.py`:
 
 ```python
-from k_search.search_v2.config import ArtifactConfig, MetricsConfig, SearchConfig, SearchResult
+from k_search.modular.config import ArtifactConfig, MetricsConfig, SearchConfig, SearchResult
 
 __all__ = ["run_search", "SearchConfig", "SearchResult", "MetricsConfig", "ArtifactConfig"]
 ```
 
 **Step 4: Run tests to verify they pass**
 
-Run: `cd K-Search && python -m pytest tests/search_v2/ -v`
+Run: `cd K-Search && python -m pytest tests/modular/ -v`
 Expected: All PASS
 
 **Step 5: Commit**
 
 ```bash
-cd K-Search && git add k_search/search_v2/ tests/search_v2/
-git commit -m "feat(search_v2): add create_artifact_stores factory and integrate into run_search"
+cd K-Search && git add k_search/modular/ tests/modular/
+git commit -m "feat(modular): add create_artifact_stores factory and integrate into run_search"
 ```
 
 ---
@@ -811,12 +811,12 @@ git commit -m "feat(search_v2): add create_artifact_stores factory and integrate
 ## Validation
 
 ```bash
-cd K-Search && python -m pytest tests/search_v2/ tests/task_framework/ -v
-cd K-Search && ruff check k_search/search_v2/ k_search/task_framework/
+cd K-Search && python -m pytest tests/modular/ tests/modular/ -v
+cd K-Search && ruff check k_search/modular/ k_search/modular/
 cd K-Search && python -c "
-from k_search.search_v2 import run_search, SearchConfig, MetricsConfig, ArtifactConfig
-from k_search.search_v2.metrics import create_metrics_trackers
-from k_search.search_v2.artifacts import create_artifact_stores
+from k_search.modular import run_search, SearchConfig, MetricsConfig, ArtifactConfig
+from k_search.modular.metrics import create_metrics_trackers
+from k_search.modular.artifacts import create_artifact_stores
 print('PR2 complete!')
 "
 ```

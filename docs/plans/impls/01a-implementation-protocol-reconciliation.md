@@ -13,7 +13,7 @@
 ## Task 1: Rename Protocol in results.py
 
 **Files:**
-- Modify: `k_search/task_framework/protocols/results.py`
+- Modify: `k_search/modular/protocols/results.py`
 
 **Step 1: Rename the protocol and change to attributes**
 
@@ -38,27 +38,27 @@ class Implementation(Protocol):
 
 **Step 2: Verify file**
 
-Run: `ruff check k_search/task_framework/protocols/results.py`
+Run: `ruff check k_search/modular/protocols/results.py`
 
 ---
 
-## Task 2: Update EvalOutcome in types.py
+## Task 2: Update Round in types.py
 
 **Files:**
-- Modify: `k_search/task_framework/types.py`
+- Modify: `k_search/modular/types.py`
 
 **Step 1: Update import and field name**
 
 Change the TYPE_CHECKING import:
 ```python
 if TYPE_CHECKING:
-    from k_search.task_framework.protocols.results import EvaluationResult, Implementation
+    from k_search.modular.protocols.results import EvaluationResult, Implementation
 ```
 
-Change the EvalOutcome dataclass (using `impl` per naming convention):
+Change the Round dataclass (using `impl` per naming convention):
 ```python
 @dataclass
-class EvalOutcome:
+class Round:
     """Complete result of evaluating an implementation."""
 
     impl: Implementation
@@ -68,14 +68,14 @@ class EvalOutcome:
 
 **Step 2: Verify**
 
-Run: `ruff check k_search/task_framework/types.py`
+Run: `ruff check k_search/modular/types.py`
 
 ---
 
 ## Task 3: Update Wrapper Class
 
 **Files:**
-- Modify: `k_search/task_framework/adapters/wrappers.py`
+- Modify: `k_search/modular/adapters/wrappers.py`
 
 **Step 1: Rename class and change to attributes**
 
@@ -97,21 +97,21 @@ Remove the `@property` decorators for `name` and `content`.
 
 **Step 2: Verify**
 
-Run: `ruff check k_search/task_framework/adapters/wrappers.py`
+Run: `ruff check k_search/modular/adapters/wrappers.py`
 
 ---
 
 ## Task 4: Update Protocol Imports
 
 **Files:**
-- Modify: `k_search/task_framework/protocols/analyzer.py`
-- Modify: `k_search/task_framework/protocols/evaluator.py`
+- Modify: `k_search/modular/protocols/analyzer.py`
+- Modify: `k_search/modular/protocols/evaluator.py`
 
 **Step 1: Update analyzer.py**
 
 Change import and parameter name (using `impl` per naming convention):
 ```python
-from k_search.task_framework.protocols.results import EvaluationResult, Implementation
+from k_search.modular.protocols.results import EvaluationResult, Implementation
 
 class Analyzer(Protocol):
     def analyze(
@@ -126,7 +126,7 @@ class Analyzer(Protocol):
 
 Change import and parameter name (using `impl` per naming convention):
 ```python
-from k_search.task_framework.protocols.results import EvaluationResult, Implementation
+from k_search.modular.protocols.results import EvaluationResult, Implementation
 
 class Evaluator(Protocol):
     def evaluate(
@@ -139,16 +139,16 @@ class Evaluator(Protocol):
 
 **Step 3: Verify**
 
-Run: `ruff check k_search/task_framework/protocols/`
+Run: `ruff check k_search/modular/protocols/`
 
 ---
 
 ## Task 5: Update All Exports
 
 **Files:**
-- Modify: `k_search/task_framework/protocols/__init__.py`
-- Modify: `k_search/task_framework/adapters/__init__.py`
-- Modify: `k_search/task_framework/__init__.py`
+- Modify: `k_search/modular/protocols/__init__.py`
+- Modify: `k_search/modular/adapters/__init__.py`
+- Modify: `k_search/modular/__init__.py`
 
 **Step 1: Update protocols/__init__.py**
 
@@ -158,28 +158,28 @@ Replace `SolutionArtifact` with `Implementation` in import and `__all__`.
 
 Replace `GpuModeSolutionArtifact` with `GpuModeImplementation` in import and `__all__`.
 
-**Step 3: Update task_framework/__init__.py**
+**Step 3: Update modular/__init__.py**
 
 Replace both names in imports and `__all__`.
 
 **Step 4: Verify imports work**
 
-Run: `python -c "from k_search.task_framework import Implementation, GpuModeImplementation; print('OK')"`
+Run: `python -c "from k_search.modular import Implementation, GpuModeImplementation; print('OK')"`
 
 ---
 
 ## Task 6: Update Tests
 
 **Files:**
-- Modify: `tests/task_framework/test_wrappers.py`
-- Modify: `tests/task_framework/test_gpu_mode_adapter.py`
-- Modify: `tests/task_framework/test_e2e_causal_conv1d.py`
+- Modify: `tests/modular/test_wrappers.py`
+- Modify: `tests/modular/test_gpu_mode_adapter.py`
+- Modify: `tests/modular/test_e2e_causal_conv1d.py`
 
 **Step 1: Update test_wrappers.py**
 
 - Rename `TestGpuModeSolutionArtifact` → `TestGpuModeImplementation`
 - Update imports: `GpuModeSolutionArtifact` → `GpuModeImplementation`
-- Update `TestEvalOutcome` to use `.impl` field instead of `.solution`
+- Update `TestRound` to use `.impl` field instead of `.solution`
 
 **Step 2: Update test_gpu_mode_adapter.py**
 
@@ -193,7 +193,7 @@ Run: `python -c "from k_search.task_framework import Implementation, GpuModeImpl
 
 **Step 4: Run all tests**
 
-Run: `CUDA_VISIBLE_DEVICES=3 python -m pytest tests/task_framework/ -v`
+Run: `CUDA_VISIBLE_DEVICES=3 python -m pytest tests/modular/ -v`
 Expected: All 23 tests pass
 
 ---
@@ -202,17 +202,17 @@ Expected: All 23 tests pass
 
 **Step 1: Run ruff**
 
-Run: `ruff check k_search/task_framework/ tests/task_framework/`
+Run: `ruff check k_search/modular/ tests/modular/`
 Expected: All checks passed
 
 **Step 2: Run ty**
 
-Run: `ty check k_search/task_framework/`
+Run: `ty check k_search/modular/`
 Expected: All checks passed
 
 **Step 3: Verify top-level imports**
 
-Run: `python -c "from k_search.task_framework import *; print('All exports OK')"`
+Run: `python -c "from k_search.modular import *; print('All exports OK')"`
 
 ---
 
@@ -230,7 +230,7 @@ Replace all occurrences:
 - `SolutionArtifact` → `Implementation`
 - `GpuModeSolutionArtifact` → `GpuModeImplementation`
 
-For EvalOutcome references, update field name:
+For Round references, update field name:
 - `.solution` → `.impl`
 
 **Step 2: Verify no stale references**
@@ -259,12 +259,12 @@ Expected: No matches (except possibly in historical notes)
 
 ```bash
 cd K-Search && git add -A && git commit -m "$(cat <<'EOF'
-refactor(task_framework): rename SolutionArtifact to Implementation
+refactor(modular): rename SolutionArtifact to Implementation
 
 Reconciles naming with 2026-03-04-implementation-protocol.md:
 - SolutionArtifact → Implementation (now uses attrs, not properties)
 - GpuModeSolutionArtifact → GpuModeImplementation
-- EvalOutcome.solution → EvalOutcome.impl
+- Round.solution → Round.impl
 - Updated all design docs for consistency
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
@@ -279,6 +279,6 @@ EOF
 After completing all tasks:
 - Protocol renamed: `Implementation` with simple `name`/`content` attributes (was `SolutionArtifact` with properties)
 - Wrapper renamed: `GpuModeImplementation` (was `GpuModeSolutionArtifact`)
-- Field renamed: `EvalOutcome.impl` (was `.solution`)
+- Field renamed: `Round.impl` (was `.solution`)
 - All docs updated for consistency
 - All 23 tests passing

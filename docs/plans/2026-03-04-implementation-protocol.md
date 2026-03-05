@@ -114,13 +114,13 @@ execute(impl, eval) → evaluator.evaluate(impl)
 - **Evaluator**: Runs implementations (loading, execution, checking)
 - **Implementation**: The code data
 
-## EvalOutcome
+## Round
 
 Pairs an implementation with its evaluation result. Extension point for additional data (e.g., analysis results).
 
 ```python
 @dataclass
-class EvalOutcome:
+class Round:
     impl: Implementation
     result: EvaluationResult
     # Extension fields added by subclasses or composition
