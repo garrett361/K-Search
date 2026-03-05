@@ -2,7 +2,7 @@
 
 from k_search.modular.llm_utils import strip_markdown_fences
 from k_search.modular.protocols import TaskDefinition
-from k_search.modular.round import Round
+from k_search.modular.world.round import Round
 
 __all__ = ["build_prompt", "strip_markdown_fences"]
 

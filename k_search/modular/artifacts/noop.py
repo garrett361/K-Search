@@ -1,6 +1,6 @@
 """No-op artifact store implementation."""
 
-from k_search.modular.round import Round
+from k_search.modular.world.round import Round
 
 
 class NoOpArtifactStore:

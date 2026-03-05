@@ -9,7 +9,7 @@ from k_search.modular.adapters.gpu_mode.wrappers import GpuModeImplementation
 from k_search.modular.results import CheckResult
 from k_search.modular.llm_utils import strip_markdown_fences
 from k_search.modular.protocols.eval_result import EvaluationResult
-from k_search.modular.round import Round
+from k_search.modular.world.round import Round
 from k_search.tasks.gpu_mode_task import GpuModeTask
 from k_search.tasks.task_base import BuildSpec, Solution, SourceFile, SupportedLanguages
 

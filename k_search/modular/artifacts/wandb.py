@@ -10,7 +10,7 @@ from pathlib import Path
 import wandb
 
 from k_search.modular.config import ArtifactConfig
-from k_search.modular.round import Round
+from k_search.modular.world.round import Round
 
 if TYPE_CHECKING:
     from k_search.modular.protocols import ArtifactStore

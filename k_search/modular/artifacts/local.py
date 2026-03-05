@@ -5,7 +5,7 @@ import shutil
 from pathlib import Path
 
 from k_search.modular.config import ArtifactConfig
-from k_search.modular.round import Round
+from k_search.modular.world.round import Round
 
 
 class LocalArtifactStore:

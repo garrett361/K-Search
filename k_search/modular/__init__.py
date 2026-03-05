@@ -3,7 +3,7 @@
 from k_search.modular.config import ArtifactConfig, MetricsConfig, SearchConfig, SearchResult
 from k_search.modular.loop import LLMCall, run_search
 from k_search.modular.results import AnalysisResult, CheckResult
-from k_search.modular.round import Round
+from k_search.modular.world.round import Round
 
 from k_search.modular.protocols import (
     Analyzer,

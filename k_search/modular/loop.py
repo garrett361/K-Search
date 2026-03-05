@@ -15,7 +15,7 @@ from k_search.modular.protocols import (
     MetricsTracker,
 )
 from k_search.modular.protocols.task_definition import TaskDefinition
-from k_search.modular.round import Round
+from k_search.modular.world.round import Round
 
 logger = logging.getLogger(__name__)
 
