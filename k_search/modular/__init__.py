@@ -3,7 +3,7 @@
 from k_search.modular.config import ArtifactConfig, MetricsConfig, SearchConfig, SearchResult
 from k_search.modular.loop import LLMCall, run_search
 from k_search.modular.results import AnalysisResult, CheckResult
-from k_search.modular.world.round import Round
+from k_search.modular.world import Action, Cycle, Node, Round, Tree
 
 from k_search.modular.protocols import (
     Analyzer,
@@ -17,7 +17,9 @@ from k_search.modular.protocols import (
     MetricsTracker,
     ReferenceImpl,
     Scorer,
+    StateFormatter,
     TaskDefinition,
+    WorldModel,
 )
 from k_search.modular.adapters import (
     GpuModeEvaluationResult,
@@ -40,7 +42,12 @@ __all__ = [
     # Types
     "AnalysisResult",
     "CheckResult",
+    # World
+    "Action",
+    "Cycle",
+    "Node",
     "Round",
+    "Tree",
     # Protocols
     "Analyzer",
     "ArtifactStore",
@@ -53,7 +60,9 @@ __all__ = [
     "MetricsTracker",
     "ReferenceImpl",
     "Scorer",
+    "StateFormatter",
     "TaskDefinition",
+    "WorldModel",
     # Adapters
     "GpuModeEvaluationResult",
     "GpuModeEvaluator",
