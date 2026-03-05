@@ -4,8 +4,8 @@ import pytest
 from pathlib import Path
 
 from k_search.search_v2 import run_search, SearchConfig
+from k_search.task_framework.adapters import GpuModeEvaluator, GpuModeTaskDefinition
 from k_search.tasks.gpu_mode_task import GpuModeTask
-from k_search.task_framework.adapters import GpuModeAdapter, GpuModeEvaluator
 
 
 CAUSAL_CONV1D_DIR = (
@@ -34,14 +34,14 @@ class TestE2ESearch:
     def test_single_round_with_valid_code(self, task_dir: Path, valid_triton_code: str):
         """Run single search round with valid Triton code, verify score and metrics."""
         gpu_task = GpuModeTask(task_dir=task_dir)
-        adapter = GpuModeAdapter(gpu_task)
+        task_def = GpuModeTaskDefinition(gpu_task)
         evaluator = GpuModeEvaluator(gpu_task)
 
         def mock_llm(prompt: str) -> str:
             return valid_triton_code
 
         config = SearchConfig(max_rounds=1)
-        result = run_search(adapter, evaluator, mock_llm, config)
+        result = run_search(task_def, evaluator, mock_llm, config)
 
         assert result.rounds_completed == 1
         assert result.impl is not None
@@ -54,7 +54,7 @@ class TestE2ESearch:
     def test_two_rounds_best_tracked(self, task_dir: Path, valid_triton_code: str):
         """Run two rounds, verify best result is tracked correctly."""
         gpu_task = GpuModeTask(task_dir=task_dir)
-        adapter = GpuModeAdapter(gpu_task)
+        task_def = GpuModeTaskDefinition(gpu_task)
         evaluator = GpuModeEvaluator(gpu_task)
 
         call_count = 0
@@ -65,7 +65,7 @@ class TestE2ESearch:
             return valid_triton_code
 
         config = SearchConfig(max_rounds=2)
-        result = run_search(adapter, evaluator, mock_llm, config)
+        result = run_search(task_def, evaluator, mock_llm, config)
 
         assert result.rounds_completed == 2
         assert call_count == 2

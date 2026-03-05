@@ -11,7 +11,7 @@ from k_search.tasks.task_base import (
 
 class TestGpuModeEvaluationResult:
     def test_wraps_eval_result(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
+        from k_search.task_framework.adapters.gpu_mode import GpuModeEvaluationResult
 
         inner = EvalResult(status="passed", latency_ms=1.5, log_excerpt="test log")
         wrapper = GpuModeEvaluationResult(inner)
@@ -20,7 +20,7 @@ class TestGpuModeEvaluationResult:
         assert wrapper.get_log() == "test log"
 
     def test_is_success_false_for_failed(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
+        from k_search.task_framework.adapters.gpu_mode import GpuModeEvaluationResult
 
         inner = EvalResult(status="failed", log_excerpt="error")
         wrapper = GpuModeEvaluationResult(inner)
@@ -28,7 +28,7 @@ class TestGpuModeEvaluationResult:
         assert wrapper.is_success() is False
 
     def test_get_metrics_excludes_log(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
+        from k_search.task_framework.adapters.gpu_mode import GpuModeEvaluationResult
 
         inner = EvalResult(
             status="passed",
@@ -43,7 +43,7 @@ class TestGpuModeEvaluationResult:
         assert "log_excerpt" not in metrics
 
     def test_backwards_compat_is_passed(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
+        from k_search.task_framework.adapters.gpu_mode import GpuModeEvaluationResult
 
         inner = EvalResult(status="passed", latency_ms=1.0)
         wrapper = GpuModeEvaluationResult(inner)
@@ -54,7 +54,7 @@ class TestGpuModeEvaluationResult:
         assert wrapper.status == "passed"
 
     def test_backwards_compat_to_dict(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
+        from k_search.task_framework.adapters.gpu_mode import GpuModeEvaluationResult
 
         inner = EvalResult(status="passed", latency_ms=1.0, log_excerpt="log")
         wrapper = GpuModeEvaluationResult(inner)
@@ -64,7 +64,7 @@ class TestGpuModeEvaluationResult:
         assert d["latency_ms"] == 1.0
 
     def test_backwards_compat_score(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
+        from k_search.task_framework.adapters.gpu_mode import GpuModeEvaluationResult
 
         inner = EvalResult(status="passed", latency_ms=2.0)
         wrapper = GpuModeEvaluationResult(inner)
@@ -74,7 +74,7 @@ class TestGpuModeEvaluationResult:
 
 class TestGpuModeImplementation:
     def test_wraps_solution(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeImplementation
+        from k_search.task_framework.adapters.gpu_mode import GpuModeImplementation
 
         inner = Solution(
             name="test_sol",
@@ -97,7 +97,7 @@ class TestGpuModeImplementation:
 
 class TestGpuModeImplementationArtifactDir:
     def test_yields_directory_with_source_files(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeImplementation
+        from k_search.task_framework.adapters.gpu_mode import GpuModeImplementation
 
         solution = Solution(
             name="test",
@@ -121,7 +121,7 @@ class TestGpuModeImplementationArtifactDir:
             assert (src_dir / "utils.py").read_text() == "# utils"
 
     def test_yields_none_when_no_sources(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeImplementation
+        from k_search.task_framework.adapters.gpu_mode import GpuModeImplementation
 
         solution = Solution(
             name="test",
@@ -140,7 +140,7 @@ class TestGpuModeImplementationArtifactDir:
             assert src_dir is None
 
     def test_cleans_up_temp_dir_after_context(self):
-        from k_search.task_framework.adapters.wrappers import GpuModeImplementation
+        from k_search.task_framework.adapters.gpu_mode import GpuModeImplementation
 
         solution = Solution(
             name="test",
@@ -163,11 +163,11 @@ class TestGpuModeImplementationArtifactDir:
 
 class TestEvalOutcome:
     def test_eval_outcome_holds_impl_and_result(self):
-        from k_search.task_framework.types import EvalOutcome
-        from k_search.task_framework.adapters.wrappers import (
+        from k_search.task_framework.adapters.gpu_mode import (
             GpuModeEvaluationResult,
             GpuModeImplementation,
         )
+        from k_search.task_framework.types import EvalOutcome
         from k_search.tasks.task_base import (
             EvalResult,
             Solution,

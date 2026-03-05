@@ -14,6 +14,13 @@ def make_eval_result_mock(is_success: bool = True, metrics: dict | None = None) 
     return result
 
 
+def make_impl_mock(name: str = "test_impl") -> Mock:
+    """Create a mock Implementation."""
+    impl = Mock()
+    impl.name = name
+    return impl
+
+
 def make_task_mock(name: str = "test_task") -> Mock:
     """Create a mock TaskDefinition."""
     task = Mock()
@@ -21,6 +28,15 @@ def make_task_mock(name: str = "test_task") -> Mock:
     task.get_prompt_text.return_value = "Generate optimized kernel code"
     task.scorer.score.return_value = 0.5
     task.feedback_provider.for_codegen.return_value = "Previous attempt feedback"
+
+    impl_counter = [0]
+
+    def create_impl(llm_output: str) -> Mock:
+        impl = make_impl_mock(f"{name}_r{impl_counter[0]}")
+        impl_counter[0] += 1
+        return impl
+
+    task.create_implementation.side_effect = create_impl
     return task
 
 
@@ -260,12 +276,24 @@ class TestBuildPrompt:
 
 
 class TestCreateImplementation:
-    """Tests for create_implementation function."""
+    """Tests for task.create_implementation via GpuModeTaskDefinition."""
 
     def test_creates_valid_implementation(self):
-        from k_search.search_v2.prompts import create_implementation
+        from unittest.mock import MagicMock
 
-        impl = create_implementation("def kernel(): pass", 5, "my_task", "triton")
+        from k_search.task_framework.adapters.gpu_mode import GpuModeTaskDefinition
+
+        mock_task = MagicMock()
+        mock_task.name = "my_task"
+        mock_task._cfg.task_dir.exists.return_value = False
+
+        task_def = GpuModeTaskDefinition.__new__(GpuModeTaskDefinition)
+        task_def._task = mock_task
+        task_def._language = "triton"
+        task_def._impl_counter = 5
+        task_def.name = "my_task"
+
+        impl = task_def.create_implementation("def kernel(): pass")
 
         assert impl.name == "my_task_r5"
         assert impl.content.definition == "my_task"
@@ -273,11 +301,43 @@ class TestCreateImplementation:
         assert "def kernel(): pass" in impl.content.sources[0].content
 
     def test_default_language_is_triton(self):
-        from k_search.search_v2.prompts import create_implementation
+        from unittest.mock import MagicMock
 
-        impl = create_implementation("code", 0)
+        from k_search.task_framework.adapters.gpu_mode import GpuModeTaskDefinition
+
+        mock_task = MagicMock()
+        mock_task.name = "test_task"
+
+        task_def = GpuModeTaskDefinition.__new__(GpuModeTaskDefinition)
+        task_def._task = mock_task
+        task_def._language = "triton"
+        task_def._impl_counter = 0
+        task_def.name = "test_task"
+
+        impl = task_def.create_implementation("code")
 
         assert impl.content.spec.language.value == "triton"
+
+    def test_increments_counter(self):
+        from unittest.mock import MagicMock
+
+        from k_search.task_framework.adapters.gpu_mode import GpuModeTaskDefinition
+
+        mock_task = MagicMock()
+        mock_task.name = "test_task"
+
+        task_def = GpuModeTaskDefinition.__new__(GpuModeTaskDefinition)
+        task_def._task = mock_task
+        task_def._language = "triton"
+        task_def._impl_counter = 0
+        task_def.name = "test_task"
+
+        impl1 = task_def.create_implementation("code1")
+        impl2 = task_def.create_implementation("code2")
+
+        assert impl1.name == "test_task_r0"
+        assert impl2.name == "test_task_r1"
+        assert task_def._impl_counter == 2
 
 
 class TestStripMarkdownFences:

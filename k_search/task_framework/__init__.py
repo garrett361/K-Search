@@ -14,9 +14,9 @@ from k_search.task_framework.protocols import (
     TaskDefinition,
 )
 from k_search.task_framework.adapters import (
-    GpuModeAdapter,
     GpuModeEvaluationResult,
     GpuModeImplementation,
+    GpuModeTaskDefinition,
 )
 
 __all__ = [
@@ -36,7 +36,7 @@ __all__ = [
     "Analyzer",
     "TaskDefinition",
     # Adapters
-    "GpuModeAdapter",
     "GpuModeEvaluationResult",
     "GpuModeImplementation",
+    "GpuModeTaskDefinition",
 ]

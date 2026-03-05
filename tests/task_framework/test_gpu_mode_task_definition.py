@@ -1,4 +1,4 @@
-"""Tests for GpuModeAdapter."""
+"""Tests for GpuModeTaskDefinition."""
 
 import pytest
 from pathlib import Path
@@ -16,95 +16,99 @@ CAUSAL_CONV1D_DIR = (
 
 
 @pytest.mark.cuda
-class TestGpuModeAdapterConstruction:
-    def test_adapter_wraps_gpu_mode_task(self):
-        from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
+class TestGpuModeTaskDefinitionConstruction:
+    def test_wraps_gpu_mode_task(self):
+        from k_search.task_framework.adapters.gpu_mode import GpuModeTaskDefinition
 
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        adapter = GpuModeAdapter(task)
+        task_def = GpuModeTaskDefinition(task)
 
-        assert adapter.name == task.name
+        assert task_def.name == task.name
 
-    def test_adapter_has_required_components(self):
-        from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
+    def test_has_required_components(self):
+        from k_search.task_framework.adapters.gpu_mode import GpuModeTaskDefinition
 
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        adapter = GpuModeAdapter(task)
+        task_def = GpuModeTaskDefinition(task)
 
-        assert adapter.input_generator is not None
-        assert adapter.correctness_checker is not None
-        assert adapter.scorer is not None
-        assert adapter.feedback_provider is not None
-        assert adapter.reference_impl is not None
+        assert task_def.input_generator is not None
+        assert task_def.correctness_checker is not None
+        assert task_def.scorer is not None
+        assert task_def.feedback_provider is not None
+        assert task_def.reference_impl is not None
 
     def test_get_prompt_text_returns_spec(self):
-        from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
+        from k_search.task_framework.adapters.gpu_mode import GpuModeTaskDefinition
 
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        adapter = GpuModeAdapter(task)
+        task_def = GpuModeTaskDefinition(task)
 
-        prompt = adapter.get_prompt_text()
+        prompt = task_def.get_prompt_text()
         assert "custom_kernel" in prompt
         assert len(prompt) > 100
 
     def test_get_prompt_text_respects_language(self):
-        from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
+        from k_search.task_framework.adapters.gpu_mode import GpuModeTaskDefinition
 
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        adapter = GpuModeAdapter(task)
+        task_def = GpuModeTaskDefinition(task)
 
-        triton_prompt = adapter.get_prompt_text(context={"language": "triton"})
+        triton_prompt = task_def.get_prompt_text(context={"language": "triton"})
         assert "triton" in triton_prompt.lower() or "custom_kernel" in triton_prompt
 
 
 @pytest.mark.cuda
-class TestGpuModeAdapterScorer:
+class TestGpuModeTaskDefinitionScorer:
     def test_scorer_returns_positive_for_passed(self):
-        from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
-        from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
+        from k_search.task_framework.adapters.gpu_mode import (
+            GpuModeEvaluationResult,
+            GpuModeTaskDefinition,
+        )
         from k_search.tasks.task_base import EvalResult
 
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        adapter = GpuModeAdapter(task)
+        task_def = GpuModeTaskDefinition(task)
 
         result = GpuModeEvaluationResult(EvalResult(status="passed", latency_ms=1.0))
-        score = adapter.scorer.score(result)
+        score = task_def.scorer.score(result)
 
         assert score > 0
 
     def test_scorer_returns_zero_for_failed(self):
-        from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
-        from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
+        from k_search.task_framework.adapters.gpu_mode import (
+            GpuModeEvaluationResult,
+            GpuModeTaskDefinition,
+        )
         from k_search.tasks.task_base import EvalResult
 
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        adapter = GpuModeAdapter(task)
+        task_def = GpuModeTaskDefinition(task)
 
         result = GpuModeEvaluationResult(EvalResult(status="failed"))
-        score = adapter.scorer.score(result)
+        score = task_def.scorer.score(result)
 
         assert score == 0.0
 
 
 @pytest.mark.cuda
-class TestGpuModeAdapterFeedbackProvider:
+class TestGpuModeTaskDefinitionFeedbackProvider:
     def test_for_codegen_returns_log(self):
-        from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
-        from k_search.task_framework.adapters.wrappers import (
+        from k_search.task_framework.adapters.gpu_mode import (
             GpuModeEvaluationResult,
             GpuModeImplementation,
+            GpuModeTaskDefinition,
         )
         from k_search.task_framework.types import EvalOutcome
         from k_search.tasks.task_base import (
+            BuildSpec,
             EvalResult,
             Solution,
-            BuildSpec,
             SourceFile,
             SupportedLanguages,
         )
 
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        adapter = GpuModeAdapter(task)
+        task_def = GpuModeTaskDefinition(task)
 
         sol = Solution(
             name="test",
@@ -123,26 +127,26 @@ class TestGpuModeAdapterFeedbackProvider:
             result=GpuModeEvaluationResult(result),
         )
 
-        feedback = adapter.feedback_provider.for_codegen(outcome)
+        feedback = task_def.feedback_provider.for_codegen(outcome)
         assert "index out of bounds" in feedback
 
     def test_for_world_model_returns_metrics(self):
-        from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
-        from k_search.task_framework.adapters.wrappers import (
+        from k_search.task_framework.adapters.gpu_mode import (
             GpuModeEvaluationResult,
             GpuModeImplementation,
+            GpuModeTaskDefinition,
         )
         from k_search.task_framework.types import EvalOutcome
         from k_search.tasks.task_base import (
+            BuildSpec,
             EvalResult,
             Solution,
-            BuildSpec,
             SourceFile,
             SupportedLanguages,
         )
 
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        adapter = GpuModeAdapter(task)
+        task_def = GpuModeTaskDefinition(task)
 
         sol = Solution(
             name="test",
@@ -161,6 +165,6 @@ class TestGpuModeAdapterFeedbackProvider:
             result=GpuModeEvaluationResult(result),
         )
 
-        metrics_list = adapter.feedback_provider.for_world_model(outcome)
+        metrics_list = task_def.feedback_provider.for_world_model(outcome)
         assert len(metrics_list) == 1
         assert "latency_ms" in metrics_list[0]

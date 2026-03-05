@@ -1,4 +1,4 @@
-"""Wrappers adapting GpuMode types to task_framework protocols."""
+"""GPU Mode type wrappers implementing task_framework protocols."""
 
 import tempfile
 from collections.abc import Iterator
@@ -10,12 +10,11 @@ from k_search.tasks.task_base import EvalResult, Solution
 
 
 class GpuModeEvaluationResult:
-    """Wraps EvalResult to implement EvaluationResult protocol + backwards compat."""
+    """Wraps EvalResult to implement EvaluationResult protocol."""
 
     def __init__(self, inner: EvalResult) -> None:
         self._inner = inner
 
-    # New protocol methods
     def is_success(self) -> bool:
         return self._inner.is_passed()
 
@@ -24,10 +23,6 @@ class GpuModeEvaluationResult:
 
     def get_log(self) -> str:
         return self._inner.log_excerpt
-
-    # Backwards compatibility with V1 interface
-    def is_passed(self) -> bool:
-        return self._inner.is_passed()
 
     @property
     def status(self) -> str:
@@ -38,24 +33,11 @@ class GpuModeEvaluationResult:
         return self._inner.latency_ms
 
     @property
-    def reference_latency_ms(self) -> float | None:
-        return self._inner.reference_latency_ms
-
-    @property
-    def mean_vs_baseline_factor(self) -> float | None:
-        return self._inner.mean_vs_baseline_factor
-
-    @property
     def speedup_factor(self) -> float | None:
         return self._inner.speedup_factor
 
-    @property
-    def log_excerpt(self) -> str:
-        return self._inner.log_excerpt
-
-    @property
-    def metrics(self) -> dict[str, Any]:
-        return self._inner.metrics
+    def is_passed(self) -> bool:
+        return self._inner.is_passed()
 
     def to_dict(self, **kwargs: Any) -> dict[str, Any]:
         return self._inner.to_dict(**kwargs)
@@ -63,15 +45,9 @@ class GpuModeEvaluationResult:
     def score(self) -> float:
         return self._inner.score()
 
-    def status_code(self) -> int:
-        return self._inner.status_code()
-
-    def perf_summary_lines(self, *, prefix: str) -> list[str]:
-        return self._inner.perf_summary_lines(prefix=prefix)
-
 
 class GpuModeImplementation:
-    """Wrapper exposing V1 Solution as Implementation protocol."""
+    """Wraps Solution to implement Implementation protocol."""
 
     def __init__(self, inner: Solution) -> None:
         self.inner = inner

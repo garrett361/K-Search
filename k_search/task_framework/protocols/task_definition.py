@@ -2,11 +2,12 @@
 
 from typing import Any, Protocol
 
+from k_search.task_framework.protocols.correctness import CorrectnessChecker
+from k_search.task_framework.protocols.feedback_provider import FeedbackProvider
 from k_search.task_framework.protocols.input_generator import InputGenerator
 from k_search.task_framework.protocols.reference_impl import ReferenceImpl
-from k_search.task_framework.protocols.correctness import CorrectnessChecker
+from k_search.task_framework.protocols.results import Implementation
 from k_search.task_framework.protocols.scorer import Scorer
-from k_search.task_framework.protocols.feedback_provider import FeedbackProvider
 
 
 class TaskDefinition(Protocol):
@@ -26,4 +27,11 @@ class TaskDefinition(Protocol):
 
     def get_test_cases(self) -> list[dict[str, Any]]:
         """Parameter sets for evaluation."""
+        ...
+
+    def create_implementation(self, llm_output: str) -> Implementation:
+        """Create Implementation from raw LLM output.
+
+        Task handles: parsing (strip markdown), naming, language, entry points, build spec.
+        """
         ...

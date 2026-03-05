@@ -11,11 +11,11 @@ from pathlib import Path
 import openai
 
 from k_search.search_v2 import run_search, SearchConfig, ArtifactConfig
-from k_search.search_v2.config import MetricsConfig
 from k_search.search_v2.artifacts import create_artifact_stores
+from k_search.search_v2.config import MetricsConfig
 from k_search.search_v2.metrics import create_metrics_trackers
+from k_search.task_framework.adapters import GpuModeEvaluator, GpuModeTaskDefinition
 from k_search.tasks.gpu_mode_task import GpuModeTask
-from k_search.task_framework.adapters import GpuModeAdapter, GpuModeEvaluator
 
 logging.basicConfig(
     level=logging.INFO,
@@ -116,7 +116,7 @@ def main():
 
     logger.info(f"Loading task: {args.task}")
     gpu_task = GpuModeTask(name=args.task, task_dir=task_dir)
-    adapter = GpuModeAdapter(gpu_task)
+    task_def = GpuModeTaskDefinition(gpu_task, language=args.language)
     evaluator = GpuModeEvaluator(gpu_task)
 
     client_kwargs = {"api_key": api_key, "timeout": args.timeout}
@@ -173,7 +173,7 @@ def main():
     )
 
     result = run_search(
-        adapter,
+        task_def,
         evaluator,
         llm,
         config,

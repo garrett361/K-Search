@@ -1,10 +1,10 @@
-"""GpuModeEvaluator: Evaluator implementation for GpuModeTask."""
+"""GPU Mode Evaluator implementation."""
 
 from typing import Any
 
-from k_search.tasks.gpu_mode_task import GpuModeTask
+from k_search.task_framework.adapters.gpu_mode.types import GpuModeEvaluationResult
 from k_search.task_framework.protocols.results import EvaluationResult, Implementation
-from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
+from k_search.tasks.gpu_mode_task import GpuModeTask
 
 
 class GpuModeEvaluator:
@@ -20,13 +20,7 @@ class GpuModeEvaluator:
         timeout_secs: int | None = None,
         context: dict[str, Any] | None = None,
     ) -> EvaluationResult:
-        """Evaluate implementation by delegating to V1 run_benchmark."""
-        # Extract Solution from Implementation wrapper
-        # GpuModeImplementation wraps Solution as .content
+        """Evaluate implementation by delegating to run_benchmark."""
         solution = impl.content
-
-        # Delegate to V1 evaluation
         eval_result = self._task.run_benchmark(solution=solution)
-
-        # Wrap in protocol-compliant result
         return GpuModeEvaluationResult(eval_result)

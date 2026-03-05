@@ -3,13 +3,13 @@
 import pytest
 from pathlib import Path
 
-from k_search.tasks.gpu_mode_task import GpuModeTask
 from k_search.task_framework import (
-    GpuModeAdapter,
+    EvalOutcome,
     GpuModeEvaluationResult,
     GpuModeImplementation,
-    EvalOutcome,
+    GpuModeTaskDefinition,
 )
+from k_search.tasks.gpu_mode_task import GpuModeTask
 
 
 CAUSAL_CONV1D_DIR = (
@@ -24,22 +24,22 @@ CAUSAL_CONV1D_DIR = (
 class TestTaskFrameworkE2E:
     """E2E tests validating task_framework works with real causal_conv1d task."""
 
-    def test_adapter_loads_causal_conv1d(self):
-        """Verify adapter can wrap causal_conv1d task."""
+    def test_task_definition_loads_causal_conv1d(self):
+        """Verify task definition can wrap causal_conv1d task."""
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        adapter = GpuModeAdapter(task)
+        task_def = GpuModeTaskDefinition(task)
 
-        assert "causal_conv1d" in adapter.name
-        assert adapter.input_generator is not None
-        assert adapter.reference_impl is not None
+        assert "causal_conv1d" in task_def.name
+        assert task_def.input_generator is not None
+        assert task_def.reference_impl is not None
 
     @pytest.mark.cuda
     def test_input_generator_produces_valid_data(self):
         """Verify input generator produces valid tensors."""
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        adapter = GpuModeAdapter(task)
+        task_def = GpuModeTaskDefinition(task)
 
-        data = adapter.input_generator.generate(
+        data = task_def.input_generator.generate(
             params={"B": 2, "T": 64, "D": 32, "W": 4},
             seed=42,
         )
@@ -53,22 +53,22 @@ class TestTaskFrameworkE2E:
     def test_reference_impl_runs(self):
         """Verify reference implementation runs."""
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        adapter = GpuModeAdapter(task)
+        task_def = GpuModeTaskDefinition(task)
 
-        data = adapter.input_generator.generate(
+        data = task_def.input_generator.generate(
             params={"B": 2, "T": 64, "D": 32, "W": 4},
             seed=42,
         )
-        output = adapter.reference_impl.run(data)
+        output = task_def.reference_impl.run(data)
 
         assert output.shape == (2, 64, 32)
 
     def test_prompt_text_contains_spec(self):
         """Verify prompt text includes task specification."""
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        adapter = GpuModeAdapter(task)
+        task_def = GpuModeTaskDefinition(task)
 
-        prompt = adapter.get_prompt_text()
+        prompt = task_def.get_prompt_text()
 
         assert "custom_kernel" in prompt
         assert "causal" in prompt.lower() or "conv" in prompt.lower()
@@ -78,25 +78,25 @@ class TestTaskFrameworkE2E:
         from k_search.tasks.task_base import EvalResult
 
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        adapter = GpuModeAdapter(task)
+        task_def = GpuModeTaskDefinition(task)
 
         result = GpuModeEvaluationResult(EvalResult(status="passed", latency_ms=2.0))
-        score = adapter.scorer.score(result)
+        score = task_def.scorer.score(result)
 
         assert score == 0.5  # 1/2.0
 
     def test_feedback_provider_formats_outcome(self):
         """Verify feedback provider formats EvalOutcome correctly."""
         from k_search.tasks.task_base import (
+            BuildSpec,
             EvalResult,
             Solution,
-            BuildSpec,
             SourceFile,
             SupportedLanguages,
         )
 
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        adapter = GpuModeAdapter(task)
+        task_def = GpuModeTaskDefinition(task)
 
         sol = Solution(
             name="test",
@@ -122,10 +122,10 @@ class TestTaskFrameworkE2E:
             result=GpuModeEvaluationResult(result),
         )
 
-        codegen_feedback = adapter.feedback_provider.for_codegen(outcome)
+        codegen_feedback = task_def.feedback_provider.for_codegen(outcome)
         assert "CUDA error" in codegen_feedback
 
-        wm_metrics = adapter.feedback_provider.for_world_model(outcome)
+        wm_metrics = task_def.feedback_provider.for_world_model(outcome)
         assert len(wm_metrics) == 1
         assert wm_metrics[0]["status"] == "failed"
 
@@ -134,18 +134,15 @@ class TestTaskFrameworkE2E:
     def test_full_eval_workflow(self):
         """Full workflow: generate input, run reference, check baseline."""
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        adapter = GpuModeAdapter(task)
+        task_def = GpuModeTaskDefinition(task)
 
-        # Generate input
-        data = adapter.input_generator.generate(
+        data = task_def.input_generator.generate(
             params={"B": 2, "T": 64, "D": 32, "W": 4},
             seed=42,
         )
 
-        # Run reference
-        ref_output = adapter.reference_impl.run(data)
+        ref_output = task_def.reference_impl.run(data)
         assert ref_output.shape == (2, 64, 32)
 
-        # Verify prompt is usable
-        prompt = adapter.get_prompt_text(context={"language": "triton"})
+        prompt = task_def.get_prompt_text(context={"language": "triton"})
         assert len(prompt) > 500
