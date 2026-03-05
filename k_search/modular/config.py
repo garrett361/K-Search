@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from k_search.task_framework.protocols.results import EvaluationResult, Implementation
+from k_search.modular.protocols import EvaluationResult, Implementation
 
 
 @dataclass
