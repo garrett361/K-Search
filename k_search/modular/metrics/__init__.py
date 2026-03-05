@@ -9,7 +9,7 @@ from k_search.modular.metrics.wandb import WandbMetricsTracker
 
 if TYPE_CHECKING:
     from k_search.modular.protocols import MetricsTracker
-    from k_search.search_v2.config import MetricsConfig
+    from k_search.modular.config import MetricsConfig
 
 __all__ = [
     "NoOpMetricsTracker",
@@ -21,7 +21,7 @@ __all__ = [
 def create_metrics_trackers(
     config: MetricsConfig | None = None,
 ) -> list[MetricsTracker]:
-    from k_search.search_v2.config import MetricsConfig as _MetricsConfig
+    from k_search.modular.config import MetricsConfig as _MetricsConfig
 
     config = config or _MetricsConfig()
     if config.wandb:
