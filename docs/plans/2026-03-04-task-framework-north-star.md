@@ -1,85 +1,80 @@
 # Task Framework North-Star Architecture
 
-Single-source visual reference consolidating `2026-03-04-task-framework-design.md`, `2026-03-04-implementation-protocol.md`, and `2026-03-04-search-v2-design.md`.
+Single-source visual reference consolidating `2026-03-04-task-framework-design.md`, `2026-03-04-implementation-protocol.md`, `2026-03-04-search-v2-design.md`, and `2026-03-05-tree-data-model-design.md`. Status: ✅ implemented, 🔲 planned.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                        SearchOrchestrator (modular)                        │
+│                   SearchOrchestrator (modular) 🔲                           │
 │                                                                              │
 │  __init__(                                                                   │
 │    task: TaskDefinition,                                                     │
-│    executor: Executor,                                                       │
+│    evaluator: Evaluator,                                                     │
 │    codegen_llm: Callable[[str], str],                                        │
-│    selector: ActionSelector,                                                 │
+│    world_model: WorldModel,                                                  │
 │    formatter: StateFormatter,                                                │
 │    config: SearchConfig                                                      │
 │  )                                                                           │
 │                                                                              │
-│  run() -> SolutionNode | None                                                │
+│  run() -> Node | None                                                        │
 │                                                                              │
 │  Main loop:                                                                  │
-│    1. actions: list[ActionNode] = selector.select(tree, k=1)                 │
-│    2. prompt: str = formatter.format_tree(tree) + task.get_prompt_text()     │
-│    3. code: str = codegen_llm(prompt)                                        │
-│    4. impl: Implementation = parse_code_to_impl(code)                        │
-│    5. outcome: Round = executor.execute(impl)                          │
-│    6. selector.update(tree, action, outcome)                                 │
+│    1. node: Node = world_model.select(tree)                                  │
+│    2. node.status = "in_progress"                                            │
+│    3. cycle: Cycle = execute_cycle(node)  # multiple rounds                  │
+│    4. node.cycle = cycle; node.status = "closed"                             │
+│    5. world_model.update(tree)                                               │
+│    6. new_node: Node = world_model.propose(tree)                             │
+│    7. tree.add_node(new_node)                                                │
 └─────────────────────────────────────────────────────────────────────────────┘
           │                    │                      │
           │ uses               │ uses                 │ uses
           ▼                    ▼                      ▼
 ┌──────────────────┐  ┌─────────────────┐  ┌──────────────────────────────────┐
-│ ActionSelector   │  │ StateFormatter  │  │ TaskDefinition + Executor        │
-│ (Protocol)       │  │ (Protocol)      │  │ (from modular)            │
+│ WorldModel ✅    │  │ StateFormatter ✅│  │ TaskDefinition ✅ + Evaluator ✅ │
+│ (Protocol)       │  │ (Protocol)      │  │ (from modular)                   │
 │                  │  │                 │  │                                  │
-│ propose_actions( │  │ format_tree(    │  │ See below                        │
-│   tree: SolTree, │  │   tree: SolTree,│  │                                  │
-│   context: dict? │  │   context: dict?│  │                                  │
-│ )->list[ActNode] │  │ ) -> str        │  │                                  │
-│                  │  │                 │  │                                  │
-│ select(          │  │ format_frontier(│  │                                  │
-│   tree: SolTree, │  │   actions: list │  │                                  │
-│   k: int         │  │     [ActionNode]│  │                                  │
-│ )->list[ActNode] │  │ ) -> str        │  │                                  │
-│                  │  │                 │  │                                  │
-│ update(          │  └─────────────────┘  │                                  │
-│   tree: SolTree, │                       │                                  │
-│   action: ActNode│  Implementations:     │                                  │
-│   outcome: Eval- │  - LegacyJSONFmt      │                                  │
-│     Outcome      │  - MarkdownFmt        │                                  │
+│ propose(         │  │ format_tree(    │  │ See below                        │
+│   tree: Tree,    │  │   tree: Tree    │  │                                  │
+│   context: dict? │  │ ) -> str        │  │                                  │
+│ ) -> Node        │  │                 │  │                                  │
+│                  │  │ format_node(    │  │                                  │
+│ select(          │  │   node: Node    │  │                                  │
+│   tree: Tree,    │  │ ) -> str        │  │                                  │
+│   context: dict? │  │                 │  │                                  │
+│ ) -> Node        │  └─────────────────┘  │                                  │
+│                  │                       │                                  │
+│ update(          │  Implementations: 🔲  │                                  │
+│   tree: Tree,    │  - LegacyJSONFmt      │                                  │
+│   context: dict? │  - MarkdownFmt        │                                  │
 │ ) -> None        │                       │                                  │
 │                  │                       │                                  │
-│ Implementations: │                       │                                  │
+│ Impl: 🔲         │                       │                                  │
 │ - LLMWorldModel  │                       │                                  │
-│ - SimpleRefine   │                       │                                  │
 └──────────────────┘                       └──────────────────────────────────┘
 
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                       SolutionTree (modular/model)                         │
+│                        Tree (modular/world) ✅                               │
 │  (Dataclass)                                                                 │
 │                                                                              │
-│  solutions: dict[str, SolutionNode]                                          │
-│  actions: dict[str, ActionNode]                                              │
-│  root_id: str                                                                │
-│  active_leaf_id: str                                                         │
+│  root: Node                                                                  │
+│  annotations: dict[str, Any] | None                                          │
 │                                                                              │
 │  ┌───────────────────────────────┐  ┌───────────────────────────────────┐   │
-│  │ SolutionNode (Dataclass)      │  │ ActionNode (Dataclass)            │   │
+│  │ Node (Dataclass) ✅           │  │ Action (Dataclass) ✅             │   │
 │  │                               │  │                                   │   │
-│  │ id: str                       │  │ id: str                           │   │
-│  │ parent_id: str | None         │  │ parent_solution_id: str           │   │
-│  │ solution_id: str | None       │  │ title: str                        │   │
-│  │ solution_content: Any         │  │ description: str                  │   │
-│  │ eval_result: dict[str,Any]|None│  │ difficulty: int                   │   │
-│  │ status: str                   │  │ predicted_score: float            │   │
-│  │ depth: int                    │  │ status: str                       │   │
-│  │ child_action_ids: list[str]   │  │ result_solution_id: str | None    │   │
-│  └───────────────────────────────┘  └───────────────────────────────────┘   │
-│                                                                              │
-│  get_frontier() -> list[ActionNode]                                          │
-│  get_best_solution() -> SolutionNode | None                                  │
-│  get_path_to_root(node_id: str) -> list[SolutionNode]                        │
+│  │ parent: Node | None           │  │ title: str                        │   │
+│  │ children: list[Node]          │  │ annotations: dict | None          │   │
+│  │ status: str                   │  └───────────────────────────────────┘   │
+│  │ action: Action | None         │                                          │
+│  │ cycle: Cycle | None           │  ┌───────────────────────────────────┐   │
+│  │ annotations: dict | None      │  │ Cycle (Dataclass) ✅              │   │
+│  └───────────────────────────────┘  │                                   │   │
+│                                      │ rounds: list[Round]              │   │
+│  get_frontier() -> list[Node]        │ best_round: Round | None (prop)  │   │
+│  get_best_node() -> Node | None      │ succeeded: bool (property)       │   │
+│  get_path_to_root(node) -> list[Node]│                                   │   │
+│  add_node(node) -> None              └───────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -89,14 +84,14 @@ Single-source visual reference consolidating `2026-03-04-task-framework-design.m
 
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              TaskDefinition                                  │
+│                           TaskDefinition ✅                                  │
 │  (Protocol)                                                                  │
 │                                                                              │
 │  name: str                                                                   │
-│  reference: Implementation | None                                            │
+│  reference_impl: ReferenceImpl | None                                        │
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │  Atomic Protocols                                                     │   │
+│  │  Atomic Protocols ✅                                                  │   │
 │  │                                                                       │   │
 │  │  ┌───────────────────────────┐  ┌───────────────────────────────┐    │   │
 │  │  │ InputGenerator (Protocol) │  │ CorrectnessChecker (Protocol) │    │   │
@@ -111,13 +106,13 @@ Single-source visual reference consolidating `2026-03-04-task-framework-design.m
 │  │  │ Scorer (Protocol)         │  │ FeedbackProvider (Protocol)   │    │   │
 │  │  │                           │  │                               │    │   │
 │  │  │ score(                    │  │ for_codegen(                  │    │   │
-│  │  │   result: EvaluationResult│  │   outcomes: Round |     │    │   │
-│  │  │ ) -> float                │  │            list[Round]  │    │   │
+│  │  │   result: EvaluationResult│  │   outcomes: Round |           │    │   │
+│  │  │ ) -> float                │  │            list[Round]        │    │   │
 │  │  │                           │  │ ) -> str                      │    │   │
 │  │  │                           │  │                               │    │   │
 │  │  │                           │  │ for_world_model(              │    │   │
-│  │  │                           │  │   outcomes: Round |     │    │   │
-│  │  │                           │  │            list[Round]  │    │   │
+│  │  │                           │  │   outcomes: Round |           │    │   │
+│  │  │                           │  │            list[Round]        │    │   │
 │  │  │                           │  │ ) -> list[dict[str, Any]]     │    │   │
 │  │  └───────────────────────────┘  └───────────────────────────────┘    │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
@@ -129,25 +124,25 @@ Single-source visual reference consolidating `2026-03-04-task-framework-design.m
           │ consumed by
           ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          Executor (Protocol)                                 │
+│                          Executor (Protocol) 🔲                              │
 │  Orchestration: sequential, parallel, pipelined                              │
 │                                                                              │
 │  __init__(evaluator: Evaluator, config: ExecutionConfig)                     │
 │                                                                              │
-│  execute(impl: Implementation) -> Round                                │
+│  execute(impl: Implementation) -> Round                                      │
 └─────────────────────────────────────────────────────────────────────────────┘
           │
           │ holds internally, delegates to
           ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          Evaluator (Protocol)                                │
+│                          Evaluator (Protocol) ✅                             │
 │  Execution: loading, subprocess/in-process, timing                           │
 │                                                                              │
 │  evaluate(impl: Implementation) -> EvaluationResult                          │
 │                                                                              │
 │  Internal flow:                                                              │
 │    1. input_data: Any = input_gen.generate(params: dict, seed: int)          │
-│    2. expected: Any = _run(task.reference: Implementation, input_data)       │
+│    2. expected: Any = _run(task.reference_impl, input_data)                  │
 │    3. actual: Any = _run(impl: Implementation, input_data)                   │
 │    4. check: CheckResult = checker.check(actual, expected)                   │
 │    5. return EvaluationResult (wraps CheckResult + timing)                   │
@@ -155,34 +150,41 @@ Single-source visual reference consolidating `2026-03-04-task-framework-design.m
 
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                       Implementation (Protocol)                              │
+│                       Implementation (Protocol) ✅                           │
 │  Data container. No run() method. Evaluator knows how to execute it.         │
 │                                                                              │
 │  name: str                                                                   │
 │  content: Any   # str | dict[str, str] | Path — task-specific                │
 │                                                                              │
-│  Both task.reference and solution are Implementation:                        │
-│    task.reference: Implementation | None  (from TaskDefinition)              │
-│    solution: Implementation               (from LLM output)                  │
+│  Both task.reference_impl and solution are Implementation:                   │
+│    task.reference_impl: ReferenceImpl | None  (from TaskDefinition)          │
+│    solution: Implementation                   (from LLM output)              │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                            Data Types                                        │
+│                            Data Types ✅                                     │
 │                                                                              │
 │  ┌─────────────────────────────────┐  ┌─────────────────────────────────┐   │
-│  │ CheckResult (dataclass)         │  │ EvaluationResult (Protocol)     │   │
+│  │ CheckResult (dataclass) ✅      │  │ EvaluationResult (Protocol) ✅  │   │
 │  │                                 │  │                                 │   │
 │  │ passed: bool                    │  │ is_success() -> bool            │   │
 │  │ message: str                    │  │ get_metrics() -> dict[str, Any] │   │
 │  │ criteria: dict[str, Any] | None │  │ get_log() -> str                │   │
 │  └─────────────────────────────────┘  └─────────────────────────────────┘   │
 │                                                                              │
-│  ┌─────────────────────────────────┐                                        │
-│  │ Round (dataclass)         │                                        │
-│  │                                 │                                        │
-│  │ solution: Implementation        │                                        │
-│  │ result: EvaluationResult        │                                        │
+│  ┌─────────────────────────────────┐  ┌─────────────────────────────────┐   │
+│  │ Round (dataclass) ✅           │  │ AnalysisResult (dataclass) ✅   │   │
+│  │                                 │  │                                 │   │
+│  │ impl: Implementation            │  │ summary: str                    │   │
+│  │ result: EvaluationResult        │  │ metrics: dict[str, Any]         │   │
+│  │ prompt: str                     │  │ raw_artifact: bytes | None      │   │
+│  │ llm_response: str               │  │ strategic_guidance: str | None  │   │
+│  │ prompt_tokens: int              │  └─────────────────────────────────┘   │
+│  │ completion_tokens: int          │                                        │
+│  │ duration_secs: float            │                                        │
+│  │ score: float                    │                                        │
+│  │ analysis: AnalysisResult | None │                                        │
 │  └─────────────────────────────────┘                                        │
 └─────────────────────────────────────────────────────────────────────────────┘
 
@@ -198,7 +200,7 @@ Single-source visual reference consolidating `2026-03-04-task-framework-design.m
 │  InputGenerator.generate(params, seed) -> input_data: Any                    │
 │       │                                                                      │
 │       ▼                                                                      │
-│  Evaluator._run(task.reference: Implementation, input_data) -> expected: Any │
+│  Evaluator._run(task.reference_impl, input_data) -> expected: Any            │
 │  Evaluator._run(solution: Implementation, input_data) -> actual: Any         │
 │       │                                                                      │
 │       ▼                                                                      │
@@ -211,7 +213,7 @@ Single-source visual reference consolidating `2026-03-04-task-framework-design.m
 │  Executor wraps (impl: Implementation, result: EvaluationResult) -> Round│
 │                                                                              │
 │                                                                              │
-│  POST-EVALUATION PHASE (consumed by SearchOrchestrator and protocols)        │
+│  POST-EVALUATION PHASE (consumed by run_search ✅ / SearchOrchestrator 🔲)   │
 │  ────────────────────────────────────────────────────────────────────        │
 │  EvaluationResult                                                            │
 │       │                                                                      │
@@ -224,28 +226,28 @@ Single-source visual reference consolidating `2026-03-04-task-framework-design.m
 │       │                                       ├────────────────────────┐     │
 │       │                                       │                        │     │
 │       ▼                                       ▼                        ▼     │
-│  SolutionTree.                    FeedbackProvider.       ActionSelector.    │
-│    get_best_solution()              for_codegen(...)        update(tree,     │
-│                                     for_world_model(...)      action,        │
-│                                       │                       outcome)       │
+│  Tree.get_best_node() ✅          FeedbackProvider ✅     WorldModel ✅      │
+│                                     for_codegen(...)        update(tree)     │
+│                                     for_world_model(...)                     │
+│                                       │                                      │
 │                                       │                                      │
 │                                       ├──► str (logs) ──► Codegen LLM        │
-│                                       └──► list[dict] ──► SolutionNode.      │
-│                                                              eval_result     │
+│                                       └──► list[dict] ──► Node.annotations   │
+│                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    FeedbackProvider vs StateFormatter                        │
+│                    FeedbackProvider ✅ vs StateFormatter ✅                  │
 │                                                                              │
 │  FeedbackProvider.for_world_model(outcome) -> list[dict[str, Any]]           │
 │    - Extracts metrics from ONE evaluation outcome                            │
-│    - Stored in SolutionNode.eval_result                                      │
+│    - Stored in Node.annotations                                              │
 │    - Called after each evaluation                                            │
 │                                                                              │
 │  StateFormatter.format_tree(tree) -> str                                     │
-│    - Formats ENTIRE SolutionTree for P_world prompt                          │
-│    - Used by ActionSelector to see full search state                         │
+│    - Formats ENTIRE Tree for P_world prompt                                  │
+│    - Used by WorldModel to see full search state                             │
 │    - Called before each action selection                                     │
 │                                                                              │
 │  No overlap: one extracts metrics, one formats tree.                         │
