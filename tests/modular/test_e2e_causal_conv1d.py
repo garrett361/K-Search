@@ -34,6 +34,7 @@ class TestModularE2E:
         assert task_def.reference_impl is not None
 
     @pytest.mark.cuda
+    @pytest.mark.cuda_subprocess
     def test_input_generator_produces_valid_data(self):
         """Verify input generator produces valid tensors."""
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
@@ -50,6 +51,7 @@ class TestModularE2E:
         assert x.shape == (2, 64, 32)
 
     @pytest.mark.cuda
+    @pytest.mark.cuda_subprocess
     def test_reference_impl_runs(self):
         """Verify reference implementation runs."""
         task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)

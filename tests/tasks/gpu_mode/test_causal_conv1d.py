@@ -61,6 +61,7 @@ class TestSpec:
 
 
 @pytest.mark.cuda
+@pytest.mark.cuda_subprocess
 class TestGenerateInput:
     def test_generate_input_returns_three_tuple(self):
         """Verify generate_input returns (x, weight, config) tuple."""
@@ -94,6 +95,7 @@ class TestGenerateInput:
 
 
 @pytest.mark.cuda
+@pytest.mark.cuda_subprocess
 class TestReference:
     def test_ref_kernel_output_shape(self):
         """Verify ref_kernel produces correct output shape."""
@@ -120,6 +122,7 @@ class TestReference:
 
 
 @pytest.mark.cuda
+@pytest.mark.cuda_subprocess
 class TestIntegration:
     def test_baseline_matches_reference(self):
         """Verify custom_kernel matches ref_kernel exactly."""
@@ -164,6 +167,7 @@ class TestIntegration:
 
 
 @pytest.mark.cuda
+@pytest.mark.cuda_subprocess
 @pytest.mark.slow
 class TestPerformance:
     def test_full_scale_test_case(self):

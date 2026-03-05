@@ -60,6 +60,7 @@ class TestSpec:
 
 
 @pytest.mark.cuda
+@pytest.mark.cuda_subprocess
 class TestGenerateInput:
     def test_generate_input_returns_six_tuple(self):
         """Verify generate_input returns (x, w1, w2, w3, num_tokens_per_expert, config) tuple."""
@@ -149,6 +150,7 @@ class TestGenerateInput:
 
 
 @pytest.mark.cuda
+@pytest.mark.cuda_subprocess
 class TestReference:
     def test_ref_kernel_output_shape(self):
         """Verify ref_kernel produces correct output shape."""
@@ -169,6 +171,7 @@ class TestReference:
 
 
 @pytest.mark.cuda
+@pytest.mark.cuda_subprocess
 class TestGroupedMmEquivalence:
     def test_forloop_matches_grouped_mm(self):
         """Verify for-loop reference matches torch._grouped_mm (if available)."""
@@ -198,6 +201,7 @@ class TestGroupedMmEquivalence:
 
 
 @pytest.mark.cuda
+@pytest.mark.cuda_subprocess
 class TestIntegration:
     def test_baseline_matches_reference(self):
         """Verify custom_kernel matches ref_kernel exactly."""
@@ -259,6 +263,7 @@ class TestIntegration:
 
 
 @pytest.mark.cuda
+@pytest.mark.cuda_subprocess
 @pytest.mark.slow
 class TestPerformance:
     def test_mixtral_scale_test_case(self):
