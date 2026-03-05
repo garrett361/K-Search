@@ -177,12 +177,57 @@ def _build_round_metrics(
 
 ## Artifact Storage
 
+### Implementation.artifact_dir()
+
+Files may exist only in memory (e.g., LLM output parsed into Solution objects). The `artifact_dir()` context manager materializes them to a temp directory for artifact stores to copy/upload without knowing whether files originated in-memory or on disk.
+
+```python
+class Implementation(Protocol):
+    name: str
+    content: Any
+
+    @contextmanager
+    def artifact_dir(self) -> Iterator[Path | None]:
+        """Yield directory containing files for artifact storage, or None.
+
+        Files may exist only in memory (e.g., from LLM output). This context
+        manager materializes them to a temp directory for the duration of the
+        context, allowing artifact stores to copy/upload without knowing
+        whether files were in-memory or already on disk.
+
+        Yields:
+            Path to directory containing files, or None if no files.
+        """
+        yield None  # Default: no files
+```
+
+GpuModeImplementation writes Solution.sources to temp dir:
+
+```python
+class GpuModeImplementation:
+    @contextmanager
+    def artifact_dir(self) -> Iterator[Path | None]:
+        sources = {sf.path: sf.content for sf in self.inner.sources}
+        if not sources:
+            yield None
+            return
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_p = Path(tmpdir)
+            for rel_path, content in sources.items():
+                path = tmpdir_p / rel_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content)
+            yield tmpdir_p
+```
+
 ### Local Storage Structure
 
 ```
 {output_dir}/
 └── round_{idx}/
-    ├── solution.py        # outcome.impl.content
+    ├── code/
+    │   └── kernel.py      # copied from artifact_dir()
     └── metadata.json      # { name, is_success, ...get_metrics() }
 ```
 
@@ -190,6 +235,23 @@ def _build_round_metrics(
 
 - `only_store_successes=True` (default): only store when `result.is_success()`
 - `only_store_successes=False`: store every round
+
+### Artifact Store Usage
+
+```python
+# LocalArtifactStore
+with outcome.impl.artifact_dir() as src_dir:
+    if src_dir:
+        shutil.copytree(src_dir, code_dir)
+
+# WandbArtifactStore - must iterate for name= prefix
+with outcome.impl.artifact_dir() as src_dir:
+    if src_dir:
+        for file_path in src_dir.rglob("*"):
+            if file_path.is_file():
+                rel = file_path.relative_to(src_dir)
+                artifact.add_file(str(file_path), name=f"code/{rel}")
+```
 
 ## Factory Functions
 
