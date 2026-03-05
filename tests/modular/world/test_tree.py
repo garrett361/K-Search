@@ -96,3 +96,52 @@ def test_get_node_by_id():
     assert tree._get_node_by_id("0") is root
     assert tree._get_node_by_id("1") is child
     assert tree._get_node_by_id("999") is None
+
+
+def test_update_node_merges_annotations():
+    root = Node(annotations={"a": 1})
+    tree = Tree(root=root)
+    tree.update_node(root, {"b": 2})
+    assert root.annotations == {"a": 1, "b": 2}
+
+
+def test_update_node_creates_annotations_if_none():
+    root = Node(annotations=None)
+    tree = Tree(root=root)
+    tree.update_node(root, {"x": "y"})
+    assert root.annotations == {"x": "y"}
+
+
+def test_split_node_creates_children():
+    root = Node(status="open")
+    tree = Tree(root=root)
+
+    children = tree.split_node(
+        root,
+        [
+            {"title": "Option A"},
+            {"title": "Option B", "annotations": {"priority": "high"}},
+        ],
+    )
+
+    assert len(children) == 2
+    assert root.status == "closed"
+    assert children[0].parent is root
+    assert children[0].action is not None
+    assert children[0].action.title == "Option A"
+    assert children[1].action is not None
+    assert children[1].action.annotations == {"priority": "high"}
+    assert children[0]._id == "1"
+    assert children[1]._id == "2"
+
+
+def test_delete_node_soft_deletes():
+    root = Node(status="closed")
+    tree = Tree(root=root)
+    child = Node(parent=root, status="open")
+    tree.add_node(child)
+
+    tree.delete_node(child)
+
+    assert child.status == "deleted"
+    assert child in root.children

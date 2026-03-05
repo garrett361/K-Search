@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from k_search.modular.world.action import Action
+
 if TYPE_CHECKING:
     from k_search.modular.world.node import Node
 
@@ -71,3 +73,31 @@ class Tree:
             result.append(node)
             queue.extend(node.children)
         return result
+
+    def update_node(self, node: Node, annotations: dict[str, Any]) -> None:
+        """Merge annotations into node."""
+        if node.annotations is None:
+            node.annotations = {}
+        node.annotations.update(annotations)
+
+    def split_node(self, node: Node, children_data: list[dict[str, Any]]) -> list[Node]:
+        """Split node into children. Mark parent closed, add children as open."""
+        from k_search.modular.world.node import Node as NodeClass
+
+        node.status = "closed"
+        new_children = []
+        for data in children_data:
+            child = NodeClass(
+                parent=node,
+                status="open",
+                action=Action(
+                    title=data.get("title", ""), annotations=data.get("annotations")
+                ),
+            )
+            self.add_node(child)
+            new_children.append(child)
+        return new_children
+
+    def delete_node(self, node: Node) -> None:
+        """Soft delete - mark node deleted, preserves tree structure."""
+        node.status = "deleted"
