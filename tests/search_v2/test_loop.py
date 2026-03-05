@@ -162,16 +162,16 @@ class TestRunSearch:
         assert "custom_task_r0" in captured_impls[0].name
         assert "custom_task_r1" in captured_impls[1].name
 
-    def test_negative_scores_handled(self):
+    def test_zero_scores_handled(self):
         task = make_task_mock()
-        task.scorer.score.side_effect = [-1.0, -0.5, -0.8]
+        task.scorer.score.side_effect = [0.0, 0.5, 0.0]
 
         evaluator = make_evaluator_mock()
         config = SearchConfig(max_rounds=3)
 
         result = run_search(task, evaluator, stub_llm, config)
 
-        assert result.score == -0.5
+        assert result.score == 0.5
         assert result.rounds_completed == 3
 
     def test_llm_receives_task_prompt(self):

@@ -14,6 +14,14 @@ class SearchConfig:
 
 
 @dataclass
+class MetricsConfig:
+    """Configuration for metrics tracking."""
+
+    chars_per_token: int = 4
+    wandb: bool = False
+
+
+@dataclass
 class SearchResult:
     """Result from a search run."""
 

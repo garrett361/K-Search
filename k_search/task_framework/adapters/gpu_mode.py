@@ -71,12 +71,12 @@ class _GpuModeScorer:
 
     def score(self, result: EvaluationResult) -> float:
         if not result.is_success():
-            return -1.0
+            return 0.0
         metrics = result.get_metrics()
         latency = metrics.get("latency_ms")
         if latency and latency > 0:
             return 1.0 / latency
-        return -1.0
+        return 0.0
 
 
 class _GpuModeFeedbackProvider:
