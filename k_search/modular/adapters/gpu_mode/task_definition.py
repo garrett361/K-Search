@@ -7,9 +7,9 @@ from typing import Any
 
 from k_search.modular.adapters.gpu_mode.wrappers import GpuModeImplementation
 from k_search.modular.results import CheckResult
-from k_search.task_framework.llm_utils import strip_markdown_fences
-from k_search.task_framework.protocols.results import EvaluationResult
-from k_search.task_framework.types import EvalOutcome
+from k_search.modular.llm_utils import strip_markdown_fences
+from k_search.modular.protocols.eval_result import EvaluationResult
+from k_search.modular.round import Round
 from k_search.tasks.gpu_mode_task import GpuModeTask
 from k_search.tasks.task_base import BuildSpec, Solution, SourceFile, SupportedLanguages
 
@@ -76,17 +76,17 @@ class _Scorer:
 
 
 class _FeedbackProvider:
-    def for_codegen(self, outcomes: EvalOutcome | list[EvalOutcome]) -> str:
-        if isinstance(outcomes, EvalOutcome):
-            outcomes = [outcomes]
-        return "\n\n".join(o.result.get_log() for o in outcomes)
+    def for_codegen(self, rounds: Round | list[Round]) -> str:
+        if isinstance(rounds, Round):
+            rounds = [rounds]
+        return "\n\n".join(r.result.get_log() for r in rounds)
 
     def for_world_model(
-        self, outcomes: EvalOutcome | list[EvalOutcome]
+        self, rounds: Round | list[Round]
     ) -> list[dict[str, Any]]:
-        if isinstance(outcomes, EvalOutcome):
-            outcomes = [outcomes]
-        return [o.result.get_metrics() for o in outcomes]
+        if isinstance(rounds, Round):
+            rounds = [rounds]
+        return [r.result.get_metrics() for r in rounds]
 
 
 class GpuModeTaskDefinition:
