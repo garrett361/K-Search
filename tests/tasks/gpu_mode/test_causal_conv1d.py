@@ -1,5 +1,6 @@
 """Tests for gpu_mode causal_conv1d task."""
 
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -7,11 +8,27 @@ import pytest
 import torch
 
 _TASK_DIR = Path(__file__).parent.parent.parent.parent / "k_search" / "tasks" / "gpu_mode" / "causal_conv1d"
+
+# Add task dir to sys.path for internal imports within the task modules
 sys.path.insert(0, str(_TASK_DIR))
 
-from reference import check_implementation, generate_input, ref_kernel  # noqa: E402  # ty: ignore[unresolved-import]
-from spec import CAUSAL_CONV1D_SPEC_TEXT_TRITON  # noqa: E402  # ty: ignore[unresolved-import]
-from submission import custom_kernel  # noqa: E402  # ty: ignore[unresolved-import]
+
+def _load_module(name: str):
+    spec = importlib.util.spec_from_file_location(f"causal_conv1d_{name}", _TASK_DIR / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_reference = _load_module("reference")
+_spec = _load_module("spec")
+_submission = _load_module("submission")
+
+check_implementation = _reference.check_implementation
+generate_input = _reference.generate_input
+ref_kernel = _reference.ref_kernel
+CAUSAL_CONV1D_SPEC_TEXT_TRITON = _spec.CAUSAL_CONV1D_SPEC_TEXT_TRITON
+custom_kernel = _submission.custom_kernel
 
 
 class TestSpec:
