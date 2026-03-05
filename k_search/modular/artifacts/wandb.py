@@ -9,7 +9,7 @@ from pathlib import Path
 
 import wandb
 
-from k_search.search_v2.config import ArtifactConfig
+from k_search.modular.config import ArtifactConfig
 from k_search.modular.round import Round
 
 if TYPE_CHECKING:
