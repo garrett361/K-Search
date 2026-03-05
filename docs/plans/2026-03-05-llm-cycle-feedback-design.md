@@ -114,6 +114,28 @@ class LLMFailureAnalyzer:
         ...
 ```
 
+### Available Failure Data (GPU Mode Specifics)
+
+> **Note:** This section documents GPU Mode adapter internals. The v2 core components (LLMFailureAnalyzer, FeedbackProvider, etc.) interact only with protocol interfaces (`EvaluationResult.get_log()`, `EvaluationResult.get_metrics()`). Adapters are responsible for surfacing appropriate data through these interfaces.
+
+The LLMFailureAnalyzer accesses failure data via protocol methods:
+
+| Protocol Method | What Adapters Should Provide |
+|-----------------|------------------------------|
+| `result.get_log()` | Relevant error/failure information |
+| `result.get_metrics()` | Structured timing/status data |
+| `impl.content` | Source code of the attempt |
+
+**GPU Mode adapter specifics (for adapter implementers):**
+
+| GpuMode Source | Limitation | Adapter Consideration |
+|----------------|------------|----------------------|
+| `log_excerpt` | 8KB cap, first failure only | Consider extracting from `raw_result` if richer detail needed |
+| `raw_result` dict | Contains `benchmark.{i}.error` per benchmark | Can surface via custom adapter |
+| Per-benchmark timing | In `raw_result` as `benchmark.{i}.mean` etc. | Not currently exposed |
+
+**Design principle:** v2 components remain task-agnostic. If GPU Mode needs richer failure data surfaced, implement a custom adapter that extracts from `raw_result` and exposes via `get_log()` or `get_metrics()`.
+
 ### Loop Integration
 
 The loop/orchestrator tracks cycle history and invokes analyzers:
