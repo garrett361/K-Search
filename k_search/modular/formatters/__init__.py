@@ -1,5 +1,5 @@
 """Formatters for tree state serialization."""
 
-from k_search.modular.formatters.simple import SimpleStateFormatter
+from k_search.modular.formatters.simple import DefaultFormatter
 
-__all__ = ["SimpleStateFormatter"]
+__all__ = ["DefaultFormatter"]
