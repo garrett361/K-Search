@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -15,12 +15,28 @@ class Tree:
 
     root: Node
     annotations: dict[str, Any] | None = None
+    _next_id: int = field(default=0, init=False)
+
+    def __post_init__(self) -> None:
+        self._assign_id(self.root)
+
+    def _assign_id(self, node: Node) -> None:
+        node._id = str(self._next_id)
+        self._next_id += 1
 
     def add_node(self, node: Node) -> None:
         """Add node to tree, attaching to its parent's children list."""
         if node.parent is None:
             raise ValueError("Cannot add node without parent (use root for root node)")
+        self._assign_id(node)
         node.parent.children.append(node)
+
+    def _get_node_by_id(self, id: str) -> Node | None:
+        """Look up node by ID. For tools.py only."""
+        for node in self._all_nodes():
+            if node._id == id:
+                return node
+        return None
 
     def get_frontier(self) -> list[Node]:
         """Return all nodes with status 'open'."""

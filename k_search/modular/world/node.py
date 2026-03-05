@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 class Node:
     """Search tree node."""
 
+    _id: str = ""
     parent: Node | None = None
     children: list[Node] = field(default_factory=list)
     status: str = "open"  # "open" | "in_progress" | "closed"

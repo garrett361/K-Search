@@ -71,3 +71,28 @@ def test_get_path_to_root():
     tree.add_node(grandchild)
 
     assert tree.get_path_to_root(grandchild) == [grandchild, child, root]
+
+
+def test_tree_assigns_sequential_ids():
+    root = Node(status="closed")
+    tree = Tree(root=root)
+
+    child1 = Node(parent=root)
+    child2 = Node(parent=root)
+    tree.add_node(child1)
+    tree.add_node(child2)
+
+    assert root._id == "0"
+    assert child1._id == "1"
+    assert child2._id == "2"
+
+
+def test_get_node_by_id():
+    root = Node(status="closed")
+    tree = Tree(root=root)
+    child = Node(parent=root)
+    tree.add_node(child)
+
+    assert tree._get_node_by_id("0") is root
+    assert tree._get_node_by_id("1") is child
+    assert tree._get_node_by_id("999") is None
