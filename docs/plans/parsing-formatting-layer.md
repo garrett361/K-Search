@@ -61,8 +61,8 @@ class Tree:
     def get_path_to_root(self, node: Node) -> list[Node]: ...
 
     # New - ID lookup
-    def get_node_by_id(self, id: str) -> Node | None:
-        """Look up node by ID. Returns None if not found."""
+    def _get_node_by_id(self, id: str) -> Node | None:
+        """Look up node by ID. For tools.py only."""
         for node in self._all_nodes():
             if node._id == id:
                 return node
@@ -219,7 +219,7 @@ def get_tree_tools(enabled: set[str] | None = None) -> list[dict[str, Any]]:
 def apply_tool_call(tree: Tree, tool_name: str, args: dict[str, Any]) -> ParseResult[Node]:
     """Route tool call to Tree method. Returns ParseResult for error handling."""
     if tool_name == "insert_node":
-        parent = tree.get_node_by_id(args.get("parent_id", ""))
+        parent = tree._get_node_by_id(args.get("parent_id", ""))
         if parent is None:
             return ParseResult.fail(f"parent_id not found: {args.get('parent_id')}")
         node = Node(
@@ -230,28 +230,28 @@ def apply_tool_call(tree: Tree, tool_name: str, args: dict[str, Any]) -> ParseRe
         return ParseResult.ok(node)
 
     if tool_name == "update_node":
-        node = tree.get_node_by_id(args.get("node_id", ""))
+        node = tree._get_node_by_id(args.get("node_id", ""))
         if node is None:
             return ParseResult.fail(f"node_id not found: {args.get('node_id')}")
         tree.update_node(node, args["annotations"])
         return ParseResult.ok(node)
 
     if tool_name == "split_node":
-        node = tree.get_node_by_id(args.get("node_id", ""))
+        node = tree._get_node_by_id(args.get("node_id", ""))
         if node is None:
             return ParseResult.fail(f"node_id not found: {args.get('node_id')}")
         children = tree.split_node(node, args.get("children", []))
         return ParseResult.ok(children[0] if children else node)
 
     if tool_name == "delete_node":
-        node = tree.get_node_by_id(args.get("node_id", ""))
+        node = tree._get_node_by_id(args.get("node_id", ""))
         if node is None:
             return ParseResult.fail(f"node_id not found: {args.get('node_id')}")
         tree.delete_node(node)
         return ParseResult.ok(node)
 
     if tool_name == "select_node":
-        node = tree.get_node_by_id(args.get("node_id", ""))
+        node = tree._get_node_by_id(args.get("node_id", ""))
         if node is None:
             return ParseResult.fail(f"node_id not found: {args.get('node_id')}")
         return ParseResult.ok(node)
@@ -303,7 +303,7 @@ class LegacyJSONFormatter:
 
 **Modify:**
 - `k_search/modular/world/node.py` - add `_id` field
-- `k_search/modular/world/tree.py` - add `_next_id`, `__post_init__`, `_assign_id`, `get_node_by_id`, `update_node`, `split_node`, `delete_node`
+- `k_search/modular/world/tree.py` - add `_next_id`, `__post_init__`, `_assign_id`, `_get_node_by_id`, `update_node`, `split_node`, `delete_node`
 
 **Create:**
 - `k_search/modular/world/parse_result.py` - ParseResult[T]
@@ -316,7 +316,7 @@ class LegacyJSONFormatter:
 
 1. `pytest tests/modular/world/` - existing tests pass
 2. New unit tests:
-   - `test_tree.py` - ID assignment, get_node_by_id, update_node, split_node, delete_node
+   - `test_tree.py` - ID assignment, _get_node_by_id, update_node, split_node, delete_node
    - `test_tools.py` - apply_tool_call with valid/invalid IDs, get_tree_tools filtering
    - `test_formatters.py` - SimpleStateFormatter output, LegacyJSONFormatter matches v1 schema
 3. API compatibility test (`@pytest.mark.api`, can skip in CI):
