@@ -12,7 +12,9 @@ __all__ = [
 ]
 
 
-def create_metrics_trackers(config: MetricsConfig | None = None) -> list[MetricsTracker]:
+def create_metrics_trackers(
+    config: MetricsConfig | None = None,
+) -> list[MetricsTracker]:
     config = config or MetricsConfig()
     if config.wandb:
         return [WandbMetricsTracker(config)]

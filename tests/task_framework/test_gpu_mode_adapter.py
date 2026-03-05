@@ -72,7 +72,7 @@ class TestGpuModeAdapterScorer:
 
         assert score > 0
 
-    def test_scorer_returns_negative_for_failed(self):
+    def test_scorer_returns_zero_for_failed(self):
         from k_search.task_framework.adapters.gpu_mode import GpuModeAdapter
         from k_search.task_framework.adapters.wrappers import GpuModeEvaluationResult
         from k_search.tasks.task_base import EvalResult
@@ -83,7 +83,7 @@ class TestGpuModeAdapterScorer:
         result = GpuModeEvaluationResult(EvalResult(status="failed"))
         score = adapter.scorer.score(result)
 
-        assert score < 0
+        assert score == 0.0
 
 
 @pytest.mark.cuda

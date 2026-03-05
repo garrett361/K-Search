@@ -1,6 +1,7 @@
 """Search configuration and result types."""
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from k_search.task_framework.protocols.results import EvaluationResult, Implementation
 
@@ -19,6 +20,19 @@ class MetricsConfig:
 
     chars_per_token: int = 4
     wandb: bool = False
+
+
+@dataclass
+class ArtifactConfig:
+    """Configuration for artifact storage."""
+
+    output_dir: Path | str | None = None
+    only_store_successes: bool = True
+    wandb: bool = False
+
+    def __post_init__(self) -> None:
+        if isinstance(self.output_dir, str):
+            self.output_dir = Path(self.output_dir)
 
 
 @dataclass

@@ -1,5 +1,9 @@
 """Wrappers adapting GpuMode types to task_framework protocols."""
 
+import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
 from typing import Any
 
 from k_search.tasks.task_base import EvalResult, Solution
@@ -73,3 +77,19 @@ class GpuModeImplementation:
         self.inner = inner
         self.name = inner.name
         self.content = inner
+
+    @contextmanager
+    def artifact_dir(self) -> Iterator[Path | None]:
+        """Materialize Solution sources to temp directory."""
+        sources = {sf.path: sf.content for sf in self.inner.sources}
+        if not sources:
+            yield None
+            return
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_p = Path(tmpdir)
+            for rel_path, content in sources.items():
+                path = tmpdir_p / rel_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content)
+            yield tmpdir_p

@@ -95,6 +95,72 @@ class TestGpuModeImplementation:
         assert "custom_kernel" in wrapper.content.sources[0].content
 
 
+class TestGpuModeImplementationArtifactDir:
+    def test_yields_directory_with_source_files(self):
+        from k_search.task_framework.adapters.wrappers import GpuModeImplementation
+
+        solution = Solution(
+            name="test",
+            definition="test_task",
+            author="test",
+            spec=BuildSpec(
+                language=SupportedLanguages.TRITON,
+                target_hardware=[],
+                entry_point="kernel.py::custom_kernel",
+            ),
+            sources=[
+                SourceFile(path="kernel.py", content="def custom_kernel(): pass"),
+                SourceFile(path="utils.py", content="# utils"),
+            ],
+        )
+        impl = GpuModeImplementation(solution)
+
+        with impl.artifact_dir() as src_dir:
+            assert src_dir is not None
+            assert (src_dir / "kernel.py").read_text() == "def custom_kernel(): pass"
+            assert (src_dir / "utils.py").read_text() == "# utils"
+
+    def test_yields_none_when_no_sources(self):
+        from k_search.task_framework.adapters.wrappers import GpuModeImplementation
+
+        solution = Solution(
+            name="test",
+            definition="test_task",
+            author="test",
+            spec=BuildSpec(
+                language=SupportedLanguages.TRITON,
+                target_hardware=[],
+                entry_point="kernel.py::custom_kernel",
+            ),
+            sources=[],
+        )
+        impl = GpuModeImplementation(solution)
+
+        with impl.artifact_dir() as src_dir:
+            assert src_dir is None
+
+    def test_cleans_up_temp_dir_after_context(self):
+        from k_search.task_framework.adapters.wrappers import GpuModeImplementation
+
+        solution = Solution(
+            name="test",
+            definition="test_task",
+            author="test",
+            spec=BuildSpec(
+                language=SupportedLanguages.TRITON,
+                target_hardware=[],
+                entry_point="kernel.py::custom_kernel",
+            ),
+            sources=[SourceFile(path="kernel.py", content="code")],
+        )
+        impl = GpuModeImplementation(solution)
+
+        with impl.artifact_dir() as src_dir:
+            dir_path = src_dir
+
+        assert not dir_path.exists()
+
+
 class TestEvalOutcome:
     def test_eval_outcome_holds_impl_and_result(self):
         from k_search.task_framework.types import EvalOutcome

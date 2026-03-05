@@ -4,6 +4,7 @@ import logging
 import time
 from typing import Callable
 
+from k_search.search_v2.artifacts import ArtifactStore, NoOpArtifactStore
 from k_search.search_v2.config import MetricsConfig, SearchConfig, SearchResult
 from k_search.search_v2.metrics import MetricsTracker, NoOpMetricsTracker
 from k_search.search_v2.prompts import build_prompt, create_implementation
@@ -54,6 +55,7 @@ def run_search(
     config: SearchConfig,
     metrics_trackers: list[MetricsTracker] | None = None,
     metrics_config: MetricsConfig | None = None,
+    artifact_stores: list[ArtifactStore] | None = None,
 ) -> SearchResult:
     """Run simple sequential optimization loop.
 
@@ -67,6 +69,7 @@ def run_search(
         SearchResult with best implementation found
     """
     metrics_trackers = metrics_trackers or [NoOpMetricsTracker()]
+    artifact_stores = artifact_stores or [NoOpArtifactStore()]
 
     metrics_config = metrics_config or MetricsConfig()
 
@@ -127,6 +130,10 @@ def run_search(
         )
         for tracker in metrics_trackers:
             tracker.log(round_metrics, step=round_idx)
+
+        outcome = EvalOutcome(impl=impl, result=result)
+        for store in artifact_stores:
+            store.store(outcome, round_idx)
 
     return SearchResult(
         impl=best_outcome.impl if best_outcome else None,
