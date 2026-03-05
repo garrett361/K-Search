@@ -141,41 +141,48 @@ for round in range(max_rounds):
 
 ## Module Structure
 
+> **Implementation Status:** The structure below is the *target design* for the full V2 loop with tree-based search and world model. As of 2026-03-05, only the foundation exists (`protocols/`, `adapters/`, `metrics/`, `artifacts/`, `loop.py`). The `model/`, `selectors/`, `formatters/`, and `parsing/` directories are NOT YET IMPLEMENTED.
+
 ```
 k_search/modular/
 ├── __init__.py
 │
-├── model/                          # Core data model (pure dataclasses)
+├── model/                          # 🔲 NOT YET IMPLEMENTED
 │   ├── __init__.py
 │   ├── node.py                     # SolutionNode, ActionNode
 │   ├── tree.py                     # SolutionTree
 │   ├── action.py                   # ActionProposal, ActionOutcome
-│   └── config.py                   # SearchConfig, RetryConfig
+│   └── config.py                   # RetryConfig (extends existing config.py)
 │
 ├── protocols/
 │   ├── __init__.py
-│   ├── action_selector.py          # ActionSelector protocol
-│   ├── formatter.py                # StateFormatter protocol
-│   └── llm_client.py               # LLMClient protocol
+│   ├── action_selector.py          # 🔲 ActionSelector protocol
+│   ├── formatter.py                # 🔲 StateFormatter protocol
+│   ├── eval_result.py              # ✅ EvaluationResult protocol
+│   ├── impl.py                     # ✅ Implementation protocol
+│   ├── evaluator.py                # ✅ Evaluator protocol
+│   ├── task_definition.py          # ✅ TaskDefinition protocol
+│   └── ...                         # ✅ Other foundation protocols
 │
-├── selectors/
+├── selectors/                      # 🔲 NOT YET IMPLEMENTED
 │   ├── __init__.py
 │   ├── world_model.py              # LLMWorldModel (P_world) — DEFAULT
 │   └── simple_refine.py            # Simple iterative refinement (no world model)
 │
-├── formatters/
+├── formatters/                     # 🔲 NOT YET IMPLEMENTED
 │   ├── __init__.py
 │   ├── legacy_json.py              # Current schema — for parity
 │   ├── markdown.py                 # Future: Markdown format
 │   └── natural_language.py         # Future: NL summaries
 │
-├── parsing/
+├── parsing/                        # 🔲 NOT YET IMPLEMENTED
 │   ├── __init__.py
 │   ├── result.py                   # ParseResult type
 │   ├── json_parser.py              # JSON extraction and validation
 │   └── legacy_schema.py            # Current schema parser/validator
 │
-├── search.py                       # SearchOrchestrator
+├── search.py                       # 🔲 SearchOrchestrator (NOT YET IMPLEMENTED)
+├── loop.py                         # ✅ Simple run_search() function (implemented)
 └── integration.py                  # Adapters to TaskDefinition
 ```
 

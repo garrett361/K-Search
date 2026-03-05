@@ -4,42 +4,65 @@ Design for implementing K-Search V2 incrementally, validated against V1 at each 
 
 ## Implementation Priorities
 
-| Priority | Goal | Validation |
-|----------|------|------------|
-| 1 | Task framework foundation + V1 adapter | e2e causal_conv1d tests |
-| 2 | Minimal V2 search loop | Unit tests + parity with V1 |
-| 3 | Wandb logging (minimal → enhanced) | Manual verification |
-| 4 | Loop feedback extension | Unit tests + e2e with pattern injection |
+| Priority | Goal | Validation | Status |
+|----------|------|------------|--------|
+| 1 | Task framework foundation + V1 adapter | e2e causal_conv1d tests | ✅ DONE |
+| 2 | Minimal V2 search loop (simple) | Unit tests | ✅ DONE |
+| 2b | Full V2 loop (tree + world model) | Parity with V1 | 🔲 NOT STARTED |
+| 3 | Wandb logging (minimal → enhanced) | Manual verification | ✅ DONE |
+| 4 | Loop feedback extension | Unit tests + e2e with pattern injection | 🔲 NOT STARTED |
 
 Each priority gets its own implementation plan created after the previous one is complete.
 
+**Note:** Priority 2 was split. The simple sequential loop (`run_search()`) is complete. The full tree-based `SearchOrchestrator` with world model is Priority 2b.
+
 ---
 
-## Priority 1: Task Framework Foundation
+## Priority 1: Task Framework Foundation ✅
 
 Build protocols and adapters. V1 code unchanged—GpuModeTask wrapped via adapter.
 
-### Module Structure
+### Module Structure (as implemented)
 
 ```
 k_search/modular/
 ├── __init__.py
 ├── protocols/
 │   ├── __init__.py
-│   ├── results.py              # EvaluationResult, Implementation
+│   ├── eval_result.py          # EvaluationResult protocol
+│   ├── impl.py                 # Implementation protocol
 │   ├── input_generator.py
-│   ├── correctness.py          # CorrectnessChecker, CheckResult
+│   ├── reference_impl.py
+│   ├── correctness.py          # CorrectnessChecker
 │   ├── scorer.py
 │   ├── feedback_provider.py
 │   ├── evaluator.py
 │   ├── analyzer.py
-│   └── task_definition.py
+│   ├── task_definition.py
+│   ├── metrics_tracker.py
+│   └── artifact_store.py
 ├── adapters/
 │   ├── __init__.py
-│   ├── wrappers.py             # GpuModeEvaluationResult, GpuModeImplementation
-│   └── gpu_mode.py             # GpuModeAdapter
-├── types.py                    # Round, CheckResult
-└── loader.py
+│   └── gpu_mode/
+│       ├── __init__.py
+│       ├── task_definition.py  # GpuModeTaskDefinition
+│       ├── evaluator.py        # GpuModeEvaluator
+│       └── wrappers.py         # GpuModeImplementation, GpuModeEvaluationResult
+├── round.py                    # Round dataclass
+├── results.py                  # CheckResult, AnalysisResult
+├── config.py                   # SearchConfig, SearchResult
+├── loop.py                     # run_search() function
+├── prompts.py                  # build_prompt()
+├── llm_utils.py
+├── metrics/
+│   ├── __init__.py
+│   ├── noop.py
+│   └── wandb.py
+└── artifacts/
+    ├── __init__.py
+    ├── noop.py
+    ├── local.py
+    └── wandb.py
 ```
 
 ### Key Protocols
@@ -96,17 +119,24 @@ class AnalysisResult:
 
 ---
 
-## Priority 2: Minimal V2 Search Loop
+## Priority 2: Minimal V2 Search Loop ✅
 
-### Module Structure
+A simple sequential `run_search()` function was implemented in `loop.py`. This greedy loop doesn't use tree structures or world model—it just tracks the best result across rounds.
+
+See `k_search/modular/loop.py` for the implementation.
+
+---
+
+## Priority 2b: Full V2 Search Loop (Tree + World Model) 🔲
+
+### Module Structure (NOT YET IMPLEMENTED)
 
 ```
 k_search/modular/
-├── __init__.py
 ├── model/
 │   ├── node.py                 # SolutionNode, ActionNode
 │   ├── tree.py                 # SolutionTree
-│   └── config.py               # SearchConfig
+│   └── config.py               # RetryConfig (extends existing config.py)
 ├── protocols/
 │   ├── action_selector.py      # ActionSelector
 │   └── formatter.py            # StateFormatter
@@ -161,11 +191,13 @@ Replay recorded V1 runs through V2, compare outputs.
 
 ---
 
-## Priority 3: Wandb Logging
+## Priority 3: Wandb Logging ✅
 
-**Phase 3a (minimal)**: Round count, best score, pass/fail, wall clock timing
+**Phase 3a (minimal)**: Round count, best score, pass/fail, wall clock timing — DONE
 
-**Phase 3b (enhanced)**: Token counting, loop timing breakdown, code artifact saving
+**Phase 3b (enhanced)**: Token counting, loop timing breakdown, code artifact saving — DONE
+
+Implemented in `k_search/modular/metrics/wandb.py` and `k_search/modular/artifacts/wandb.py`.
 
 ---
 
@@ -244,3 +276,12 @@ analyzer_llm       ─── defaults to world_model_llm
 - Task framework details: `2026-03-04-task-framework-design.md`
 - Search V2 details: `2026-03-04-search-v2-design.md`
 - Extensions: `2026-03-04-task-framework-extensions.md`
+- Modular restructure: `2026-03-05-modular-restructure-design.md`
+
+### Implementation Plans
+
+- `impls/01-task-framework-foundation.md` — Priority 1
+- `impls/03-bare-minimum-search-loop.md` — Priority 2
+- `impls/04a-wandb-metrics-integration.md` — Priority 3a
+- `impls/04b-wandb-artifacts-integration.md` — Priority 3b
+- `impls/05-modular-restructure.md` — File reorganization

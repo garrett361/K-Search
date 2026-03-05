@@ -44,7 +44,7 @@ Codegen prompt with "Previous Issues" section
 
 ### AnalysisResult Refactor
 
-**File:** `k_search/modular/types.py`
+**File:** `k_search/modular/results.py`
 
 Current specialized fields replaced with generic container:
 
@@ -91,7 +91,7 @@ class LLMFailureAnalyzer:
         context: dict[str, Any] | None = None,
     ) -> AnalysisResult | None:
         cycle_outcomes = (context or {}).get("cycle_outcomes", [])
-        failures = [o for o in cycle_outcomes if not o.result.passed()]
+        failures = [o for o in cycle_outcomes if not o.result.is_success()]
 
         if len(failures) < self.config.min_failures:
             return None
@@ -151,7 +151,7 @@ The loop/orchestrator tracks cycle history and invokes analyzers:
 │       result = evaluator.evaluate(impl)                         │
 │       outcome = Round(impl, result)                       │
 │                                                                 │
-│       if not result.passed():                                   │
+│       if not result.is_success():                                   │
 │           cycle_outcomes.append(outcome)                        │
 │           if analyzer:                                          │
 │               analysis = analyzer.analyze(                      │

@@ -13,31 +13,49 @@ Core abstraction layer for code optimization tasks. Provides composable protocol
 ## Module Structure
 
 ```
-k_search/modular/           # NEW: isolated submodule
+k_search/modular/                  # Implemented submodule
 ├── __init__.py                    # Public exports
 │
 ├── protocols/
 │   ├── __init__.py
-│   ├── results.py                 # EvaluationResult, Implementation
+│   ├── eval_result.py             # EvaluationResult protocol
+│   ├── impl.py                    # Implementation protocol
 │   ├── input_generator.py
 │   ├── reference_impl.py
 │   ├── correctness.py
 │   ├── scorer.py
 │   ├── feedback_provider.py
 │   ├── evaluator.py
-│   └── task_definition.py         # Composite protocol
+│   ├── analyzer.py
+│   ├── task_definition.py         # Composite protocol
+│   ├── metrics_tracker.py
+│   └── artifact_store.py
 │
 ├── adapters/
 │   ├── __init__.py
-│   └── gpu_mode.py                # Wraps GpuModeTask
+│   └── gpu_mode/
+│       ├── __init__.py
+│       ├── task_definition.py     # GpuModeTaskDefinition
+│       ├── evaluator.py           # GpuModeEvaluator
+│       └── wrappers.py            # GpuModeImplementation, GpuModeEvaluationResult
 │
-├── execution/
+├── metrics/
 │   ├── __init__.py
-│   └── sequential.py              # Current behavior
+│   ├── noop.py
+│   └── wandb.py
 │
-├── config.py                      # ExecutionConfig
-├── loader.py                      # Directory-based discovery
-└── types.py                       # Round, CheckResult
+├── artifacts/
+│   ├── __init__.py
+│   ├── noop.py
+│   ├── local.py
+│   └── wandb.py
+│
+├── config.py                      # SearchConfig, SearchResult, MetricsConfig
+├── loop.py                        # run_search() function
+├── prompts.py                     # build_prompt()
+├── llm_utils.py
+├── round.py                       # Round dataclass
+└── results.py                     # CheckResult, AnalysisResult
 ```
 
 ## Core Protocols
@@ -427,20 +445,24 @@ Both V1 and V2 can use modular simultaneously during migration.
 
 Adapter-first approach: wrap existing `GpuModeTask` without modifying task files. Each phase is independently useful and testable.
 
-### Phase 1: Result Protocols and Wrappers
+### Phase 1: Result Protocols and Wrappers ✅
 
-**Files to create:**
+**Files created:**
 
 ```
 k_search/modular/
 ├── __init__.py
 ├── protocols/
 │   ├── __init__.py
-│   └── results.py          # EvaluationResult, Implementation protocols
+│   ├── eval_result.py      # EvaluationResult protocol
+│   └── impl.py             # Implementation protocol
 ├── adapters/
 │   ├── __init__.py
-│   └── wrappers.py         # GpuModeEvaluationResult, GpuModeImplementation
-└── types.py                # CheckResult, Round
+│   └── gpu_mode/
+│       ├── __init__.py
+│       └── wrappers.py     # GpuModeEvaluationResult, GpuModeImplementation
+├── round.py                # Round dataclass
+└── results.py              # CheckResult, AnalysisResult
 ```
 
 **V1 files modified:**
