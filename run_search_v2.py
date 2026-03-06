@@ -2,7 +2,6 @@
 """V2 Search Loop entry point."""
 
 import argparse
-import dataclasses
 import logging
 import os
 import sys
@@ -12,7 +11,7 @@ import openai
 
 from k_search.modular import run_search, SearchConfig, ArtifactConfig
 from k_search.modular.artifacts import create_artifact_stores
-from k_search.modular.config import MetricsConfig
+from k_search.modular.config import MetricsConfig, build_run_config
 from k_search.modular.metrics import create_metrics_trackers
 from k_search.modular.adapters import GpuModeEvaluator, GpuModeTaskDefinition
 from k_search.tasks.gpu_mode_task import GpuModeTask
@@ -146,6 +145,20 @@ def main():
         wandb=args.wandb,
     )
 
+    run_config = build_run_config(
+        run_id=args.run_name
+        or f"{args.task}-{args.model_name.replace('/', '-')}-r{args.max_rounds}",
+        model_name=args.model_name,
+        reasoning_effort=args.reasoning_effort,
+        search_config=config,
+        metrics_config=metrics_config,
+        artifact_config=artifact_config,
+        wandb_project=args.wandb_project,
+        wandb_run_name=args.run_name,
+        task=args.task,
+        language=args.language,
+    )
+
     if args.wandb:
         import wandb
 
@@ -153,25 +166,15 @@ def main():
             project=args.wandb_project,
             name=args.run_name,
             dir=args.wandb_dir,
-            config={
-                "search": dataclasses.asdict(config),
-                "metrics": dataclasses.asdict(metrics_config),
-                "artifacts": {
-                    "output_dir": str(artifact_config.output_dir)
-                    if artifact_config.output_dir
-                    else None,
-                    "only_store_successes": artifact_config.only_store_successes,
-                    "wandb": artifact_config.wandb,
-                },
-                "task": args.task,
-                "language": args.language,
-                "model_name": args.model_name,
-                "reasoning_effort": args.reasoning_effort,
-            },
+            config=run_config,
         )
         logger.info(f"Wandb enabled: project={args.wandb_project}, run={args.run_name}")
 
-    metrics_trackers = create_metrics_trackers(metrics_config)
+    metrics_trackers = create_metrics_trackers(
+        metrics_config,
+        output_dir=args.artifact_output_dir,
+        run_config=run_config,
+    )
     artifact_stores = create_artifact_stores(artifact_config)
 
     logger.info(
