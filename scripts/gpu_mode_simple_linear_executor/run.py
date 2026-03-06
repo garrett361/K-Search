@@ -138,6 +138,8 @@ def main():
     client_kwargs = {"api_key": api_key, "timeout": args.timeout}
     if args.base_url:
         client_kwargs["base_url"] = args.base_url
+    if (rits_api_key := os.getenv("RITS_API_KEY")) is not None:
+        client_kwargs["default_headers"] = {"RITS_API_KEY": rits_api_key}
 
     client = openai.OpenAI(**client_kwargs)
     llm = create_llm_call(client, args.model_name)
