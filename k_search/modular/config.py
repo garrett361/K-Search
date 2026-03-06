@@ -20,6 +20,7 @@ class MetricsConfig:
 
     chars_per_token: int = 4
     wandb: bool = False
+    local: bool = True
 
 
 @dataclass
