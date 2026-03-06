@@ -95,6 +95,16 @@ def main():
         help="Directory for wandb local files (default: cwd)",
     )
     parser.add_argument(
+        "--wandb-group",
+        default=None,
+        help="Wandb group name (e.g., experiment name)",
+    )
+    parser.add_argument(
+        "--wandb-tags",
+        default=None,
+        help="Comma-separated wandb tags (e.g., baseline,causal_conv1d,triton)",
+    )
+    parser.add_argument(
         "--artifact-output-dir",
         default=None,
         help="Directory to save artifacts (code, metadata)",
@@ -145,6 +155,8 @@ def main():
         wandb=args.wandb,
     )
 
+    wandb_tags = args.wandb_tags.split(",") if args.wandb_tags else None
+
     run_config = build_run_config(
         run_id=args.run_name
         or f"{args.task}-{args.model_name.replace('/', '-')}-r{args.max_rounds}",
@@ -155,6 +167,8 @@ def main():
         artifact_config=artifact_config,
         wandb_project=args.wandb_project,
         wandb_run_name=args.run_name,
+        wandb_group=args.wandb_group,
+        wandb_tags=wandb_tags,
         task=args.task,
         language=args.language,
     )
@@ -167,6 +181,8 @@ def main():
             name=args.run_name,
             dir=args.wandb_dir,
             config=run_config,
+            group=args.wandb_group,
+            tags=wandb_tags,
         )
         logger.info(f"Wandb enabled: project={args.wandb_project}, run={args.run_name}")
 

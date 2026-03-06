@@ -73,6 +73,8 @@ def build_run_config(
     verl_experiment_id: str | None = None,
     wandb_project: str | None = None,
     wandb_run_name: str | None = None,
+    wandb_group: str | None = None,
+    wandb_tags: list[str] | None = None,
     **task_kwargs: str,
 ) -> dict:
     """Build unified run config for wandb.init and local serialization."""
@@ -92,7 +94,12 @@ def build_run_config(
         "task_config": task_kwargs,
         "git": collect_git_info(),
         "env": collect_env_info(),
-        "wandb": {"project": wandb_project, "run_name": wandb_run_name},
+        "wandb": {
+            "project": wandb_project,
+            "run_name": wandb_run_name,
+            "group": wandb_group,
+            "tags": wandb_tags,
+        },
     }
 
 
