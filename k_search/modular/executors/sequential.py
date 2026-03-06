@@ -57,8 +57,10 @@ class SequentialExecutor:
         """
         for round_idx in range(self._max_rounds):
             logger.info(f"Round {round_idx + 1}/{self._max_rounds}")
+            logger.debug("=== ROUND %d START ===", round_idx + 1)
 
             proposed = self._world_model.propose(self._tree)
+            logger.debug("World model proposed %d node(s)", len(proposed))
 
             for node in proposed:
                 self._tree.add_node(node)
@@ -67,24 +69,35 @@ class SequentialExecutor:
             if not nodes:
                 logger.info("No nodes to evaluate, stopping")
                 break
+            logger.debug("Selected %d node(s) for execution", len(nodes))
 
             for node in nodes:
                 self._execute_node(node, round_idx)
 
             self._world_model.update(self._tree)
+            logger.debug("=== ROUND %d END ===", round_idx + 1)
 
         return self._tree.get_best_node()
 
     def _execute_node(self, node: Node, round_idx: int) -> None:
         """Generate code for action and evaluate."""
+        logger.debug("Node status: open -> in_progress")
         node.status = "in_progress"
 
         prompt = self._code_prompt_fn(node, self._task)
         code = self._llm(prompt)
+        logger.debug("LLM code response:\n\n%s\n", code)
 
         impl = self._task.create_implementation(code)
         result = self._evaluator.evaluate(impl)
         score = self._task.scorer.score(result)
+
+        logger.debug(
+            "Evaluation result: success=%s, score=%.4f", result.is_success(), score
+        )
+        metrics = result.get_metrics()
+        if metrics:
+            logger.debug("Evaluation metrics:\n\n%s\n", metrics)
 
         chars_per_token = self._metrics_config.chars_per_token
         prompt_tokens = len(prompt) // chars_per_token
@@ -101,6 +114,7 @@ class SequentialExecutor:
             score=score,
         )
         node.cycle = Cycle(rounds=[round])
+        logger.debug("Node status: in_progress -> closed")
         node.status = "closed"
 
         for tracker in self._metrics_trackers:

@@ -18,8 +18,8 @@ class GpuModeEvaluationResult:
     def is_success(self) -> bool:
         return self._inner.is_passed()
 
-    def get_metrics(self) -> dict[str, Any]:
-        return self._inner.to_dict(include_log_excerpt=False)
+    def get_metrics(self, max_str_chars: int = 0) -> dict[str, Any]:
+        return self._inner.to_dict(include_log_excerpt=False, max_str_chars=max_str_chars)
 
     def get_log(self) -> str:
         return self._inner.log_excerpt

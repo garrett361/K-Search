@@ -61,10 +61,12 @@ def create_action_prompt_fn(task_def: GpuModeTaskDefinition):
                 feedback = task_def.feedback_provider.for_codegen(best_round)
                 feedback_section = f"\n## Previous Best Result\n{feedback}\n"
 
-        return ACTION_PROMPT_TEMPLATE.format(
+        prompt = ACTION_PROMPT_TEMPLATE.format(
             task_spec=task_spec,
             feedback_section=feedback_section,
         )
+        logger.debug("ACTION PROMPT:\n\n%s\n", prompt)
+        return prompt
 
     return action_prompt_fn
 
@@ -78,9 +80,11 @@ def create_code_prompt_fn(task_def: GpuModeTaskDefinition):
 
     def code_prompt_fn(node: Node, task: TaskDefinition) -> str:
         if node.action:
-            return f"{task_def.get_prompt_text()}\n\nAction: {node.action.title}\n\nGenerate the implementation:"
-        # Round 0: no action, direct generation
-        return f"{task_def.get_prompt_text()}\n\nGenerate the implementation:"
+            prompt = f"{task_def.get_prompt_text()}\n\nAction: {node.action.title}\n\nGenerate the implementation:"
+        else:
+            prompt = f"{task_def.get_prompt_text()}\n\nGenerate the implementation:"
+        logger.debug("CODE PROMPT:\n\n%s\n", prompt)
+        return prompt
 
     return code_prompt_fn
 
@@ -107,7 +111,13 @@ def main():
     parser.add_argument("--base-url", default=None, help="OpenAI-compatible base URL")
     parser.add_argument("--api-key", default=None, help="API key (or set LLM_API_KEY)")
     parser.add_argument("--timeout", type=int, default=300)
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Enable debug logging"
+    )
     args = parser.parse_args()
+
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
 
     api_key = args.api_key or os.getenv("LLM_API_KEY")
     if not api_key:
