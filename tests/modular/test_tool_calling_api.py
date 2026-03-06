@@ -48,7 +48,7 @@ class TestToolCallingAPI:
             instructions="You are a tree editor. Use insert_node to add nodes.",
             input="Add a node called 'Optimize memory' under the root (id 0).",
             tools=TOOLS,  # type: ignore[arg-type]
-            tool_choice="required",
+            tool_choice="auto",
         )
 
         tool_calls = [item for item in response.output if item.type == "function_call"]
