@@ -84,3 +84,18 @@ def test_timer_rejects_non_string_tag():
     with pytest.raises(TypeError, match="tag must be str, got int: 123"):
         with timer[123]:
             pass
+
+
+def test_timer_accepts_list_of_tags():
+    timer = Timer()
+    timer.start()
+
+    tags = ["llm", "world_model"]
+    with timer[tags]:
+        time.sleep(0.01)
+
+    timer.stop()
+
+    timing = timer.get_timing_secs()
+    assert "llm" in timing
+    assert "world_model" in timing
