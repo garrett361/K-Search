@@ -52,7 +52,7 @@ class Timer:
         if self._start_time is not None and self._end_time is None:
             self._end_time = time.perf_counter()
 
-    def __getitem__(self, categories: str | Iterable[str]) -> AbstractContextManager[None]:
+    def __getitem__(self, tags: str | Iterable[str]) -> AbstractContextManager[None]:
         """Context manager for timing region(s).
 
         Usage:
@@ -61,19 +61,26 @@ class Timer:
 
         Assignment (timer["x"] = ...) raises TypeError — only __getitem__ is implemented.
         """
-        if isinstance(categories, str):
-            categories = [categories]
-        return self._track(tuple(categories))
+        if isinstance(tags, str):
+            tags = [tags]
+        elif not isinstance(tags, Iterable):
+            raise TypeError(f"tag must be str, got {type(tags).__name__}: {tags!r}")
+        validated = []
+        for tag in tags:
+            if not isinstance(tag, str):
+                raise TypeError(f"tag must be str, got {type(tag).__name__}: {tag!r}")
+            validated.append(tag)
+        return self._track(tuple(validated))
 
     @contextmanager
-    def _track(self, categories: tuple[str, ...]) -> AbstractContextManager[None]:
+    def _track(self, tags: tuple[str, ...]) -> AbstractContextManager[None]:
         start = time.perf_counter()
         try:
             yield
         finally:
             elapsed = time.perf_counter() - start
-            for cat in categories:
-                self._totals[cat] = self._totals.get(cat, 0.0) + elapsed
+            for tag in tags:
+                self._totals[tag] = self._totals.get(tag, 0.0) + elapsed
 
     @property
     def total_secs(self) -> float:
@@ -83,13 +90,13 @@ class Timer:
         return end - self._start_time
 
     def get_timing_secs(self) -> dict[str, float]:
-        """Return timing dict with category breakdowns.
+        """Return timing dict with tag breakdowns.
 
-        Keys: "total", category names, "overhead" (if categories tracked).
+        Keys: "total", tag names, "overhead" (if tags tracked).
         """
         metrics: dict[str, float] = {"total": self.total_secs}
-        for cat, secs in self._totals.items():
-            metrics[cat] = secs
+        for tag, secs in self._totals.items():
+            metrics[tag] = secs
         if self._totals:
             metrics["overhead"] = self.total_secs - sum(self._totals.values())
         return metrics
@@ -97,8 +104,8 @@ class Timer:
 
 Features:
 - Explicit `start()` / `stop()` lifecycle
-- `timer["cat"]` or `timer["cat1", "cat2"]` for overlapping categories
-- Accepts any iterable of strings
+- `timer["tag"]` or `timer["tag1", "tag2"]` for overlapping tags
+- Accepts any iterable of strings, validates all are strings
 - `AbstractContextManager[None]` return type makes usage clear
 - Assignment attempts raise `TypeError` (only `__getitem__` implemented)
 - `get_timing_secs()` returns plain keys (no prefix)
@@ -191,9 +198,10 @@ k_search/modular/
 | Span vs Node extension | Separate class | Single responsibility, transient vs persistent |
 | Timer ownership | Span owns Timer | Natural scope, executor passes span around |
 | Timer start/stop | Explicit methods | No magic, clear lifecycle |
-| Category syntax | `timer["cat"]` | Concise, read-only via `__getitem__` |
+| Tag syntax | `timer["tag"]` | Concise, read-only via `__getitem__` |
 | `__getitem__` return type | `AbstractContextManager[None]` | Explicit that it returns a context manager |
-| Multi-category | Iterable support | Tag regions with overlapping categories |
+| Multi-tag | Iterable support | Tag regions with overlapping tags |
+| Tag validation | TypeError for non-strings | Fail fast on invalid input |
 | Metrics keys | Plain (no prefix) | Consumer adds prefixes if needed |
 
 ## Future Considerations
