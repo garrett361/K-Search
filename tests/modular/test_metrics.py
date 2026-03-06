@@ -15,7 +15,9 @@ from k_search.modular.metrics.wandb import WandbMetricsTracker
 class TestWandbMetricsTracker:
     def test_raises_when_wandb_not_installed(self):
         with patch.dict(sys.modules, {"wandb": None}):
-            with pytest.raises(RuntimeError, match="wandb configured but not installed"):
+            with pytest.raises(
+                RuntimeError, match="wandb configured but not installed"
+            ):
                 WandbMetricsTracker(MetricsConfig(wandb=True))
 
     def test_raises_when_no_active_run(self):
@@ -59,6 +61,33 @@ class TestCreateMetricsTrackers:
 
         assert len(trackers) == 1
         assert isinstance(trackers[0], WandbMetricsTracker)
+
+    def test_returns_local_tracker_when_local_and_output_dir(self, tmp_path):
+        from k_search.modular.metrics.local import LocalMetricsTracker
+
+        trackers = create_metrics_trackers(
+            MetricsConfig(local=True), output_dir=tmp_path
+        )
+        assert len(trackers) == 1
+        assert isinstance(trackers[0], LocalMetricsTracker)
+
+    def test_returns_both_trackers_when_wandb_and_local(self, tmp_path):
+        from k_search.modular.metrics.local import LocalMetricsTracker
+
+        mock_wandb = MagicMock()
+        mock_wandb.run = MagicMock()
+        with patch.dict(sys.modules, {"wandb": mock_wandb}):
+            trackers = create_metrics_trackers(
+                MetricsConfig(wandb=True, local=True), output_dir=tmp_path
+            )
+        assert len(trackers) == 2
+        assert isinstance(trackers[0], WandbMetricsTracker)
+        assert isinstance(trackers[1], LocalMetricsTracker)
+
+    def test_noop_when_local_false_and_wandb_false(self):
+        trackers = create_metrics_trackers(MetricsConfig(local=False, wandb=False))
+        assert len(trackers) == 1
+        assert isinstance(trackers[0], NoOpMetricsTracker)
 
 
 class TestBuildRoundMetrics:
