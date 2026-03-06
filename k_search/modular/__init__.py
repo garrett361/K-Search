@@ -1,6 +1,11 @@
 """Modular framework: protocol-based abstractions for code optimization tasks."""
 
-from k_search.modular.config import ArtifactConfig, MetricsConfig, SearchConfig, SearchResult
+from k_search.modular.config import (
+    ArtifactConfig,
+    MetricsConfig,
+    SearchConfig,
+    SearchResult,
+)
 from k_search.modular.loop import LLMCall, run_search
 from k_search.modular.results import AnalysisResult, CheckResult
 from k_search.modular.world import Action, Cycle, Node, Round, Tree

@@ -81,9 +81,7 @@ class _FeedbackProvider:
             rounds = [rounds]
         return "\n\n".join(r.result.get_log() for r in rounds)
 
-    def for_world_model(
-        self, rounds: Round | list[Round]
-    ) -> list[dict[str, Any]]:
+    def for_world_model(self, rounds: Round | list[Round]) -> list[dict[str, Any]]:
         if isinstance(rounds, Round):
             rounds = [rounds]
         return [r.result.get_metrics() for r in rounds]

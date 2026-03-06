@@ -12,8 +12,6 @@ class FeedbackProvider(Protocol):
         """Format rounds as feedback for codegen LLM."""
         ...
 
-    def for_world_model(
-        self, rounds: Round | list[Round]
-    ) -> list[dict[str, Any]]:
+    def for_world_model(self, rounds: Round | list[Round]) -> list[dict[str, Any]]:
         """Format rounds for world model. Returns one dict per round."""
         ...
