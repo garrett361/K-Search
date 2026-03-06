@@ -34,11 +34,11 @@ class SimpleWorldModel:
         """Generate action via LLM, return node (don't add to tree)."""
         parent = self._get_last_node(tree)
 
-        if tree.get_best_node() is None:
-            logger.debug("Using initial action (no best node yet)")
+        if not tree.root.children:
+            logger.debug("Using initial action (no prior rounds)")
             action_description = INITIAL_ACTION
         else:
-            logger.debug("Requesting action from LLM (best node exists)")
+            logger.debug("Requesting action from LLM (prior rounds exist)")
             prompt = self._action_prompt_fn(tree, context)
             raw_response = self._llm(prompt)
             logger.debug("LLM action response:\n\n%s\n", raw_response)
