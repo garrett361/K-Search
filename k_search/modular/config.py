@@ -1,9 +1,65 @@
 """Search configuration and result types."""
 
+import socket
+import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 from k_search.modular.protocols import EvaluationResult, Implementation
+
+
+def collect_git_info() -> dict[str, str | bool | None]:
+    """Collect K-Search git info. Returns empty dict on failure."""
+
+    def _git(args: list[str]) -> str | None:
+        try:
+            r = subprocess.run(
+                ["git"] + args, capture_output=True, text=True, timeout=5
+            )
+            return r.stdout.strip() if r.returncode == 0 else None
+        except Exception:
+            return None
+
+    try:
+        commit = _git(["rev-parse", "HEAD"])
+        branch = _git(["branch", "--show-current"])
+        status = _git(["status", "--porcelain"])
+        if commit is None and branch is None:
+            return {}
+        return {
+            "commit": commit,
+            "branch": branch,
+            "dirty": bool(status) if status is not None else None,
+        }
+    except Exception:
+        return {}
+
+
+def collect_env_info() -> dict[str, str | None]:
+    """Collect runtime environment. Returns empty dict on failure."""
+    try:
+        result: dict[str, str | None] = {
+            "hostname": socket.gethostname(),
+            "python_version": sys.version.split()[0],
+        }
+        try:
+            import torch
+
+            result["torch_version"] = torch.__version__
+            if torch.cuda.is_available():
+                result["gpu"] = torch.cuda.get_device_name()
+        except ImportError:
+            pass
+        try:
+            import triton
+
+            result["triton_version"] = getattr(triton, "__version__", None)
+        except ImportError:
+            pass
+        return result
+    except Exception:
+        return {}
 
 
 @dataclass
