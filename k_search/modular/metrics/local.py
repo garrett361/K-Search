@@ -1,4 +1,5 @@
 """Local filesystem metrics tracker implementation."""
+
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -17,7 +18,9 @@ class LocalMetricsTracker:
         if not self._initialized:
             self._output_dir.mkdir(parents=True, exist_ok=True)
             if self._run_config:
-                (self._output_dir / "config.json").write_text(json.dumps(self._run_config, indent=2))
+                (self._output_dir / "config.json").write_text(
+                    json.dumps(self._run_config, indent=2)
+                )
             self._initialized = True
 
         row: dict = {"step": step, **metrics}
