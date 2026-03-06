@@ -37,6 +37,8 @@ class Timer:
         """Context manager for timing region(s)."""
         if isinstance(tags, str):
             tags = [tags]
+        elif not isinstance(tags, Iterable):
+            raise TypeError(f"tag must be str, got {type(tags).__name__}: {tags!r}")
         validated = []
         for tag in tags:
             if not isinstance(tag, str):
