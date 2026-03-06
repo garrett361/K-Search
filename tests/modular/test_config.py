@@ -30,3 +30,24 @@ class TestCollectEnvInfo:
         from unittest.mock import patch
         with patch("socket.gethostname", side_effect=OSError):
             assert collect_env_info() == {}
+
+
+class TestBuildRunConfig:
+    def test_builds_complete_config_structure(self):
+        from k_search.modular.config import build_run_config, SearchConfig, MetricsConfig, ArtifactConfig
+
+        result = build_run_config(
+            run_id="test-run", model_name="test-model", reasoning_effort="medium",
+            search_config=SearchConfig(max_rounds=5),
+            metrics_config=MetricsConfig(),
+            artifact_config=ArtifactConfig(output_dir="/tmp"),
+            task="causal_conv1d", language="triton",
+        )
+
+        assert result["run_id"] == "test-run"
+        assert result["model_name"] == "test-model"
+        assert result["search"]["max_rounds"] == 5
+        assert result["task_config"] == {"task": "causal_conv1d", "language": "triton"}
+        assert isinstance(result["git"], dict)
+        assert isinstance(result["env"], dict)
+        assert result["artifacts"]["output_dir"] == "/tmp"

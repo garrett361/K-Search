@@ -3,6 +3,7 @@
 import socket
 import subprocess
 import sys
+import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -60,6 +61,39 @@ def collect_env_info() -> dict[str, str | None]:
         return result
     except Exception:
         return {}
+
+
+def build_run_config(
+    run_id: str,
+    model_name: str,
+    reasoning_effort: str,
+    search_config: "SearchConfig",
+    metrics_config: "MetricsConfig",
+    artifact_config: "ArtifactConfig",
+    verl_experiment_id: str | None = None,
+    wandb_project: str | None = None,
+    wandb_run_name: str | None = None,
+    **task_kwargs: str,
+) -> dict:
+    """Build unified run config for wandb.init and local serialization."""
+    return {
+        "run_id": run_id,
+        "verl_experiment_id": verl_experiment_id,
+        "model_name": model_name,
+        "reasoning_effort": reasoning_effort,
+        "search": dataclasses.asdict(search_config),
+        "metrics": dataclasses.asdict(metrics_config),
+        "artifacts": {
+            "output_dir": str(artifact_config.output_dir)
+            if artifact_config.output_dir
+            else None,
+            "only_store_successes": artifact_config.only_store_successes,
+        },
+        "task_config": task_kwargs,
+        "git": collect_git_info(),
+        "env": collect_env_info(),
+        "wandb": {"project": wandb_project, "run_name": wandb_run_name},
+    }
 
 
 @dataclass
