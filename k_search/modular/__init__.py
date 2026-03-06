@@ -34,6 +34,8 @@ from k_search.modular.adapters import (
 )
 from k_search.modular.metrics import NoOpMetricsTracker
 from k_search.modular.artifacts import NoOpArtifactStore
+from k_search.modular.timer import Timer
+from k_search.modular.span import Span
 
 __all__ = [
     # Config
@@ -76,4 +78,7 @@ __all__ = [
     # Default implementations
     "NoOpMetricsTracker",
     "NoOpArtifactStore",
+    # Execution context
+    "Timer",
+    "Span",
 ]
