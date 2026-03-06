@@ -38,11 +38,16 @@ def _simple_code_prompt_fn(node, task):
 
 
 def test_run_completes_rounds():
-    """Executor runs for max_rounds."""
+    """Executor runs for max_rounds.
+
+    Round 0: initial action (no LLM) + code gen (1 LLM call)
+    Round 1+: propose action (1 LLM) + code gen (1 LLM) = 2 calls each
+    """
     root = Node(status="closed")
     tree = Tree(root=root)
 
-    llm_responses = iter(["action 1", "code 1", "action 2", "code 2", "action 3", "code 3"])
+    # Round 0: code only, Round 1: action + code, Round 2: action + code
+    llm_responses = iter(["code 0", "action 1", "code 1", "action 2", "code 2"])
     mock_llm = MagicMock(side_effect=lambda p: next(llm_responses))
 
     task = _mock_task()
@@ -55,12 +60,13 @@ def test_run_completes_rounds():
     )
     executor.run()
 
-    assert mock_llm.call_count == 6
+    # Round 0: 1 call (code), Round 1: 2 calls, Round 2: 2 calls = 5 total
+    assert mock_llm.call_count == 5
     assert evaluator.evaluate.call_count == 3
 
 
-def test_run_adds_proposed_nodes_to_tree():
-    """Executor adds proposed nodes to tree."""
+def test_run_adds_nodes_to_tree():
+    """Executor adds nodes to tree."""
     root = Node(status="closed")
     tree = Tree(root=root)
 
@@ -78,6 +84,8 @@ def test_run_adds_proposed_nodes_to_tree():
     assert len(root.children) == 1
     node = root.children[0]
     assert node.status == "closed"
+    assert node.action is not None  # Round 0 has initial action
+    assert "optimized" in node.action.title.lower()
     assert node.cycle is not None
     assert len(node.cycle.rounds) == 1
 
@@ -91,7 +99,7 @@ def test_run_stops_on_empty_select():
     world_model.propose.return_value = []
     world_model.select.return_value = []
 
-    mock_llm = MagicMock()
+    mock_llm = MagicMock(return_value="code")
     task = _mock_task()
     evaluator = _mock_evaluator()
 
@@ -101,4 +109,5 @@ def test_run_stops_on_empty_select():
     )
     executor.run()
 
+    # No nodes proposed, select returns empty, no execution
     assert evaluator.evaluate.call_count == 0

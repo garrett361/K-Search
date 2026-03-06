@@ -13,12 +13,17 @@ logger = logging.getLogger(__name__)
 ActionPromptFn = Callable[[Tree, dict[str, Any] | None], str]
 
 
+INITIAL_ACTION = "Write an optimized implementation."
+
+
 class SimpleWorldModel:
     """Reference world model with two-step LLM pattern.
 
     - propose(): LLM generates action description, returns nodes (no tree mutation)
     - select(): Returns latest node (linear tree)
     - update(): No-op
+
+    Round 0 uses a generic initial action. Round 1+ asks LLM for specific actions.
     """
 
     def __init__(self, llm: Callable[[str], str], action_prompt_fn: ActionPromptFn):
@@ -27,17 +32,19 @@ class SimpleWorldModel:
 
     def propose(self, tree: Tree, context: dict[str, Any] | None = None) -> list[Node]:
         """Generate action via LLM, return node (don't add to tree)."""
-        prompt = self._action_prompt_fn(tree, context)
-        action_description = self._llm(prompt)
-
         parent = self._get_last_node(tree)
 
-        node = Node(
-            parent=parent,
-            status="open",
-            action=Action(title=action_description.strip()),
-        )
-        logger.info(f"Proposed action: {node.action.title[:50]}...")
+        # Round 0: use generic initial action (no LLM call)
+        # Round 1+: ask LLM for specific action based on feedback
+        if tree.get_best_node() is None:
+            action_description = INITIAL_ACTION
+        else:
+            prompt = self._action_prompt_fn(tree, context)
+            action_description = self._llm(prompt).strip()
+
+        action = Action(title=action_description)
+        node = Node(parent=parent, status="open", action=action)
+        logger.info(f"Proposed action: {action.title[:50]}...")
         return [node]
 
     def select(self, tree: Tree, context: dict[str, Any] | None = None) -> list[Node]:

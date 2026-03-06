@@ -49,6 +49,9 @@ class SequentialExecutor:
     def run(self) -> Node | None:
         """Execute search.
 
+        Every round: propose action, then generate code from action.
+        Round 0 proposes a generic initial action (no feedback yet).
+
         Termination: runs for max_rounds or until select() returns empty.
         TODO: termination responsibility (executor vs world model vs tree) not yet defined.
         """
@@ -106,4 +109,6 @@ class SequentialExecutor:
         for store in self._artifact_stores:
             store.store(round, round_idx)
 
-        logger.info(f"Round {round_idx + 1}: score={score:.4f}, success={result.is_success()}")
+        logger.info(
+            f"Round {round_idx + 1}: score={score:.4f}, success={result.is_success()}"
+        )
