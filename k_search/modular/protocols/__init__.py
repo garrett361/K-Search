@@ -5,6 +5,7 @@ from k_search.modular.protocols.artifact_store import ArtifactStore
 from k_search.modular.protocols.correctness import CorrectnessChecker
 from k_search.modular.protocols.eval_result import EvaluationResult
 from k_search.modular.protocols.evaluator import Evaluator
+from k_search.modular.protocols.executor import Executor
 from k_search.modular.protocols.feedback_provider import FeedbackProvider
 from k_search.modular.protocols.formatter import StateFormatter
 from k_search.modular.protocols.impl import Implementation
@@ -21,6 +22,7 @@ __all__ = [
     "CorrectnessChecker",
     "EvaluationResult",
     "Evaluator",
+    "Executor",
     "FeedbackProvider",
     "Implementation",
     "InputGenerator",
