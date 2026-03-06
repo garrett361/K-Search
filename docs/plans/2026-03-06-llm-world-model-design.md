@@ -23,14 +23,30 @@ class LLMWorldModel:
         self._formatter = formatter
         self._task = task
 
-    def propose(self, tree: Tree, context: dict | None = None) -> Node:
-        """Call LLM with forced insert_node tool, apply result."""
+    def propose(self, tree: Tree, context: dict | None = None) -> list[Node]:
+        """Call LLM with forced insert_node tool(s), apply results."""
 
-    def select(self, tree: Tree, context: dict | None = None) -> Node:
-        """Return highest-scoring open node. No LLM call."""
+    def select(self, tree: Tree, context: dict | None = None) -> list[Node]:
+        """Return highest-scoring open nodes. No LLM call."""
 
     def update(self, tree: Tree, context: dict | None = None) -> None:
         """Call LLM, apply any returned tool calls."""
+
+
+class AsyncWorldModelWrapper:
+    """Wrap sync WorldModel for use with PipelineExecutor."""
+
+    def __init__(self, sync_model: WorldModel):
+        self._sync = sync_model
+
+    async def propose(self, tree: Tree, context: dict | None = None) -> list[Node]:
+        return await asyncio.to_thread(self._sync.propose, tree, context)
+
+    async def select(self, tree: Tree, context: dict | None = None) -> list[Node]:
+        return await asyncio.to_thread(self._sync.select, tree, context)
+
+    async def update(self, tree: Tree, context: dict | None = None) -> None:
+        await asyncio.to_thread(self._sync.update, tree, context)
 ```
 
 ## Method Details
@@ -39,22 +55,24 @@ class LLMWorldModel:
 
 1. Build prompt: tree state (via formatter) + task spec
 2. Call LLM with `tools=[insert_node]`, `tool_choice=forced`
-3. Parse single tool call from response
-4. Apply via `apply_tool_call(tree, "insert_node", args)`
-5. Return new node (or raise on failure)
+3. Parse tool calls from response (may be multiple)
+4. Apply each via `apply_tool_call(tree, "insert_node", args)`
+5. Return list of new nodes (or raise on failure)
 
 ### select()
 
 Deterministic - no LLM:
 ```python
-def select(self, tree: Tree, context: dict | None = None) -> Node:
+def select(self, tree: Tree, context: dict | None = None) -> list[Node]:
     frontier = tree.get_frontier()
     if not frontier:
         raise WorldModelError("empty frontier")
-    return max(frontier, key=lambda n: self._get_node_score(n))
+    # Return top nodes by score - count configurable
+    sorted_frontier = sorted(frontier, key=lambda n: self._get_node_score(n), reverse=True)
+    return sorted_frontier[:self._select_count]
 ```
 
-Matches V1's `choose_next_action_node_id()` behavior.
+Matches V1's `choose_next_action_node_id()` behavior but returns list for batch selection.
 
 ### update()
 
@@ -77,14 +95,14 @@ Orchestrator                         LLMWorldModel
     │       ├─► formatter.format_tree(tree)
     │       ├─► build propose prompt
     │       ├─► llm(prompt, tools=[insert_node], tool_choice=forced)
-    │       ├─► apply_tool_call(tree, "insert_node", args)
-    │       └─► return new_node
+    │       ├─► for each tool_call: apply_tool_call(tree, "insert_node", args)
+    │       └─► return list[new_nodes]
     │
     ├─► select(tree, context={})
     │       ├─► tree.get_frontier()
-    │       └─► return max(frontier, key=score)
+    │       └─► return sorted(frontier, key=score)[:count]
     │
-    ├─► [execute cycle on selected_node]
+    ├─► [execute cycle on selected_nodes]
     │
     └─► update(tree, context={"node": node, "cycle": cycle})
             ├─► formatter.format_tree(tree)
@@ -115,10 +133,10 @@ Tools from `TREE_TOOLS` via `get_tree_tools(enabled=...)`:
 ```
 k_search/modular/
 ├── protocols/
-│   └── world_model.py        # existing protocol (unchanged)
+│   └── world_model.py        # WorldModel, AsyncWorldModel (update for list[Node])
 ├── world_models/             # NEW
 │   ├── __init__.py
-│   └── llm.py                # LLMWorldModel, WorldModelError
+│   └── llm.py                # LLMWorldModel, AsyncWorldModelWrapper, WorldModelError
 ├── world/                    # existing
 ├── metrics/
 ├── artifacts/

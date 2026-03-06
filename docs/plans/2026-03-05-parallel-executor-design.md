@@ -15,33 +15,75 @@ When pursuing multiple actions from the world model, GPU sits idle during LLM ca
 ## Overview
 
 ```
-┌──────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ Proposer │───▶│   LLM stage     │───▶│   Eval stage    │───▶ Update tree
-└──────────┘    │ (queue_depth=4) │    │ (queue_depth=2) │
-      ▲         └─────────────────┘    └─────────────────┘
-      │                                        │
-      └────────────────────────────────────────┘
+┌──────────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ Proposer + Selector  │───▶│   LLM stage     │───▶│   Eval stage    │───▶ update()
+│ propose() → select() │    │ (queue_depth=4) │    │ (queue_depth=2) │
+└──────────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-- **Proposer** (internal coroutine): Calls `world_model.get_next_action()` when queue has capacity
+- **Proposer**: Calls `world_model.propose()` to fill frontier, `select()` to pick nodes
 - **LLM stage**: Generates implementations (bounded queue)
 - **Eval stage**: Runs GPU benchmarks (bounded queue)
 - **Update**: Applies results to tree, calls `world_model.update()`
 
 Backpressure via bounded queues — when eval is slow, impl queue fills, LLM stage blocks on put, proposer naturally pauses.
 
-## Key Decisions
+## Protocols
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Concurrency model | asyncio with bounded queues | Fine-grained backpressure, clean async/await |
-| Queue config | Single depth int per stage | Queue size IS the throttle, no separate concurrency config |
-| LLM throttling | Bounded queue | Backend (vLLM, API) handles actual scheduling |
-| Eval workers | Match hardware (num GPUs) | Natural parallelism limit |
-| Staleness | Ignore for MVP | Maximize throughput, tune later |
-| Public API | Sync `run()` | Async is internal implementation detail |
+### WorldModel Protocol (sync)
 
-## Action Node States
+```python
+class WorldModel(Protocol):
+    def propose(self, tree: Tree, context: dict[str, Any] | None = None) -> list[Node]:
+        """Generate new frontier nodes. Returns empty list if nothing to propose."""
+        ...
+
+    def select(self, tree: Tree, context: dict[str, Any] | None = None) -> list[Node]:
+        """Select frontier nodes to pursue. Returns empty list if none available."""
+        ...
+
+    def update(self, tree: Tree, context: dict[str, Any] | None = None) -> None:
+        """Update tree after cycle completes."""
+        ...
+```
+
+### AsyncWorldModel Protocol
+
+```python
+class AsyncWorldModel(Protocol):
+    async def propose(self, tree: Tree, context: dict[str, Any] | None = None) -> list[Node]: ...
+    async def select(self, tree: Tree, context: dict[str, Any] | None = None) -> list[Node]: ...
+    async def update(self, tree: Tree, context: dict[str, Any] | None = None) -> None: ...
+```
+
+### Sync-to-Async Wrapper
+
+```python
+class AsyncWorldModelWrapper:
+    """Wrap sync WorldModel for use with PipelineExecutor."""
+
+    def __init__(self, sync_model: WorldModel):
+        self._sync = sync_model
+
+    async def propose(self, tree, context=None) -> list[Node]:
+        return await asyncio.to_thread(self._sync.propose, tree, context)
+
+    async def select(self, tree, context=None) -> list[Node]:
+        return await asyncio.to_thread(self._sync.select, tree, context)
+
+    async def update(self, tree, context=None) -> None:
+        await asyncio.to_thread(self._sync.update, tree, context)
+```
+
+### Executor Protocol
+
+```python
+class Executor(Protocol):
+    # TBD - signature determined during implementation
+    ...
+```
+
+## Node Status Transitions
 
 ```
 open → in_progress → closed
@@ -49,102 +91,30 @@ open → in_progress → closed
 
 | Status | Meaning |
 |--------|---------|
-| `open` | Available for selection by executor |
-| `in_progress` | In pipeline (queued, LLM generating, or evaluating) |
-| `closed` | Done — check attached `Round` for pass/fail |
+| `open` | Available for selection |
+| `in_progress` | In pipeline (selected, LLM generating, or evaluating) |
+| `closed` | Done — has attached `Cycle` |
 
-World model's `get_next_action()` only considers `open` actions. Executor marks `in_progress` immediately upon selection.
+World model's `select()` only considers `open` nodes. Executor marks `in_progress` immediately upon selection.
 
 ## Configuration
 
 ```python
 @dataclass
 class PipelineConfig:
-    llm_queue_depth: int = 4    # max actions in LLM stage
+    llm_queue_depth: int = 4    # max nodes in LLM stage
     eval_queue_depth: int = 2   # max impls in eval stage
+    # Additional config TBD (frontier_target, etc.)
 ```
 
 Queue depth controls buffering at each stage. Tune ratio to keep eval saturated.
 
-## Protocols
+## Pipeline Internals (Schematic)
 
-### Executor Protocol
-
-```python
-@dataclass
-class ExecutorResult:
-    best_outcome: Round | None
-    rounds_completed: int
-    metrics: dict[str, Any]
-
-class Executor(Protocol):
-    def run(self, tree: SolutionTree, max_rounds: int) -> ExecutorResult:
-        """Execute search, return best result."""
-        ...
-```
-
-Sync API. Pipeline executor uses asyncio internally but hides it.
-
-**Executor dependencies** — executors replace the loop entirely, so they need all loop infrastructure:
-
-```python
-class SequentialExecutor:
-    def __init__(
-        self,
-        world_model: WorldModel,
-        evaluator: Evaluator,
-        llm: LLMCall,
-        metrics_trackers: list[MetricsTracker] | None = None,
-        artifact_store: ArtifactStore | None = None,
-    ): ...
-
-class PipelineExecutor:
-    def __init__(
-        self,
-        world_model: WorldModel,
-        evaluator: Evaluator,
-        llm: LLMCall,
-        config: PipelineConfig,
-        metrics_trackers: list[MetricsTracker] | None = None,
-        artifact_store: ArtifactStore | None = None,
-    ): ...
-```
-
-### World Model Protocol
-
-```python
-# Sync version (Stage 1-2)
-class WorldModel(Protocol):
-    def get_next_action(self, tree: SolutionTree) -> ActionNode | None:
-        """Return next action to try, or None if done."""
-        ...
-
-    def update(self, tree: SolutionTree, action: ActionNode, outcome: Round) -> None:
-        """Incorporate result into tree."""
-        ...
-
-# Async version (Stage 3 - pipeline)
-class AsyncWorldModel(Protocol):
-    async def get_next_action(self, tree: SolutionTree) -> ActionNode | None: ...
-    async def update(self, tree: SolutionTree, action: ActionNode, outcome: Round) -> None: ...
-```
-
-Simple single-action interface. Executor calls repeatedly to fill queue. Pipeline executor uses async variant.
-
-> **Note:** Sync world models can be wrapped to async via `asyncio.to_thread()` for use with pipeline executor.
-
-## Pipeline Internals
+> **Note:** This is a schematic example illustrating the general shape. Actual implementation details will likely differ.
 
 ```python
 class PipelineExecutor:
-    def __init__(
-        self,
-        world_model: WorldModel,
-        evaluator: Evaluator,
-        llm: LLMCall,
-        config: PipelineConfig,
-    ): ...
-
     async def _run_async(self, tree, max_rounds):
         action_queue = asyncio.Queue(maxsize=self.config.llm_queue_depth)
         impl_queue = asyncio.Queue(maxsize=self.config.eval_queue_depth)
@@ -154,124 +124,106 @@ class PipelineExecutor:
             tg.create_task(self._llm_worker(action_queue, impl_queue))
             tg.create_task(self._eval_worker(impl_queue))
 
-        return ExecutorResult(...)
+        return ...  # TBD
 
     async def _proposer(self, action_queue, max_rounds):
         while self.rounds_completed < max_rounds:
-            action = await self.world_model.get_next_action(self.tree)  # async
-            if action is None:
-                break
-            action.status = "in_progress"
-            await action_queue.put(action)  # blocks if full
+            frontier = self.tree.get_frontier()
+
+            # Refill frontier if needed
+            if len(frontier) < self.config.frontier_target:
+                # TODO: error handling
+                await self.world_model.propose(self.tree, context=None)
+                frontier = self.tree.get_frontier()
+
+            if not frontier:
+                break  # nothing left to explore
+
+            # TODO: error handling
+            nodes = await self.world_model.select(self.tree, context=None)
+            for node in nodes:
+                node.status = "in_progress"
+                await action_queue.put(node)
 
     async def _llm_worker(self, action_queue, impl_queue):
         while True:
-            action = await action_queue.get()
-            try:
-                prompt = build_prompt(self.tree, action)
-                code = await self.llm(prompt)  # async LLM call
-                impl = create_implementation(code, action)
-                await impl_queue.put((action, impl))
-            except Exception as e:
-                logger.warning(f"LLM failed for action {action.id}: {e}")
-                action.status = "closed"
-                # TODO: retry logic
+            node = await action_queue.get()
+            # TODO: error handling
+            prompt = build_prompt(self.tree, node)
+            code = await self.llm(prompt)
+            impl = create_implementation(code, node)
+            await impl_queue.put((node, impl))
 
     async def _eval_worker(self, impl_queue):
         while True:
-            action, impl = await impl_queue.get()
-            try:
-                # Eval stays sync (GPU work), wrap in to_thread
-                result = await asyncio.to_thread(self.evaluator.evaluate, impl)
-                outcome = Round(impl=impl, result=result)
-                action.outcome = outcome
-                action.status = "closed"
-                await self.world_model.update(self.tree, action, outcome)  # async
-                self.rounds_completed += 1
-            except Exception as e:
-                logger.warning(f"Eval failed for action {action.id}: {e}")
-                action.status = "closed"
-                # TODO: retry logic
+            node, impl = await impl_queue.get()
+            # TODO: error handling
+            # Eval stays sync (GPU work), wrap in to_thread
+            result = await asyncio.to_thread(self.evaluator.evaluate, impl)
+            round_ = Round(impl=impl, result=result, ...)
+            node.cycle = Cycle(rounds=[round_])
+            node.status = "closed"
+            context = {"completed_node": node, "round": round_}
+            await self.world_model.update(self.tree, context)
+            self.rounds_completed += 1
 ```
-
-## Metrics
-
-| Metric | Type | Purpose |
-|--------|------|---------|
-| `eval_utilization` | 0.0-1.0 | Are GPUs saturated? `busy_gpus / total_gpus` |
-| `llm_queue_size` | gauge | Current queue depth |
-| `eval_queue_size` | gauge | Current queue depth |
-
-Primary tuning metric is `eval_utilization`. Target ~1.0 means pipeline is keeping GPUs fed.
-
-## Termination
-
-| Condition | Behavior |
-|-----------|----------|
-| `rounds_completed >= max_rounds` | Proposer stops, workers drain queues, return |
-| `world_model.get_next_action() returns None` | No more actions, drain and return |
-
-## Error Handling
-
-MVP: try/except around each action, log, continue. Mark action as closed with error.
-
-```python
-# TODO: retry logic for transient failures
-```
-
-Hard failures (GPU OOM, API auth revoked) will fail repeatedly — observable from logs.
 
 ## Module Structure
 
 ```
 k_search/modular/
+├── protocols/
+│   ├── world_model.py      # WorldModel, AsyncWorldModel (update for list[Node])
+│   └── executor.py         # Executor protocol (new)
+├── world_models/
+│   ├── __init__.py
+│   └── llm.py              # LLMWorldModel + AsyncWorldModelWrapper
 ├── executors/
 │   ├── __init__.py
-│   ├── protocol.py       # Executor protocol, ExecutorResult
-│   ├── sequential.py     # SequentialExecutor
-│   └── pipeline.py       # PipelineExecutor, PipelineConfig
+│   ├── sequential.py       # SequentialExecutor
+│   └── pipeline.py         # PipelineExecutor, PipelineConfig
 └── ...
 ```
 
 ## Implementation Stages
 
-### Stage 1: World Model Foundation
+### Stage 1: World Model Foundation — ✅ DONE
 
-- `SolutionTree`, `SolutionNode`, `ActionNode` data structures
-- `WorldModel` protocol (`get_next_action`, `update`)
-- Initial world model implementation
-- Test with ad-hoc loop (no formal executor yet)
+- `Tree`, `Node`, `Action`, `Cycle` dataclasses
+- `WorldModel` protocol (needs update: `propose/select -> list[Node]`)
+- Tool infrastructure (`tools.py`, `apply_tool_call`)
+- `StateFormatter` + `DefaultFormatter`
 
-### Stage 2: Executor Protocol + Sequential
+### Stage 2: LLMWorldModel Implementation
 
-- `Executor` protocol (sync `run()`)
-- `SequentialExecutor` — formalizes the simple loop
-- `ExecutorResult` dataclass
+- Implement `LLMWorldModel` class against updated protocol
+- `propose()` → LLM with forced `insert_node` tool calls → returns `list[Node]`
+- `select()` → deterministic highest-score from frontier → returns `list[Node]`
+- `update()` → LLM with optional tool calls for tree refinement
+- `AsyncWorldModelWrapper` in same file
 
-### Stage 3: Pipeline Executor
+### Stage 3: SequentialExecutor
 
-- Async interfaces for LLM and world model:
-  ```python
-  AsyncLLMCall = Callable[[str], Awaitable[str]]
+- `Executor` protocol
+- `SequentialExecutor` - tree-aware loop replacing `run_search()`
+- Integrates WorldModel with propose/select/update cycle
+- Validates protocol works end-to-end
 
-  class AsyncWorldModel(Protocol):
-      async def get_next_action(self, tree: SolutionTree) -> ActionNode | None: ...
-      async def update(self, tree: SolutionTree, action: ActionNode, outcome: Round) -> None: ...
-  ```
-- `PipelineExecutor` with async internals (no `to_thread()` wrappers needed)
+### Stage 4: PipelineExecutor
+
+- `PipelineExecutor` with async internals
 - `PipelineConfig` (queue depths)
-- `eval_utilization` metric
-- Error handling with TODO for retry
+- Bounded queues, backpressure, concurrent LLM/eval
 
-## Future Considerations
+## Deferred
 
-- **Staleness handling**: Tag actions with tree version, let world model decide relevance
-- **Retry logic**: Configurable retry for transient LLM/eval failures
-- **Early stopping**: Stop when target score reached
-- **Adaptive queue depths**: Auto-tune based on observed utilization
-- **Multi-GPU**: Scale eval workers to match available devices
+- Error handling / retry logic - let exceptions propagate for MVP
+- ExecutorResult definition - define when we know what we need
+- Early stopping - stop when target score reached
+- Metrics - `eval_utilization`, queue gauges (add when pipeline works)
 
 ## References
 
-- Search V2 design: `2026-03-04-search-v2-design.md`
+- LLM World Model design: `2026-03-06-llm-world-model-design.md`
+- Tree data model: `2026-03-05-tree-data-model-design.md`
 - Task framework: `2026-03-04-task-framework-design.md`
