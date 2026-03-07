@@ -89,7 +89,7 @@ class SequentialExecutor:
         logger.debug("LLM code response:\n\n%s\n", code)
 
         impl = self._task.create_implementation(code)
-        result = self._evaluator.evaluate(impl)
+        result = self._evaluator.evaluate(impl, context={"round_idx": round_idx})
         score = self._task.scorer.score(result)
 
         logger.debug(

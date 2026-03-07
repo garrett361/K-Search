@@ -22,5 +22,6 @@ class GpuModeEvaluator:
     ) -> EvaluationResult:
         """Evaluate implementation by delegating to run_benchmark."""
         solution = impl.content
-        eval_result = self._task.run_benchmark(solution=solution)
+        round_num = (context or {}).get("round_idx")
+        eval_result = self._task.run_benchmark(solution=solution, round_num=round_num)
         return GpuModeEvaluationResult(eval_result)
