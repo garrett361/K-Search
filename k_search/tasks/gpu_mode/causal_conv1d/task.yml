@@ -1,0 +1,47 @@
+files:
+  - {"name": "submission.py", "source": "@SUBMISSION@"}
+  - {"name": "task.py", "source": "task.py"}
+  - {"name": "utils.py", "source": "utils.py"}
+  - {"name": "reference.py", "source": "reference.py"}
+  - {"name": "eval.py", "source": "eval.py"}
+
+lang: "py"
+
+description: |
+  Causal 1D convolution forward pass used in state space models (Mamba, etc).
+
+  The task is to optimize the forward pass of a causal 1D convolution with:
+  - Sliding window of width W over the time dimension
+  - SiLU activation
+
+  Input:
+  - `data`: Tuple of (x, weight, config)
+    - x: Input tensor [B, T, D] bfloat16
+    - weight: Convolution weights [D, W] bfloat16
+    - config: Dict (reserved for future use)
+
+  Output:
+  - torch.Tensor [B, T, D] bfloat16
+
+config:
+  main: "eval.py"
+
+templates:
+  Python: "submission.py"
+
+test_timeout: 1200
+benchmark_timeout: 1200
+ranked_timeout: 1200
+ranking_by: "geom"
+
+tests:
+  - {"B": 2, "T": 4096, "D": 2048, "W": 4, "seed": 1001}
+  - {"B": 1, "T": 2048, "D": 4096, "W": 4, "seed": 1002}
+  - {"B": 4, "T": 8192, "D": 512, "W": 4, "seed": 1003}
+  - {"B": 8, "T": 1024, "D": 1024, "W": 4, "seed": 1004}
+
+benchmarks:
+  - {"B": 2, "T": 4096, "D": 2048, "W": 4, "seed": 4001}
+  - {"B": 1, "T": 8192, "D": 512, "W": 4, "seed": 4002}
+  - {"B": 4, "T": 2048, "D": 4096, "W": 4, "seed": 4003}
+  - {"B": 8, "T": 4096, "D": 1024, "W": 4, "seed": 4004}
