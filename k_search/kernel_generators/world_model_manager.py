@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional
-import logging
-logger = logging.getLogger(__name__)
 
 from k_search.tasks.task_base import EvalResult
 from .world_model import (
@@ -173,7 +171,6 @@ class WorldModelManager:
                     pass
             return existing
 
-        logger.info(f"[WM] Building init prompts for definition_name={name}")
         prompts = build_world_model_prompts(
             definition_text=definition_text,
             target_gpu=self._target_gpu,
@@ -185,10 +182,8 @@ class WorldModelManager:
             prediction=None,
             max_chars_per_block=self._cfg.max_chars_per_block,
         )
-        logger.info(f"[WM] Calling LLM for world model init, prompt_chars={len(prompts.init_prompt)}")
         raw = (self._llm_call(prompts.init_prompt) or "").strip()
         parsed = try_parse_world_model_json(raw)
-        logger.info(f"[WM] LLM returned response_chars={len(raw)}, parsed={'ok' if parsed else 'failed'}")
         if parsed:
             # Persist a bounded excerpt of the reference implementation into the root node's notes.
             # Root stays a dummy decision/choice=null node; this is just a stable "anchor" for humans and WM.
@@ -1679,7 +1674,7 @@ class WorldModelManager:
                 "skipped_delete_not_allowed": int(skipped_delete_not_allowed),
             }
             self._last_apply_ops_report = report
-            logger.info(
+            print(
                 "[WM] apply_edit_ops:"
                 f" ops={report['ops']}"
                 f" updates={report['updates']}"
@@ -1704,7 +1699,7 @@ class WorldModelManager:
                 or report["skipped_split_invalid_children"]
                 or report["skipped_delete_not_allowed"]
             ):
-                logger.warning("[WM] edit-ops had skipped operations; refine will retry if this was a refine call.")
+                print("[WM][WARN] edit-ops had skipped operations; refine will retry if this was a refine call.")
         except Exception:
             pass
 

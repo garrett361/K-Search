@@ -1,4 +1,3 @@
-import logging
 import random
 import re
 import tempfile
@@ -7,7 +6,6 @@ from typing import Any, Dict, List, Optional
 import os
 
 import openai
-
 from .kernel_generator_prompts import (
     get_optimization_prompt_from_definition_text,
     get_prompt_from_definition_text,
@@ -21,12 +19,8 @@ try:
 except Exception:  # pragma: no cover
     wandb = None
 
-logger = logging.getLogger(__name__)
-
-
 def get_code_from_solution(language: str, solution: Any):
     from k_search.tasks.task_base import code_from_solution
-
     return code_from_solution(language, solution)
 
 
@@ -38,9 +32,7 @@ class KernelGenerator:
         target_gpu: str = "H100",
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
-        reasoning_effort: str = "medium",
-        use_reasoning_api: bool = True,
-        timeout: float = 300.0,
+        reasoning_effort: str = "medium",  # only used for openai reasoning models
     ):
         """
         Args:
@@ -50,15 +42,11 @@ class KernelGenerator:
             api_key: API key (if None, uses LLM_API_KEY environment variable)
             base_url: Base URL for the API (need to provide for non-openai api models)
             reasoning_effort: Reasoning effort for OpenAI reasoning models ("low", "medium", "high", default: "medium")
-            use_reasoning_api: Whether to use responses API (default: True)
-            timeout: Timeout in seconds for LLM API calls (default: 300)
         """
         self.model_name = model_name
         self.language = language
         self.target_gpu = target_gpu
         self.reasoning_effort = reasoning_effort
-        self.use_reasoning_api = use_reasoning_api
-        self.timeout = timeout
 
         if api_key is None:
             api_key = os.getenv("LLM_API_KEY")
@@ -71,10 +59,7 @@ class KernelGenerator:
         if base_url is not None:
             client_kwargs["base_url"] = base_url
 
-        if (rits_api_key := os.getenv("RITS_API_KEY")) is not None:
-            client_kwargs["default_headers"] = {"RITS_API_KEY": rits_api_key}
-
-        self.client = openai.OpenAI(**client_kwargs, timeout=self.timeout)
+        self.client = openai.OpenAI(**client_kwargs)
 
     def _get_supported_language(self) -> SupportedLanguages:
         language_map = {
@@ -105,7 +90,7 @@ class KernelGenerator:
                 content = match.group(1).strip()
                 files[filename] = content
             else:
-                logger.warning(f"Could not find {filename} in generated code")
+                print(f"Warning: Could not find {filename} in generated code")
 
         return files
 
@@ -153,7 +138,7 @@ class KernelGenerator:
 
                 code = code.replace(hex_float, decimal_val)
             except Exception as e:
-                logger.warning(f"Could not convert hex float {hex_float}: {e}")
+                print(f"Warning: Could not convert hex float {hex_float}: {e}")
                 code = code.replace(hex_float, "1.0")
 
         return code
@@ -168,17 +153,14 @@ class KernelGenerator:
             try:
                 effective_prompt = prompt
 
-                if self.use_reasoning_api:
+                if self.model_name.startswith("gpt-5") or self.model_name.startswith("o3"):
                     response = self.client.responses.create(
-                        model=self.model_name,
-                        input=effective_prompt,
-                        reasoning={"effort": self.reasoning_effort},
+                        model=self.model_name, input=effective_prompt, reasoning={"effort": self.reasoning_effort}
                     )
                     generated_code = response.output_text.strip()
-                else:
+                else:  # We use the completions api for OpenAI SDK compatible models
                     response = self.client.chat.completions.create(
-                        model=self.model_name,
-                        messages=[{"role": "user", "content": effective_prompt}],
+                        model=self.model_name, messages=[{"role": "user", "content": effective_prompt}]
                     )
                     generated_code = response.choices[0].message.content.strip()
 
@@ -187,16 +169,9 @@ class KernelGenerator:
                 if is_cuda:
                     # cleaned_code should be a dict of required files for CUDA.
                     if not isinstance(cleaned_code, dict):
-                        raise ValueError(
-                            "CUDA generation did not return a parsed file dict"
-                        )
+                        raise ValueError("CUDA generation did not return a parsed file dict")
                     required = ("kernel.h", "kernel.cu", "main.cpp")
-                    missing = [
-                        k
-                        for k in required
-                        if (k not in cleaned_code)
-                        or (not str(cleaned_code.get(k, "")).strip())
-                    ]
+                    missing = [k for k in required if (k not in cleaned_code) or (not str(cleaned_code.get(k, "")).strip())]
                     if missing:
                         raise ValueError(f"missing required XML files: {missing}")
 
@@ -205,11 +180,9 @@ class KernelGenerator:
             except Exception as e:
                 last_err = e
                 if is_cuda and attempt < max_parse_retries:
-                    logger.warning(
-                        f"CUDA XML parse failed ({e}); retrying generation ({attempt}/{max_parse_retries})..."
-                    )
+                    print(f"[WARN] CUDA XML parse failed ({e}); retrying generation ({attempt}/{max_parse_retries})...")
                     continue
-                logger.error(f"Error while generating code: {e}")
+                print(f"Error while generating code: {e}")
                 raise
 
         # Unreachable, but keeps type-checkers happy.
@@ -243,7 +216,8 @@ class KernelGenerator:
 
         def_name = str(getattr(task, "name", "") or "").strip() or "__unknown__"
 
-        if self.use_reasoning_api:
+        # Include reasoning effort in name and description for GPT-5 models
+        if self.model_name.startswith("gpt-5") or self.model_name.startswith("o3"):
             solution_name = f"{self.model_name}_{def_name}_{self.language}_optimized_r{round_num}_{self.reasoning_effort}"
             solution_description = f"{self.model_name} optimized kernel for {def_name} (round {round_num}, reasoning effort: {self.reasoning_effort})"
         else:
@@ -264,11 +238,7 @@ class KernelGenerator:
             entry_point = "main.cpp::run"
         else:
             # For single-file languages (triton, python)
-            code_txt = (
-                raw_code
-                if isinstance(raw_code, str) and raw_code.strip()
-                else cleaned_code
-            )
+            code_txt = raw_code if isinstance(raw_code, str) and raw_code.strip() else cleaned_code
             if isinstance(code_txt, dict):
                 code_txt = next(iter(code_txt.values()))
             sources = [SourceFile(path="main.py", content=str(code_txt or ""))]
@@ -287,7 +257,7 @@ class KernelGenerator:
             description=solution_description,
         )
         return solution
-
+    
     def generate(  # type: ignore[override]
         self,
         task: Task,
@@ -314,9 +284,7 @@ class KernelGenerator:
                 f"Task '{getattr(task, 'name', '')}' does not provide get_definition_text(); "
                 "cannot build prompts without a definition."
             )
-        baseline_targets_text = str(
-            getattr(task, "get_baseline_targets_text", lambda: "")() or ""
-        ).strip()
+        baseline_targets_text = str(getattr(task, "get_baseline_targets_text", lambda: "")() or "").strip()
 
         def _append_baseline_hint(p: str) -> str:
             if not baseline_targets_text:
@@ -333,11 +301,7 @@ class KernelGenerator:
             if callable(hook):
                 try:
                     return str(
-                        hook(
-                            language=str(self.language),
-                            target_gpu=str(self.target_gpu),
-                            phase=str(phase or ""),
-                        )
+                        hook(language=str(self.language), target_gpu=str(self.target_gpu), phase=str(phase or ""))
                         or ""
                     ).strip()
                 except Exception:
@@ -362,12 +326,7 @@ class KernelGenerator:
         else:
             gen_prompt_fn = getattr(task, "get_generation_prompt", None)
             if callable(gen_prompt_fn):
-                prompt = str(
-                    gen_prompt_fn(
-                        language=str(self.language), target_gpu=str(self.target_gpu)
-                    )
-                    or ""
-                )
+                prompt = str(gen_prompt_fn(language=str(self.language), target_gpu=str(self.target_gpu)) or "")
             else:
                 per_req = _per_task_requirement_text(phase="generate")
                 prompt = get_prompt_from_definition_text(
@@ -377,7 +336,7 @@ class KernelGenerator:
                     per_task_requirement=per_req,
                 )
             prompt = _append_baseline_hint(prompt)
-            logger.info(f"Initial prompt:\n{prompt}")
+            print(prompt)
             code_result = self._generate_code_from_prompt(prompt)
             current_code = code_result["cleaned"]
             current_raw_code = code_result["raw"]
@@ -388,7 +347,7 @@ class KernelGenerator:
         best_raw_code: Optional[str] = None
 
         for round_num in range(1, max_opt_rounds + 1):
-            logger.info(f"=== Optimization Round {round_num}/{max_opt_rounds} ===")
+            print(f"\n=== Optimization Round {round_num}/{max_opt_rounds} ===")
 
             # Use the provided seed solution on the first round if available
             if round_num == 1 and seed_solution is not None:
@@ -401,10 +360,8 @@ class KernelGenerator:
                     round_num=int(round_num),
                 )
 
-            logger.info("Evaluating solution...")
-            eval_result = task.run_benchmark(
-                solution=solution, dump_traces=False, round_num=int(round_num)
-            )
+            print("Evaluating solution...")
+            eval_result = task.run_benchmark(solution=solution, dump_traces=False, round_num=int(round_num))
             all_passed = bool(getattr(eval_result, "is_passed", lambda: False)())
             round_score = float(getattr(eval_result, "score", lambda: -1.0)())
 
@@ -415,16 +372,12 @@ class KernelGenerator:
                 best_raw_code = str(current_raw_code or "")
 
             # If all workloads passed in this round, log a W&B artifact containing the generated code for traceability.
-            if (
-                all_passed
-                and wandb is not None
-                and getattr(wandb, "run", None) is not None
-            ):
+            if all_passed and wandb is not None and getattr(wandb, "run", None) is not None:
                 try:
-                    run_id = wandb.run.id
+                    # Truncate artifact name to satisfy WandB limit.
                     safe_def = str(task.name or "")[:32]
-                    safe_sol = str(solution.name or "")[-24:]
-                    art_name = f"{run_id}_{safe_def}_r{round_num}_{safe_sol}_code"
+                    safe_sol = str(solution.name or "")[-32:]
+                    art_name = f"{safe_def}_r{round_num}_{safe_sol}_code"
                     if len(art_name) > 128:
                         import hashlib
 
@@ -459,27 +412,18 @@ class KernelGenerator:
 
                         # Raw code (as generated from the LLM before cleaning)
                         raw_path = tmpdir_p / "raw_code.txt"
-                        raw_path.write_text(
-                            str(current_raw_code)
-                            if current_raw_code is not None
-                            else ""
-                        )
+                        raw_path.write_text(str(current_raw_code) if current_raw_code is not None else "")
                         artifact.add_file(str(raw_path), name="raw/raw_code.txt")
 
                         # Round-level eval summary (best-effort)
                         summary_path = tmpdir_p / "round_summary.txt"
                         try:
                             summary_path.write_text(
-                                "\n".join(
-                                    eval_result.perf_summary_lines(prefix="round")
-                                )
-                                + "\n"
+                                "\n".join(eval_result.perf_summary_lines(prefix="round")) + "\n"
                             )
                         except Exception:
                             summary_path.write_text("")
-                        artifact.add_file(
-                            str(summary_path), name="eval/round_summary.txt"
-                        )
+                        artifact.add_file(str(summary_path), name="eval/round_summary.txt")
 
                     wandb.log_artifact(artifact)
                 except Exception:
@@ -494,9 +438,7 @@ class KernelGenerator:
                         try:
                             round_score_name = (
                                 eval_result.metrics.get("score_name")
-                                if isinstance(
-                                    getattr(eval_result, "metrics", None), dict
-                                )
+                                if isinstance(getattr(eval_result, "metrics", None), dict)
                                 else None
                             )
                         except Exception:
@@ -507,13 +449,7 @@ class KernelGenerator:
                             else f"{task.name}/generate/round_score"
                         )
                         wandb.log(
-                            {
-                                round_key: (
-                                    float(round_score)
-                                    if all_passed and round_score > 0
-                                    else None
-                                )
-                            },
+                            {round_key: (float(round_score) if all_passed and round_score > 0 else None)},
                             step=round_num,
                         )
                     except Exception:
@@ -527,25 +463,14 @@ class KernelGenerator:
                             if isinstance(getattr(best_eval, "metrics", None), dict)
                             else None
                         )
-                        score_val = (
-                            best_eval.score()
-                            if getattr(best_eval, "is_passed", lambda: False)()
-                            else None
-                        )
+                        score_val = best_eval.score() if getattr(best_eval, "is_passed", lambda: False)() else None
                     key = (
                         f"{task.name}/generate/best_{score_name}"
                         if isinstance(score_name, str) and score_name
                         else f"{task.name}/generate/best_score"
                     )
                     wandb.log(
-                        {
-                            key: (
-                                float(score_val)
-                                if isinstance(score_val, (int, float))
-                                and float(score_val) > 0
-                                else None
-                            )
-                        },
+                        {key: (float(score_val) if isinstance(score_val, (int, float)) and float(score_val) > 0 else None)},
                         step=round_num,
                     )
                 except Exception:
@@ -553,10 +478,7 @@ class KernelGenerator:
 
             # Prepare next round prompt (even if PASSED)
             if round_num < max_opt_rounds:
-                trace_logs = str(
-                    getattr(task, "get_last_round_trace_logs_for_prompt", lambda: "")()
-                    or ""
-                ).strip()
+                trace_logs = str(getattr(task, "get_last_round_trace_logs_for_prompt", lambda: "")() or "").strip()
                 # Build optional extra context similar to the original baseline generator.
                 current_best_for_prompt = None
                 try:
@@ -565,12 +487,7 @@ class KernelGenerator:
                         try:
                             sn = (
                                 best_eval.metrics.get("score_name")
-                                if (
-                                    best_eval is not None
-                                    and isinstance(
-                                        getattr(best_eval, "metrics", None), dict
-                                    )
-                                )
+                                if (best_eval is not None and isinstance(getattr(best_eval, "metrics", None), dict))
                                 else None
                             )
                         except Exception:
@@ -579,33 +496,22 @@ class KernelGenerator:
                         cb_lines.append(f"Performance: {score_label} {best_score:.4f}")
                     if best_raw_code and best_raw_code.strip():
                         cb_lines.append("Code:\n" + str(best_raw_code).strip())
-                    current_best_for_prompt = (
-                        "\n".join(cb_lines).strip() if cb_lines else None
-                    )
+                    current_best_for_prompt = "\n".join(cb_lines).strip() if cb_lines else None
                 except Exception:
                     current_best_for_prompt = None
 
                 previous_round_summary_for_prompt = None
                 try:
-                    passed_count = int(
-                        getattr(task, "get_last_round_passed_count", lambda: 0)() or 0
-                    )
-                    total_workloads = int(
-                        getattr(task, "get_last_round_total_workloads", lambda: 0)()
-                        or 0
-                    )
+                    passed_count = int(getattr(task, "get_last_round_passed_count", lambda: 0)() or 0)
+                    total_workloads = int(getattr(task, "get_last_round_total_workloads", lambda: 0)() or 0)
                     pr_lines: List[str] = []
                     if total_workloads > 0:
-                        pr_lines.append(
-                            f"Passed {passed_count}/{total_workloads} workloads."
-                        )
+                        pr_lines.append(f"Passed {passed_count}/{total_workloads} workloads.")
                     if all_passed and round_score > 0:
                         try:
                             sn = (
                                 eval_result.metrics.get("score_name")
-                                if isinstance(
-                                    getattr(eval_result, "metrics", None), dict
-                                )
+                                if isinstance(getattr(eval_result, "metrics", None), dict)
                                 else None
                             )
                         except Exception:
@@ -614,18 +520,11 @@ class KernelGenerator:
                         pr_lines.append(f"{score_label}: {round_score:.4f}.")
                     # Also include task-agnostic perf lines when available.
                     try:
-                        pr_lines.extend(
-                            [
-                                ln.lstrip("- ").strip()
-                                for ln in eval_result.perf_summary_lines(prefix="")
-                            ]
-                        )
+                        pr_lines.extend([ln.lstrip("- ").strip() for ln in eval_result.perf_summary_lines(prefix="")])
                     except Exception:
                         pass
                     previous_round_summary_for_prompt = (
-                        "\n".join(f"- {ln}" for ln in pr_lines).strip()
-                        if pr_lines
-                        else None
+                        "\n".join(f"- {ln}" for ln in pr_lines).strip() if pr_lines else None
                     )
                 except Exception:
                     previous_round_summary_for_prompt = None
@@ -659,8 +558,8 @@ class KernelGenerator:
                         per_task_requirement=per_req,
                     )
                 opt_prompt = _append_baseline_hint(opt_prompt)
-                logger.info(f"Optimization prompt:\n{opt_prompt}")
-                logger.info(f"Generating optimized code for round {round_num + 1}...")
+                print(opt_prompt)
+                print(f"Generating optimized code for round {round_num + 1}...")
                 code_result = self._generate_code_from_prompt(opt_prompt)
                 current_code = code_result["cleaned"]
                 current_raw_code = code_result["raw"]

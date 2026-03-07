@@ -1,4 +1,4 @@
-"""GPUMode submission evaluator (vendored).
+"""GPUMode TriMul evaluator (vendored).
 
 We vendor the relevant pieces of `discover/gpu_mode` into this repository so we do NOT depend on an
 external discover checkout at runtime.
@@ -11,14 +11,13 @@ This evaluator follows the upstream flow:
 
 from __future__ import annotations
 
-import dataclasses
 import json
-import logging
 import os
-import shutil
-import tempfile
+import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
+import shutil
+import tempfile
 from typing import Any, Optional
 
 from k_search.tasks.gpu_mode.code_utils import (
@@ -29,12 +28,7 @@ from k_search.tasks.gpu_mode.code_utils import (
 from k_search.tasks.gpu_mode import DEFAULT_TRIMUL_TASK_DIR
 from k_search.tasks.gpu_mode.libkernelbot.consts import SubmissionMode
 from k_search.tasks.gpu_mode.libkernelbot.run_eval import FullResult, run_config
-from k_search.tasks.gpu_mode.libkernelbot.task import (
-    build_task_config,
-    make_task_definition,
-)
-
-logger = logging.getLogger(__name__)
+from k_search.tasks.gpu_mode.libkernelbot.task import build_task_config, make_task_definition
 
 
 @dataclass
@@ -83,42 +77,7 @@ def _aggregate_score_s(means_s: list[float], ranking_by: str) -> float:
     raise ValueError(f"Unknown ranking_by: {ranking_by}")
 
 
-def benchmark_reference(
-    *,
-    task_dir: Path | None = None,
-    mode: str = "benchmark",
-    verbose: bool = False,
-) -> GpuModeEvalSummary:
-    """Benchmark the reference implementation (ref_kernel) for speedup comparison.
-
-    Creates a temporary submission that wraps ref_kernel as custom_kernel,
-    then runs it through the standard evaluation pipeline.
-
-    Args:
-        task_dir: Task directory containing reference.py with ref_kernel.
-        mode: Evaluation mode (benchmark/test).
-        verbose: Whether to print debug output.
-
-    Returns:
-        GpuModeEvalSummary with reference latency.
-    """
-    reference_submission = """\
-from reference import ref_kernel
-
-def custom_kernel(data):
-    return ref_kernel(data)
-"""
-    return evaluate_gpu_mode_submission(
-        submission_code=reference_submission,
-        mode=mode,
-        language="python",
-        task_dir=task_dir,
-        keep_tmp=False,
-        verbose=verbose,
-    )
-
-
-def evaluate_gpu_mode_submission(
+def evaluate_trimul_submission(
     *,
     submission_code: Any,
     mode: str = "benchmark",
@@ -141,9 +100,7 @@ def evaluate_gpu_mode_submission(
     else:
         submission_content = normalize_triton_submission_py(submission_code)
 
-    config = build_task_config(
-        task=task, submission_content=submission_content, arch=None, mode=mode_enum
-    )
+    config = build_task_config(task=task, submission_content=submission_content, arch=None, mode=mode_enum)
 
     # Match the original local runner behavior (`discover/gpu_mode/run_trimul_local.py`):
     # execute inside a temp directory so eval/submission artifacts don't clutter cwd.
@@ -154,8 +111,7 @@ def evaluate_gpu_mode_submission(
         os.makedirs(run_dir, exist_ok=True)
         cleanup = False
     else:
-        task_name = task_dir.name.replace("-", "_").replace(" ", "_")
-        run_dir = tempfile.mkdtemp(prefix=f"ksearch_{task_name}_")
+        run_dir = tempfile.mkdtemp(prefix="ksearch_trimul_")
         cleanup = not bool(keep_tmp)
 
     old_cwd = os.getcwd()
@@ -194,9 +150,7 @@ def evaluate_gpu_mode_submission(
     if not result.success:
         log_excerpt = str(result.error or "")
     elif run_key is None:
-        log_excerpt = (
-            f"No run results for mode={mode}. Available: {sorted(result.runs.keys())}"
-        )
+        log_excerpt = f"No run results for mode={mode}. Available: {sorted(result.runs.keys())}"
     else:
         eval_payload = result.runs[run_key]
         run = eval_payload.run
@@ -235,12 +189,7 @@ def evaluate_gpu_mode_submission(
                         # Common keys in GPUMode tasks:
                         # - check: pass|fail
                         # - test.0.error / benchmark.0.error: human-readable failure reason
-                        for k in (
-                            "test.0.error",
-                            "benchmark.0.error",
-                            "test.error",
-                            "benchmark.error",
-                        ):
+                        for k in ("test.0.error", "benchmark.0.error", "test.error", "benchmark.error"):
                             v = rr.get(k)
                             if isinstance(v, str) and v.strip():
                                 structured.append(f"{k}: {v.strip()}")
@@ -254,29 +203,20 @@ def evaluate_gpu_mode_submission(
                     try:
                         rr = getattr(run, "result", None)
                         if isinstance(rr, dict) and rr:
-                            rr_dump = (
-                                "result:\n"
-                                + json.dumps(rr, indent=2, sort_keys=True)[:4000]
-                            )
+                            rr_dump = "result:\n" + json.dumps(rr, indent=2, sort_keys=True)[:4000]
                     except Exception:
                         rr_dump = ""
 
                 blocks: list[str] = []
                 if header_lines:
-                    blocks.append(
-                        "\n".join(
-                            [ln for ln in header_lines if str(ln).strip()]
-                        ).strip()
-                    )
+                    blocks.append("\n".join([ln for ln in header_lines if str(ln).strip()]).strip())
                 if structured:
                     blocks.append("\n".join(structured).strip())
                 if rr_dump.strip():
                     blocks.append(rr_dump.strip())
                 if combined:
                     blocks.append(combined)
-                log_excerpt = "\n\n".join([b for b in blocks if b.strip()]).strip()[
-                    :8000
-                ]
+                log_excerpt = "\n\n".join([b for b in blocks if b.strip()]).strip()[:8000]
             else:
                 # Passed run: keep excerpt empty so prompts focus on perf only.
                 # (stderr/stdout may contain harmless warnings; we intentionally do not feed them back.)
@@ -296,9 +236,7 @@ def evaluate_gpu_mode_submission(
 
     if verbose:
         kept = "" if cleanup else " (kept)"
-        logger.info(
-            f"[gpumode] status={status} run_key={run_key} latency_ms={latency_ms} tmpdir={run_dir}{kept}"
-        )
+        print(f"[gpumode] status={status} run_key={run_key} latency_ms={latency_ms} tmpdir={run_dir}{kept}")
 
     return GpuModeEvalSummary(
         status=status,
@@ -310,3 +248,5 @@ def evaluate_gpu_mode_submission(
         per_benchmark_means_us=per_bench_us,
         raw_result=raw,
     )
+
+
