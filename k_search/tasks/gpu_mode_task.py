@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from k_search.tasks.task_base import (
     BuildSpec,
@@ -24,8 +24,29 @@ from k_search.tasks.task_base import (
 )
 from k_search.tasks.gpu_mode.code_utils import normalize_cuda_sources
 from k_search.tasks.gpu_mode.evaluator import evaluate_trimul_submission
-from k_search.tasks.gpu_mode.trimul.spec import TRIMUL_SPEC_TEXT_CUDA, TRIMUL_SPEC_TEXT_TRITON
 from k_search.tasks.gpu_mode import DEFAULT_TRIMUL_TASK_DIR
+
+
+def _load_spec_text(task_dir: Path, language: str) -> str:
+    """Dynamically load spec text from task_dir/spec.py."""
+    import importlib.util
+
+    spec_path = task_dir / "spec.py"
+    if not spec_path.exists():
+        raise FileNotFoundError(f"No spec.py found in {task_dir}")
+
+    spec_module = importlib.util.spec_from_file_location("spec", spec_path)
+    if spec_module is None or spec_module.loader is None:
+        raise ImportError(f"Could not load spec from {spec_path}")
+    module = importlib.util.module_from_spec(spec_module)
+    spec_module.loader.exec_module(module)
+
+    lang_suffix = f"_SPEC_TEXT_{language.upper()}"
+    for name in dir(module):
+        if name.endswith(lang_suffix):
+            return getattr(module, name)
+
+    raise ValueError(f"No *{lang_suffix} variable found in {spec_path}")
 
 
 @dataclass(frozen=True)
@@ -81,11 +102,9 @@ class GpuModeTriMulTask:
             raise ValueError(f"Unsupported language for gpumode_trimul definition text: {lang!r}")
         return f"{self.get_definition_text_for_language(language=lang)}\n"
 
-    # Optional helper (not part of the Task Protocol): generators/CLIs can use this
-    # to get language-specific prompt text.
     def get_definition_text_for_language(self, *, language: str) -> str:
-        lang = str(language or "").strip().lower()
-        return TRIMUL_SPEC_TEXT_CUDA if lang == "cuda" else TRIMUL_SPEC_TEXT_TRITON
+        lang = str(language or "").strip().lower() or "triton"
+        return _load_spec_text(self._cfg.task_dir, lang)
 
     # Optional (not in Task Protocol): language-specific generation prompt.
     def get_generation_prompt(self, *, language: str, target_gpu: str) -> str:
@@ -172,7 +191,8 @@ class GpuModeTriMulTask:
     ) -> Solution:
         lang = str(language or "").strip().lower()
         uid = f"r{int(round_num)}"
-        sol_name = f"{model_name}_{self._name}_{lang}_{uid}"
+        model_safe = str(model_name).replace("/", "-")
+        sol_name = f"{model_safe}_{self._name}_{lang}_{uid}"
         if lang == "cuda":
             if not isinstance(cleaned_code, dict):
                 # Fall back to raw xml parse later in eval; store as-is in main.cpp for visibility.

@@ -7,13 +7,15 @@ and only override prompt construction to inject the persistent world model JSON.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from pathlib import Path
 
+from openai.types.shared_params import Reasoning
+from openai.types.shared import ReasoningEffort
+
 from k_search.kernel_generators.kernel_generator import KernelGenerator
 from k_search.tasks.task_base import code_from_solution
-from k_search.kernel_generators.kernel_generator_prompts import get_prompt_from_definition_text
 from k_search.kernel_generators.world_model_prompts import (
     get_debug_and_improve_from_spec_prompt_from_text,
     get_debug_generated_code_prompt_from_text,
@@ -105,13 +107,19 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                 response = self.client.responses.create(
                     model=self.model_name,
                     input=prompt,
-                    reasoning={"effort": self.reasoning_effort},
+                    reasoning=cast(Reasoning, {"effort": self.reasoning_effort}),
                 )
                 return (response.output_text or "").strip()
             response = self.client.chat.completions.create(
-                model=self.model_name, messages=[{"role": "user", "content": prompt}]
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+                reasoning_effort=cast(ReasoningEffort, self.reasoning_effort),
             )
-            return (response.choices[0].message.content or "").strip()
+            msg = response.choices[0].message
+            content = msg.content or getattr(msg, "reasoning_content", None)
+            if content is None:
+                raise ValueError(f"LLM returned no content: {msg}")
+            return content.strip()
 
         selection_policy = WorldModelSelectionPolicy()
         if wm_max_difficulty is not None:
@@ -146,7 +154,6 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
         Baseline-aware generator with persistent world model injection/refinement.
         This is a lightly modified copy of KernelGenerator.generate().
         """
-        import random
         import time
         try:
             max_dai = int(num_debug_and_improve_rounds)
