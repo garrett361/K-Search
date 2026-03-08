@@ -25,3 +25,24 @@ flashinfer = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["k_search*"]
+
+# V1 code is vendored/legacy - only lint the new modular subsystem
+[tool.ruff]
+extend-exclude = [
+    "k_search/kernel_generators/",
+    "k_search/tasks/",
+    "k_search/utils/",
+    "generate_kernels_and_eval.py",
+    "baselines/",
+    "results/",
+]
+
+[tool.ty.src]
+exclude = [
+    "k_search/kernel_generators/**",
+    "k_search/tasks/**",
+    "k_search/utils/**",
+    "generate_kernels_and_eval.py",
+    "baselines/**",
+    "results/**",
+]
