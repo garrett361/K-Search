@@ -627,13 +627,13 @@ from typing import Any
 
 import openai
 
-from k_search.modular.adapters import GpuModeEvaluator, GpuModeTaskDefinition
+from k_search.modular.adapters import GpuModeEvaluator, GpuModeTriMulTaskDefinition
 from k_search.modular.executors import SequentialExecutor
 from k_search.modular.protocols.task_definition import TaskDefinition
 from k_search.modular.world.node import Node
 from k_search.modular.world.tree import Tree
 from k_search.modular.world_models.simple import SimpleWorldModel
-from k_search.tasks.gpu_mode_task import GpuModeTask
+from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
 
 logging.basicConfig(
     level=logging.INFO,
@@ -658,7 +658,7 @@ Rules:
 Respond with only the action title (one line, no explanation)."""
 
 
-def create_action_prompt_fn(task_def: GpuModeTaskDefinition):
+def create_action_prompt_fn(task_def: GpuModeTriMulTaskDefinition):
     """Create GPU mode specific action prompt function.
 
     Uses feedback from best round to inform next action proposal.
@@ -682,7 +682,7 @@ def create_action_prompt_fn(task_def: GpuModeTaskDefinition):
     return action_prompt_fn
 
 
-def create_code_prompt_fn(task_def: GpuModeTaskDefinition):
+def create_code_prompt_fn(task_def: GpuModeTriMulTaskDefinition):
     """Create GPU mode specific code generation prompt function."""
     def code_prompt_fn(node: Node, task: TaskDefinition) -> str:
         action_title = node.action.title if node.action else "implement solution"
@@ -725,8 +725,8 @@ def main():
         sys.exit(1)
 
     logger.info(f"Loading task: {args.task}")
-    gpu_task = GpuModeTask(name=args.task, task_dir=task_dir)
-    task_def = GpuModeTaskDefinition(gpu_task, language=args.language)
+    gpu_task = GpuModeTriMulTask(name=args.task, task_dir=task_dir)
+    task_def = GpuModeTriMulTaskDefinition(gpu_task, language=args.language)
     evaluator = GpuModeEvaluator(gpu_task)
 
     client_kwargs = {"api_key": api_key, "timeout": args.timeout}

@@ -6,7 +6,7 @@ Core abstraction layer for code optimization tasks. Provides composable protocol
 
 1. **Task format flexibility**: Support different task types (GPU Mode, FlashInfer, SQL optimization, config tuning) with varying specs, input generators, and scoring
 2. **Clean interfaces**: Separate concerns (input gen, correctness, scoring, feedback routing) into composable protocols
-3. **Zero disruption**: Wrap existing `GpuModeTask` via adapters — no changes to working code
+3. **Zero disruption**: Wrap existing `GpuModeTriMulTask` via adapters — no changes to working code
 4. **Infrastructure agnostic**: Framework protocols don't assume subprocess evaluation, GPUs, or specific languages
 5. **Future-ready**: Design accommodates parallelization, profiling, and configurable info routing (see `2026-03-04-task-framework-extensions.md`)
 
@@ -35,7 +35,7 @@ k_search/modular/                  # Implemented submodule
 │   ├── __init__.py
 │   └── gpu_mode/
 │       ├── __init__.py
-│       ├── task_definition.py     # GpuModeTaskDefinition
+│       ├── task_definition.py     # GpuModeTriMulTaskDefinition
 │       ├── evaluator.py           # GpuModeEvaluator
 │       └── wrappers.py            # GpuModeImplementation, GpuModeEvaluationResult
 │
@@ -269,16 +269,16 @@ Note: Implementation-specific config (subprocess limits, etc.) belongs in adapte
 
 ## GPU Mode Adapter
 
-Wraps existing `GpuModeTask` to implement `TaskDefinition`. Adapter handles conversion between framework protocols and concrete types:
+Wraps existing `GpuModeTriMulTask` to implement `TaskDefinition`. Adapter handles conversion between framework protocols and concrete types:
 
 ```python
-from k_search.tasks.gpu_mode_task import GpuModeTask
+from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
 from k_search.tasks.task_base import EvalResult, Solution
 
 class GpuModeAdapter:
-    """Adapts GpuModeTask to TaskDefinition protocol."""
+    """Adapts GpuModeTriMulTask to TaskDefinition protocol."""
 
-    def __init__(self, task: GpuModeTask):
+    def __init__(self, task: GpuModeTriMulTask):
         self._task = task
         self.name = task.name
         self.input_generator = _GpuModeInputGenerator(task)
@@ -299,7 +299,7 @@ class GpuModeAdapter:
 class _GpuModeInputGenerator:
     """Delegates to task's reference.py generate_input()."""
 
-    def __init__(self, task: GpuModeTask):
+    def __init__(self, task: GpuModeTriMulTask):
         self._task = task
         self._generate_fn = self._load_generate_input()
 
@@ -401,9 +401,9 @@ def load_task_definition(task_dir: Path) -> TaskDefinition:
 
     Other task types may have different structures — use appropriate adapter.
     """
-    from k_search.tasks.gpu_mode_task import GpuModeTask
+    from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
 
-    task = GpuModeTask(task_dir=task_dir)
+    task = GpuModeTriMulTask(task_dir=task_dir)
     return GpuModeAdapter(task)
 ```
 
@@ -443,7 +443,7 @@ Both V1 and V2 can use modular simultaneously during migration.
 
 ## Incremental Implementation
 
-Adapter-first approach: wrap existing `GpuModeTask` without modifying task files. Each phase is independently useful and testable.
+Adapter-first approach: wrap existing `GpuModeTriMulTask` without modifying task files. Each phase is independently useful and testable.
 
 ### Phase 1: Result Protocols and Wrappers ✅
 
@@ -524,7 +524,7 @@ class GpuModeEvaluationResult:
         return self._inner.score()
 ```
 
-**Scope**: Only `GpuModeTask` modified. `FlashInferBenchTask` unchanged.
+**Scope**: Only `GpuModeTriMulTask` modified. `FlashInferBenchTask` unchanged.
 
 ### Phase 2: Atomic Protocols
 
@@ -585,7 +585,7 @@ k_search/modular/
 
 **Who uses these**: V2 `SearchOrchestrator` accepts `TaskDefinition`. V1 generators continue accepting `Task` protocol unchanged.
 
-**Bridge for mixed usage**: `GpuModeAdapter(task)` wraps a V1 `GpuModeTask` to produce a `TaskDefinition` for V2.
+**Bridge for mixed usage**: `GpuModeAdapter(task)` wraps a V1 `GpuModeTriMulTask` to produce a `TaskDefinition` for V2.
 
 ### Migration Sequence
 
@@ -627,7 +627,7 @@ Each phase:
 
 Before implementation, verify:
 
-- [ ] `GpuModeAdapter` can implement all `TaskDefinition` methods using existing `GpuModeTask`
+- [ ] `GpuModeAdapter` can implement all `TaskDefinition` methods using existing `GpuModeTriMulTask`
 - [ ] `_GpuModeEvaluationResult` correctly wraps `EvalResult`
 - [ ] `FeedbackProvider.for_world_model()` output matches current behavior
 - [ ] `FeedbackProvider.for_codegen()` output matches current `_last_round_trace_logs_for_prompt`

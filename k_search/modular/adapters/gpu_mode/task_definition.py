@@ -10,7 +10,7 @@ from k_search.modular.results import CheckResult
 from k_search.modular.llm_utils import strip_markdown_fences
 from k_search.modular.protocols.eval_result import EvaluationResult
 from k_search.modular.world.round import Round
-from k_search.tasks.gpu_mode_task import GpuModeTask
+from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
 from k_search.tasks.task_base import BuildSpec, Solution, SourceFile, SupportedLanguages
 
 
@@ -35,7 +35,7 @@ def _load_reference_module(task_dir: Path) -> Any:
 
 
 class _InputGenerator:
-    def __init__(self, task: GpuModeTask) -> None:
+    def __init__(self, task: GpuModeTriMulTask) -> None:
         self._task = task
         module = _load_reference_module(task._cfg.task_dir)
         self._generate_fn = getattr(module, "generate_input")
@@ -45,7 +45,7 @@ class _InputGenerator:
 
 
 class _ReferenceImpl:
-    def __init__(self, task: GpuModeTask) -> None:
+    def __init__(self, task: GpuModeTriMulTask) -> None:
         self._task = task
         module = _load_reference_module(task._cfg.task_dir)
         self._ref_fn = getattr(module, "ref_kernel")
@@ -55,7 +55,7 @@ class _ReferenceImpl:
 
 
 class _CorrectnessChecker:
-    def __init__(self, task: GpuModeTask) -> None:
+    def __init__(self, task: GpuModeTriMulTask) -> None:
         self._task = task
         module = _load_reference_module(task._cfg.task_dir)
         self._check_fn = getattr(module, "check_implementation")
@@ -87,10 +87,10 @@ class _FeedbackProvider:
         return [r.result.get_metrics() for r in rounds]
 
 
-class GpuModeTaskDefinition:
-    """TaskDefinition implementation for GpuModeTask."""
+class GpuModeTriMulTaskDefinition:
+    """TaskDefinition implementation for GpuModeTriMulTask."""
 
-    def __init__(self, task: GpuModeTask, language: str = "triton") -> None:
+    def __init__(self, task: GpuModeTriMulTask, language: str = "triton") -> None:
         self._task = task
         self._language = language
         self._impl_counter = 0
@@ -128,5 +128,5 @@ class GpuModeTaskDefinition:
         return GpuModeImplementation(solution)
 
     @property
-    def task(self) -> GpuModeTask:
+    def task(self) -> GpuModeTriMulTask:
         return self._task

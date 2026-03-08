@@ -1,9 +1,9 @@
-"""Tests for GpuModeTaskDefinition."""
+"""Tests for GpuModeTriMulTaskDefinition."""
 
 import pytest
 from pathlib import Path
 
-from k_search.tasks.gpu_mode_task import GpuModeTask
+from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
 
 
 CAUSAL_CONV1D_DIR = (
@@ -16,20 +16,20 @@ CAUSAL_CONV1D_DIR = (
 
 
 @pytest.mark.cuda
-class TestGpuModeTaskDefinitionConstruction:
+class TestGpuModeTriMulTaskDefinitionConstruction:
     def test_wraps_gpu_mode_task(self):
-        from k_search.modular.adapters.gpu_mode import GpuModeTaskDefinition
+        from k_search.modular.adapters.gpu_mode import GpuModeTriMulTaskDefinition
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        task_def = GpuModeTaskDefinition(task)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
+        task_def = GpuModeTriMulTaskDefinition(task)
 
         assert task_def.name == task.name
 
     def test_has_required_components(self):
-        from k_search.modular.adapters.gpu_mode import GpuModeTaskDefinition
+        from k_search.modular.adapters.gpu_mode import GpuModeTriMulTaskDefinition
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        task_def = GpuModeTaskDefinition(task)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
+        task_def = GpuModeTriMulTaskDefinition(task)
 
         assert task_def.input_generator is not None
         assert task_def.correctness_checker is not None
@@ -38,36 +38,36 @@ class TestGpuModeTaskDefinitionConstruction:
         assert task_def.reference_impl is not None
 
     def test_get_prompt_text_returns_spec(self):
-        from k_search.modular.adapters.gpu_mode import GpuModeTaskDefinition
+        from k_search.modular.adapters.gpu_mode import GpuModeTriMulTaskDefinition
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        task_def = GpuModeTaskDefinition(task)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
+        task_def = GpuModeTriMulTaskDefinition(task)
 
         prompt = task_def.get_prompt_text()
         assert "custom_kernel" in prompt
         assert len(prompt) > 100
 
     def test_get_prompt_text_respects_language(self):
-        from k_search.modular.adapters.gpu_mode import GpuModeTaskDefinition
+        from k_search.modular.adapters.gpu_mode import GpuModeTriMulTaskDefinition
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        task_def = GpuModeTaskDefinition(task)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
+        task_def = GpuModeTriMulTaskDefinition(task)
 
         triton_prompt = task_def.get_prompt_text(context={"language": "triton"})
         assert "triton" in triton_prompt.lower() or "custom_kernel" in triton_prompt
 
 
 @pytest.mark.cuda
-class TestGpuModeTaskDefinitionScorer:
+class TestGpuModeTriMulTaskDefinitionScorer:
     def test_scorer_returns_positive_for_passed(self):
         from k_search.modular.adapters.gpu_mode import (
             GpuModeEvaluationResult,
-            GpuModeTaskDefinition,
+            GpuModeTriMulTaskDefinition,
         )
         from k_search.tasks.task_base import EvalResult
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        task_def = GpuModeTaskDefinition(task)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
+        task_def = GpuModeTriMulTaskDefinition(task)
 
         result = GpuModeEvaluationResult(EvalResult(status="passed", latency_ms=1.0))
         score = task_def.scorer.score(result)
@@ -77,12 +77,12 @@ class TestGpuModeTaskDefinitionScorer:
     def test_scorer_returns_zero_for_failed(self):
         from k_search.modular.adapters.gpu_mode import (
             GpuModeEvaluationResult,
-            GpuModeTaskDefinition,
+            GpuModeTriMulTaskDefinition,
         )
         from k_search.tasks.task_base import EvalResult
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        task_def = GpuModeTaskDefinition(task)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
+        task_def = GpuModeTriMulTaskDefinition(task)
 
         result = GpuModeEvaluationResult(EvalResult(status="failed"))
         score = task_def.scorer.score(result)
@@ -91,12 +91,12 @@ class TestGpuModeTaskDefinitionScorer:
 
 
 @pytest.mark.cuda
-class TestGpuModeTaskDefinitionFeedbackProvider:
+class TestGpuModeTriMulTaskDefinitionFeedbackProvider:
     def test_for_codegen_returns_log(self):
         from k_search.modular.adapters.gpu_mode import (
             GpuModeEvaluationResult,
             GpuModeImplementation,
-            GpuModeTaskDefinition,
+            GpuModeTriMulTaskDefinition,
         )
         from k_search.modular import Round
         from k_search.tasks.task_base import (
@@ -107,8 +107,8 @@ class TestGpuModeTaskDefinitionFeedbackProvider:
             SupportedLanguages,
         )
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        task_def = GpuModeTaskDefinition(task)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
+        task_def = GpuModeTriMulTaskDefinition(task)
 
         sol = Solution(
             name="test",
@@ -140,7 +140,7 @@ class TestGpuModeTaskDefinitionFeedbackProvider:
         from k_search.modular.adapters.gpu_mode import (
             GpuModeEvaluationResult,
             GpuModeImplementation,
-            GpuModeTaskDefinition,
+            GpuModeTriMulTaskDefinition,
         )
         from k_search.modular import Round
         from k_search.tasks.task_base import (
@@ -151,8 +151,8 @@ class TestGpuModeTaskDefinitionFeedbackProvider:
             SupportedLanguages,
         )
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        task_def = GpuModeTaskDefinition(task)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
+        task_def = GpuModeTriMulTaskDefinition(task)
 
         sol = Solution(
             name="test",

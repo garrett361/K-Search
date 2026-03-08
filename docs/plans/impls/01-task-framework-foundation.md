@@ -732,7 +732,7 @@ cd K-Search && git add k_search/modular/protocols/ && git commit -m "feat(modula
 import pytest
 from pathlib import Path
 
-from k_search.tasks.gpu_mode_task import GpuModeTask
+from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
 
 
 CAUSAL_CONV1D_DIR = Path(__file__).parent.parent.parent / "k_search" / "tasks" / "gpu_mode" / "causal_conv1d"
@@ -742,7 +742,7 @@ class TestGpuModeAdapterConstruction:
     def test_adapter_wraps_gpu_mode_task(self):
         from k_search.modular.adapters.gpu_mode import GpuModeAdapter
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
 
         assert adapter.name == task.name
@@ -750,7 +750,7 @@ class TestGpuModeAdapterConstruction:
     def test_adapter_has_required_components(self):
         from k_search.modular.adapters.gpu_mode import GpuModeAdapter
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
 
         assert adapter.input_generator is not None
@@ -762,7 +762,7 @@ class TestGpuModeAdapterConstruction:
     def test_get_prompt_text_returns_spec(self):
         from k_search.modular.adapters.gpu_mode import GpuModeAdapter
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
 
         prompt = adapter.get_prompt_text()
@@ -772,7 +772,7 @@ class TestGpuModeAdapterConstruction:
     def test_get_prompt_text_respects_language(self):
         from k_search.modular.adapters.gpu_mode import GpuModeAdapter
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
 
         triton_prompt = adapter.get_prompt_text(context={"language": "triton"})
@@ -785,7 +785,7 @@ class TestGpuModeAdapterScorer:
         from k_search.modular.adapters.wrappers import GpuModeEvaluationResult
         from k_search.tasks.task_base import EvalResult
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
 
         result = GpuModeEvaluationResult(EvalResult(status="passed", latency_ms=1.0))
@@ -798,7 +798,7 @@ class TestGpuModeAdapterScorer:
         from k_search.modular.adapters.wrappers import GpuModeEvaluationResult
         from k_search.tasks.task_base import EvalResult
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
 
         result = GpuModeEvaluationResult(EvalResult(status="failed"))
@@ -823,7 +823,7 @@ class TestGpuModeAdapterFeedbackProvider:
             SupportedLanguages,
         )
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
 
         sol = Solution(
@@ -861,7 +861,7 @@ class TestGpuModeAdapterFeedbackProvider:
             SupportedLanguages,
         )
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
 
         sol = Solution(
@@ -894,11 +894,11 @@ Expected: FAIL
 **Step 3: Implement GpuModeAdapter**
 
 ```python
-"""GpuModeAdapter: wraps GpuModeTask to implement TaskDefinition."""
+"""GpuModeAdapter: wraps GpuModeTriMulTask to implement TaskDefinition."""
 
 from typing import Any
 
-from k_search.tasks.gpu_mode_task import GpuModeTask
+from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
 from k_search.modular.protocols.results import EvaluationResult, SolutionArtifact
 from k_search.modular.types import CheckResult, Round
 
@@ -906,7 +906,7 @@ from k_search.modular.types import CheckResult, Round
 class _GpuModeInputGenerator:
     """Delegates to task's reference.py generate_input()."""
 
-    def __init__(self, task: GpuModeTask) -> None:
+    def __init__(self, task: GpuModeTriMulTask) -> None:
         self._task = task
         self._generate_fn = self._load_generate_input()
 
@@ -928,7 +928,7 @@ class _GpuModeInputGenerator:
 class _GpuModeReferenceImpl:
     """Delegates to task's reference.py ref_kernel()."""
 
-    def __init__(self, task: GpuModeTask) -> None:
+    def __init__(self, task: GpuModeTriMulTask) -> None:
         self._task = task
         self._ref_fn = self._load_ref_kernel()
 
@@ -950,7 +950,7 @@ class _GpuModeReferenceImpl:
 class _GpuModeCorrectnessChecker:
     """Delegates to task's reference.py check_implementation()."""
 
-    def __init__(self, task: GpuModeTask) -> None:
+    def __init__(self, task: GpuModeTriMulTask) -> None:
         self._task = task
         self._check_fn = self._load_check_implementation()
 
@@ -1002,9 +1002,9 @@ class _GpuModeFeedbackProvider:
 
 
 class GpuModeAdapter:
-    """Adapts GpuModeTask to TaskDefinition protocol."""
+    """Adapts GpuModeTriMulTask to TaskDefinition protocol."""
 
-    def __init__(self, task: GpuModeTask) -> None:
+    def __init__(self, task: GpuModeTriMulTask) -> None:
         self._task = task
         self.name = task.name
         self.input_generator = _GpuModeInputGenerator(task)
@@ -1023,7 +1023,7 @@ class GpuModeAdapter:
 
     # Expose underlying task for V1 compatibility
     @property
-    def task(self) -> GpuModeTask:
+    def task(self) -> GpuModeTriMulTask:
         return self._task
 ```
 
@@ -1142,7 +1142,7 @@ cd K-Search && git add k_search/modular/__init__.py k_search/modular/adapters/__
 import pytest
 from pathlib import Path
 
-from k_search.tasks.gpu_mode_task import GpuModeTask
+from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
 from k_search.modular import (
     GpuModeAdapter,
     GpuModeEvaluationResult,
@@ -1159,7 +1159,7 @@ class TestTaskFrameworkE2E:
 
     def test_adapter_loads_causal_conv1d(self):
         """Verify adapter can wrap causal_conv1d task."""
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
 
         assert "causal_conv1d" in adapter.name
@@ -1169,7 +1169,7 @@ class TestTaskFrameworkE2E:
     @pytest.mark.cuda
     def test_input_generator_produces_valid_data(self):
         """Verify input generator produces valid tensors."""
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
 
         data = adapter.input_generator.generate(
@@ -1185,7 +1185,7 @@ class TestTaskFrameworkE2E:
     @pytest.mark.cuda
     def test_reference_impl_runs(self):
         """Verify reference implementation runs."""
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
 
         data = adapter.input_generator.generate(
@@ -1198,7 +1198,7 @@ class TestTaskFrameworkE2E:
 
     def test_prompt_text_contains_spec(self):
         """Verify prompt text includes task specification."""
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
 
         prompt = adapter.get_prompt_text()
@@ -1210,7 +1210,7 @@ class TestTaskFrameworkE2E:
         """Verify scorer works with GpuModeEvaluationResult."""
         from k_search.tasks.task_base import EvalResult
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
 
         result = GpuModeEvaluationResult(
@@ -1230,7 +1230,7 @@ class TestTaskFrameworkE2E:
             SupportedLanguages,
         )
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
 
         sol = Solution(
@@ -1264,7 +1264,7 @@ class TestTaskFrameworkE2E:
     @pytest.mark.cuda_subprocess
     def test_full_eval_workflow(self):
         """Full workflow: generate input, run reference, check baseline."""
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
         adapter = GpuModeAdapter(task)
 
         # Generate input
@@ -1368,4 +1368,4 @@ tests/modular/
 └── test_e2e_causal_conv1d.py   # E2E integration tests
 ```
 
-V1 code remains unchanged. GpuModeAdapter wraps GpuModeTask for use by V2.
+V1 code remains unchanged. GpuModeAdapter wraps GpuModeTriMulTask for use by V2.

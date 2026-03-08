@@ -4,12 +4,12 @@ from k_search.modular.adapters.gpu_mode import (
     GpuModeEvaluationResult,
     GpuModeEvaluator,
     GpuModeImplementation,
-    GpuModeTaskDefinition,
+    GpuModeTriMulTaskDefinition,
 )
 
 __all__ = [
     "GpuModeEvaluationResult",
     "GpuModeEvaluator",
     "GpuModeImplementation",
-    "GpuModeTaskDefinition",
+    "GpuModeTriMulTaskDefinition",
 ]

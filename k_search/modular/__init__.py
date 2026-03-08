@@ -30,7 +30,7 @@ from k_search.modular.adapters import (
     GpuModeEvaluationResult,
     GpuModeEvaluator,
     GpuModeImplementation,
-    GpuModeTaskDefinition,
+    GpuModeTriMulTaskDefinition,
 )
 from k_search.modular.metrics import NoOpMetricsTracker
 from k_search.modular.artifacts import NoOpArtifactStore
@@ -74,7 +74,7 @@ __all__ = [
     "GpuModeEvaluationResult",
     "GpuModeEvaluator",
     "GpuModeImplementation",
-    "GpuModeTaskDefinition",
+    "GpuModeTriMulTaskDefinition",
     # Default implementations
     "NoOpMetricsTracker",
     "NoOpArtifactStore",

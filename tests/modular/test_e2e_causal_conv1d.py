@@ -7,9 +7,9 @@ from k_search.modular import (
     Round,
     GpuModeEvaluationResult,
     GpuModeImplementation,
-    GpuModeTaskDefinition,
+    GpuModeTriMulTaskDefinition,
 )
-from k_search.tasks.gpu_mode_task import GpuModeTask
+from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
 
 
 CAUSAL_CONV1D_DIR = (
@@ -26,8 +26,8 @@ class TestModularE2E:
 
     def test_task_definition_loads_causal_conv1d(self):
         """Verify task definition can wrap causal_conv1d task."""
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        task_def = GpuModeTaskDefinition(task)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
+        task_def = GpuModeTriMulTaskDefinition(task)
 
         assert "causal_conv1d" in task_def.name
         assert task_def.input_generator is not None
@@ -37,8 +37,8 @@ class TestModularE2E:
     @pytest.mark.cuda_subprocess
     def test_input_generator_produces_valid_data(self):
         """Verify input generator produces valid tensors."""
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        task_def = GpuModeTaskDefinition(task)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
+        task_def = GpuModeTriMulTaskDefinition(task)
 
         data = task_def.input_generator.generate(
             params={"B": 2, "T": 64, "D": 32, "W": 4},
@@ -54,8 +54,8 @@ class TestModularE2E:
     @pytest.mark.cuda_subprocess
     def test_reference_impl_runs(self):
         """Verify reference implementation runs."""
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        task_def = GpuModeTaskDefinition(task)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
+        task_def = GpuModeTriMulTaskDefinition(task)
 
         data = task_def.input_generator.generate(
             params={"B": 2, "T": 64, "D": 32, "W": 4},
@@ -67,8 +67,8 @@ class TestModularE2E:
 
     def test_prompt_text_contains_spec(self):
         """Verify prompt text includes task specification."""
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        task_def = GpuModeTaskDefinition(task)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
+        task_def = GpuModeTriMulTaskDefinition(task)
 
         prompt = task_def.get_prompt_text()
 
@@ -79,8 +79,8 @@ class TestModularE2E:
         """Verify scorer works with GpuModeEvaluationResult."""
         from k_search.tasks.task_base import EvalResult
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        task_def = GpuModeTaskDefinition(task)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
+        task_def = GpuModeTriMulTaskDefinition(task)
 
         result = GpuModeEvaluationResult(EvalResult(status="passed", latency_ms=2.0))
         score = task_def.scorer.score(result)
@@ -97,8 +97,8 @@ class TestModularE2E:
             SupportedLanguages,
         )
 
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        task_def = GpuModeTaskDefinition(task)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
+        task_def = GpuModeTriMulTaskDefinition(task)
 
         sol = Solution(
             name="test",
@@ -141,8 +141,8 @@ class TestModularE2E:
     @pytest.mark.cuda_subprocess
     def test_full_eval_workflow(self):
         """Full workflow: generate input, run reference, check baseline."""
-        task = GpuModeTask(task_dir=CAUSAL_CONV1D_DIR)
-        task_def = GpuModeTaskDefinition(task)
+        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
+        task_def = GpuModeTriMulTaskDefinition(task)
 
         data = task_def.input_generator.generate(
             params={"B": 2, "T": 64, "D": 32, "W": 4},

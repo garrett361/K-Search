@@ -13,8 +13,8 @@ from k_search.modular import run_search, SearchConfig, ArtifactConfig
 from k_search.modular.artifacts import create_artifact_stores
 from k_search.modular.config import MetricsConfig, build_run_config
 from k_search.modular.metrics import create_metrics_trackers
-from k_search.modular.adapters import GpuModeEvaluator, GpuModeTaskDefinition
-from k_search.tasks.gpu_mode_task import GpuModeTask
+from k_search.modular.adapters import GpuModeEvaluator, GpuModeTriMulTaskDefinition
+from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
 
 logging.basicConfig(
     level=logging.INFO,
@@ -129,8 +129,8 @@ def main():
         sys.exit(1)
 
     logger.info(f"Loading task: {args.task}")
-    gpu_task = GpuModeTask(name=args.task, task_dir=task_dir)
-    task_def = GpuModeTaskDefinition(gpu_task, language=args.language)
+    gpu_task = GpuModeTriMulTask(task_dir=task_dir)
+    task_def = GpuModeTriMulTaskDefinition(gpu_task, language=args.language)
     evaluator = GpuModeEvaluator(gpu_task)
 
     client_kwargs = {"api_key": api_key, "timeout": args.timeout}

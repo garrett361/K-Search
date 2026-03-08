@@ -396,7 +396,7 @@ Both V1 and V2 can use modular. Key distinction:
 
 | Component | V1 (current) | V1 + modular | V2 |
 |-----------|--------------|---------------------|-----|
-| Task loading | `GpuModeTask` | `GpuModeAdapter(GpuModeTask)` | `TaskDefinition` |
+| Task loading | `GpuModeTriMulTask` | `GpuModeAdapter(GpuModeTriMulTask)` | `TaskDefinition` |
 | Evaluation | `task.evaluate()` | `evaluator.evaluate()` | `evaluator.evaluate()` |
 | Metrics extraction | `result.to_dict()` | `feedback_provider.for_world_model()` | `feedback_provider.for_world_model()` |
 | Codegen feedback | `result.log_excerpt` | `feedback_provider.for_codegen()` | `feedback_provider.for_codegen()` |

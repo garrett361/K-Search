@@ -19,7 +19,7 @@ check_implementation = make_match_reference(ref_kernel, rtol=2e-2, atol=2e-2)
 Thread rtol/atol from CLI through the evaluation pipeline:
 
 1. `generate_kernels_and_eval.py` already parses `--rtol`/`--atol`
-2. Pass to `GpuModeTask` constructor or `evaluate()` method
+2. Pass to `GpuModeTriMulTask` constructor or `evaluate()` method
 3. Forward to `eval.py` which imports `check_implementation`
 4. Make `check_implementation` accept rtol/atol or generate it dynamically
 

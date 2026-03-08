@@ -28,9 +28,9 @@ k_search/modular/adapters/
 
 ```python
 class GpuModeEvaluator:
-    """Evaluator that delegates to GpuModeTask.run_benchmark()."""
+    """Evaluator that delegates to GpuModeTriMulTask.run_benchmark()."""
 
-    def __init__(self, task: GpuModeTask) -> None:
+    def __init__(self, task: GpuModeTriMulTask) -> None:
         self._task = task
 
     def evaluate(
@@ -176,7 +176,7 @@ def run_search(
 
 **File**: `tests/modular/test_e2e_search.py`
 
-- [ ] Test with real GpuModeTask (causal_conv1d)
+- [ ] Test with real GpuModeTriMulTask (causal_conv1d)
 - [ ] Test with mock LLM returning valid Triton code
 - [ ] Verify evaluation results flow through correctly
 
@@ -191,7 +191,7 @@ def run_search(
 
 - [ ] CLI argument parsing (task, model, max_rounds, etc.)
 - [ ] LLM client construction (OpenAI-compatible)
-- [ ] Wire up: GpuModeTask → GpuModeAdapter → GpuModeEvaluator → run_search()
+- [ ] Wire up: GpuModeTriMulTask → GpuModeAdapter → GpuModeEvaluator → run_search()
 - [ ] Print final SearchResult summary
 
 ### 10. Add runme recipe for V2

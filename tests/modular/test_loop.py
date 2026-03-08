@@ -285,18 +285,18 @@ class TestBuildPrompt:
 
 
 class TestCreateImplementation:
-    """Tests for task.create_implementation via GpuModeTaskDefinition."""
+    """Tests for task.create_implementation via GpuModeTriMulTaskDefinition."""
 
     def test_creates_valid_implementation(self):
         from unittest.mock import MagicMock
 
-        from k_search.modular.adapters.gpu_mode import GpuModeTaskDefinition
+        from k_search.modular.adapters.gpu_mode import GpuModeTriMulTaskDefinition
 
         mock_task = MagicMock()
         mock_task.name = "my_task"
         mock_task._cfg.task_dir.exists.return_value = False
 
-        task_def = GpuModeTaskDefinition.__new__(GpuModeTaskDefinition)
+        task_def = GpuModeTriMulTaskDefinition.__new__(GpuModeTriMulTaskDefinition)
         task_def._task = mock_task
         task_def._language = "triton"
         task_def._impl_counter = 5
@@ -312,12 +312,12 @@ class TestCreateImplementation:
     def test_default_language_is_triton(self):
         from unittest.mock import MagicMock
 
-        from k_search.modular.adapters.gpu_mode import GpuModeTaskDefinition
+        from k_search.modular.adapters.gpu_mode import GpuModeTriMulTaskDefinition
 
         mock_task = MagicMock()
         mock_task.name = "test_task"
 
-        task_def = GpuModeTaskDefinition.__new__(GpuModeTaskDefinition)
+        task_def = GpuModeTriMulTaskDefinition.__new__(GpuModeTriMulTaskDefinition)
         task_def._task = mock_task
         task_def._language = "triton"
         task_def._impl_counter = 0
@@ -330,12 +330,12 @@ class TestCreateImplementation:
     def test_increments_counter(self):
         from unittest.mock import MagicMock
 
-        from k_search.modular.adapters.gpu_mode import GpuModeTaskDefinition
+        from k_search.modular.adapters.gpu_mode import GpuModeTriMulTaskDefinition
 
         mock_task = MagicMock()
         mock_task.name = "test_task"
 
-        task_def = GpuModeTaskDefinition.__new__(GpuModeTaskDefinition)
+        task_def = GpuModeTriMulTaskDefinition.__new__(GpuModeTriMulTaskDefinition)
         task_def._task = mock_task
         task_def._language = "triton"
         task_def._impl_counter = 0

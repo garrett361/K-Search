@@ -536,7 +536,7 @@ In `evaluator.py`:
 """GPU Mode adapter implementations."""
 
 from k_search.modular.adapters.gpu_mode.evaluator import GpuModeEvaluator
-from k_search.modular.adapters.gpu_mode.task_definition import GpuModeTaskDefinition
+from k_search.modular.adapters.gpu_mode.task_definition import GpuModeTriMulTaskDefinition
 from k_search.modular.adapters.gpu_mode.wrappers import (
     GpuModeEvaluationResult,
     GpuModeImplementation,
@@ -546,7 +546,7 @@ __all__ = [
     "GpuModeEvaluationResult",
     "GpuModeEvaluator",
     "GpuModeImplementation",
-    "GpuModeTaskDefinition",
+    "GpuModeTriMulTaskDefinition",
 ]
 ```
 
@@ -559,14 +559,14 @@ from k_search.modular.adapters.gpu_mode import (
     GpuModeEvaluationResult,
     GpuModeEvaluator,
     GpuModeImplementation,
-    GpuModeTaskDefinition,
+    GpuModeTriMulTaskDefinition,
 )
 
 __all__ = [
     "GpuModeEvaluationResult",
     "GpuModeEvaluator",
     "GpuModeImplementation",
-    "GpuModeTaskDefinition",
+    "GpuModeTriMulTaskDefinition",
 ]
 ```
 
@@ -733,7 +733,7 @@ from k_search.modular.adapters import (
     GpuModeEvaluationResult,
     GpuModeEvaluator,
     GpuModeImplementation,
-    GpuModeTaskDefinition,
+    GpuModeTriMulTaskDefinition,
 )
 from k_search.modular.metrics import NoOpMetricsTracker
 from k_search.modular.artifacts import NoOpArtifactStore
@@ -768,7 +768,7 @@ __all__ = [
     "GpuModeEvaluationResult",
     "GpuModeEvaluator",
     "GpuModeImplementation",
-    "GpuModeTaskDefinition",
+    "GpuModeTriMulTaskDefinition",
     # Default implementations
     "NoOpMetricsTracker",
     "NoOpArtifactStore",
@@ -778,7 +778,7 @@ __all__ = [
 **Step 2: Verify imports**
 
 ```bash
-cd K-Search && python -c "from k_search.modular import run_search, Round, GpuModeTaskDefinition, MetricsTracker, ArtifactStore"
+cd K-Search && python -c "from k_search.modular import run_search, Round, GpuModeTriMulTaskDefinition, MetricsTracker, ArtifactStore"
 ```
 
 **Step 3: Commit**
@@ -805,7 +805,7 @@ from k_search.modular import run_search, SearchConfig, ArtifactConfig
 from k_search.modular.artifacts import create_artifact_stores
 from k_search.modular.config import MetricsConfig
 from k_search.modular.metrics import create_metrics_trackers
-from k_search.modular.adapters import GpuModeEvaluator, GpuModeTaskDefinition
+from k_search.modular.adapters import GpuModeEvaluator, GpuModeTriMulTaskDefinition
 ```
 
 With:
@@ -814,7 +814,7 @@ from k_search.modular import run_search, SearchConfig, ArtifactConfig
 from k_search.modular.artifacts import create_artifact_stores
 from k_search.modular.config import MetricsConfig
 from k_search.modular.metrics import create_metrics_trackers
-from k_search.modular.adapters import GpuModeEvaluator, GpuModeTaskDefinition
+from k_search.modular.adapters import GpuModeEvaluator, GpuModeTriMulTaskDefinition
 ```
 
 **Step 2: Verify**

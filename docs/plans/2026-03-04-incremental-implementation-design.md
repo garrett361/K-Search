@@ -20,7 +20,7 @@ Each priority gets its own implementation plan created after the previous one is
 
 ## Priority 1: Task Framework Foundation ✅
 
-Build protocols and adapters. V1 code unchanged—GpuModeTask wrapped via adapter.
+Build protocols and adapters. V1 code unchanged—GpuModeTriMulTask wrapped via adapter.
 
 ### Module Structure (as implemented)
 
@@ -45,7 +45,7 @@ k_search/modular/
 │   ├── __init__.py
 │   └── gpu_mode/
 │       ├── __init__.py
-│       ├── task_definition.py  # GpuModeTaskDefinition
+│       ├── task_definition.py  # GpuModeTriMulTaskDefinition
 │       ├── evaluator.py        # GpuModeEvaluator
 │       └── wrappers.py         # GpuModeImplementation, GpuModeEvaluationResult
 ├── round.py                    # Round dataclass
