@@ -117,7 +117,7 @@ class GpuModeTriMulTaskDefinition:
         solution = Solution(
             name=impl_name,
             definition=self.name,
-            author="search_v2",
+            author="",
             spec=BuildSpec(
                 language=SupportedLanguages(self._language),
                 target_hardware=[],
