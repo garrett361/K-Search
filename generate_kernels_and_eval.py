@@ -369,13 +369,11 @@ def main():
         from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
 
         task_dir = str(args.gpumode_task_dir) if args.gpumode_task_dir else None
-        task_name = Path(task_dir).name if task_dir else "gpumode_trimul"
         task = GpuModeTriMulTask(
             mode=str(args.gpumode_mode or "benchmark"),
             keep_tmp=bool(args.gpumode_keep_tmp),
             task_dir=task_dir,
             artifacts_dir=args.artifacts_dir,
-            name=task_name,
         )
     else:
         raise ValueError(f"Unsupported task_source: {task_source}")

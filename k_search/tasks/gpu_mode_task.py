@@ -9,6 +9,7 @@ Note: the legacy top-level `gpu_mode/` folder is expected to be removed later.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import importlib.util
 import os
 from pathlib import Path
 from typing import Any, Dict
@@ -27,26 +28,6 @@ from k_search.tasks.gpu_mode.evaluator import evaluate_trimul_submission
 from k_search.tasks.gpu_mode import DEFAULT_TRIMUL_TASK_DIR
 
 
-def _load_spec_text(task_dir: Path, language: str) -> str:
-    """Dynamically load spec text from task_dir/spec.py."""
-    import importlib.util
-
-    spec_path = task_dir / "spec.py"
-    if not spec_path.exists():
-        raise FileNotFoundError(f"No spec.py found in {task_dir}")
-
-    spec_module = importlib.util.spec_from_file_location("spec", spec_path)
-    if spec_module is None or spec_module.loader is None:
-        raise ImportError(f"Could not load spec from {spec_path}")
-    module = importlib.util.module_from_spec(spec_module)
-    spec_module.loader.exec_module(module)
-
-    lang_suffix = f"_SPEC_TEXT_{language.upper()}"
-    for name in dir(module):
-        if name.endswith(lang_suffix):
-            return getattr(module, name)
-
-    raise ValueError(f"No *{lang_suffix} variable found in {spec_path}")
 
 
 @dataclass(frozen=True)
@@ -68,13 +49,13 @@ class GpuModeTriMulTask:
         keep_tmp: bool = False,
         task_dir: str | Path | None = None,
         artifacts_dir: str | None = None,
-        name: str = "gpumode_trimul",
     ) -> None:
-        self._name = str(name or "gpumode_trimul")
+        resolved_dir = Path(task_dir).expanduser().resolve() if task_dir else DEFAULT_TRIMUL_TASK_DIR
+        self._name = resolved_dir.name
         self._cfg = GpuModeTriMulTaskConfig(
             mode=str(mode or "benchmark"),
             keep_tmp=bool(keep_tmp),
-            task_dir=(Path(task_dir).expanduser().resolve() if task_dir is not None else DEFAULT_TRIMUL_TASK_DIR),
+            task_dir=resolved_dir,
         )
         self._ksearch_artifacts_dir: str | None = (str(artifacts_dir) if artifacts_dir is not None else None)
         self._solutions: dict[str, Solution] = {}
@@ -103,8 +84,22 @@ class GpuModeTriMulTask:
         return f"{self.get_definition_text_for_language(language=lang)}\n"
 
     def get_definition_text_for_language(self, *, language: str) -> str:
-        lang = str(language or "").strip().lower() or "triton"
-        return _load_spec_text(self._cfg.task_dir, lang)
+        spec_path = self._cfg.task_dir / "spec.py"
+        if not spec_path.exists():
+            raise FileNotFoundError(f"No spec.py found in {self._cfg.task_dir}")
+
+        spec_module = importlib.util.spec_from_file_location("spec", spec_path)
+        if spec_module is None or spec_module.loader is None:
+            raise ImportError(f"Could not load spec from {spec_path}")
+        module = importlib.util.module_from_spec(spec_module)
+        spec_module.loader.exec_module(module)
+
+        lang_suffix = f"_SPEC_TEXT_{language.upper()}"
+        for name in dir(module):
+            if name.endswith(lang_suffix):
+                return getattr(module, name)
+
+        raise ValueError(f"No *{lang_suffix} variable found in {spec_path}")
 
     # Optional (not in Task Protocol): language-specific generation prompt.
     def get_generation_prompt(self, *, language: str, target_gpu: str) -> str:
