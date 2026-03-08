@@ -162,7 +162,7 @@ async def _execute_node(self, node: Node) -> None:
         with span.timer["llm", "codegen"]:
             code = await self._llm(prompt)
 
-        impl = self._task.create_implementation(code)
+        impl = self._task.create_impl(code)
 
         with span.timer["eval"]:
             result = await asyncio.to_thread(self._evaluator.evaluate, impl)

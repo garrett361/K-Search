@@ -151,7 +151,7 @@ class PipelineExecutor:
             # TODO: error handling
             prompt = build_prompt(self.tree, node)
             code = await self.llm(prompt)
-            impl = create_implementation(code, node)
+            impl = create_impl(code, node)
             await impl_queue.put((node, impl))
 
     async def _eval_worker(self, impl_queue):

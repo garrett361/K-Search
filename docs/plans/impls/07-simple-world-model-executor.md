@@ -317,7 +317,7 @@ class SequentialExecutor:
         prompt = self._code_prompt_fn(node, self._task)
         code = self._llm(prompt)
 
-        impl = self._task.create_implementation(code)
+        impl = self._task.create_impl(code)
         result = self._evaluator.evaluate(impl)
         score = self._task.scorer.score(result)
 
@@ -493,7 +493,7 @@ def _mock_task():
     """Create mock task."""
     task = MagicMock()
     task.get_prompt_text.return_value = "optimize kernel"
-    task.create_implementation.return_value = MagicMock(name="impl")
+    task.create_impl.return_value = MagicMock(name="impl")
     task.scorer.score.return_value = 0.5
     return task
 

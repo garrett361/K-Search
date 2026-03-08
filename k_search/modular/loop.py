@@ -100,7 +100,7 @@ def run_search(
 
         prompt = build_prompt(task, best_round)
         code = llm(prompt)
-        impl = task.create_implementation(code)
+        impl = task.create_impl(code)
         result = evaluator.evaluate(impl)
         score = task.scorer.score(result)
 

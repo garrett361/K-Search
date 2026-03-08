@@ -36,7 +36,7 @@ def make_task_mock(name: str = "test_task") -> Mock:
         impl_counter[0] += 1
         return impl
 
-    task.create_implementation.side_effect = create_impl
+    task.create_impl.side_effect = create_impl
     return task
 
 
@@ -285,7 +285,7 @@ class TestBuildPrompt:
 
 
 class TestCreateImplementation:
-    """Tests for task.create_implementation via GpuModeTriMulTaskDefinition."""
+    """Tests for task.create_impl via GpuModeTriMulTaskDefinition."""
 
     def test_creates_valid_implementation(self):
         from unittest.mock import MagicMock
@@ -302,7 +302,7 @@ class TestCreateImplementation:
         task_def._impl_counter = 5
         task_def.name = "my_task"
 
-        impl = task_def.create_implementation("def kernel(): pass")
+        impl = task_def.create_impl("def kernel(): pass")
 
         assert impl.name == "my_task_r5"
         assert impl.content.definition == "my_task"
@@ -323,8 +323,8 @@ class TestCreateImplementation:
         task_def._impl_counter = 0
         task_def.name = "test_task"
 
-        impl1 = task_def.create_implementation("code1")
-        impl2 = task_def.create_implementation("code2")
+        impl1 = task_def.create_impl("code1")
+        impl2 = task_def.create_impl("code2")
 
         assert impl1.name == "test_task_r0"
         assert impl2.name == "test_task_r1"

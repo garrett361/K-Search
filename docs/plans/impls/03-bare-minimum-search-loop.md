@@ -92,13 +92,13 @@ def build_prompt(
         return f"{base}\n\n{feedback}"
     return base
 
-def create_implementation(code: str, round_idx: int) -> Implementation:
+def create_impl(code: str, round_idx: int) -> Implementation:
     # Wrap code in GpuModeImplementation
     ...
 ```
 
 - [ ] Implement `build_prompt()`
-- [ ] Implement `create_implementation()` helper
+- [ ] Implement `create_impl()` helper
 
 ### 5. Implement run_search
 
@@ -138,7 +138,7 @@ def run_search(
         outcome = Round(impl=best_impl, result=best_result) if best_impl else None
         prompt = build_prompt(task, outcome)
         code = llm(prompt)
-        impl = create_implementation(code, round_idx)
+        impl = create_impl(code, round_idx)
         result = evaluator.evaluate(impl)
         score = task.scorer.score(result)
 

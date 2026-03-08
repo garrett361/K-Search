@@ -29,7 +29,7 @@ class TaskDefinition(Protocol):
         """Parameter sets for evaluation."""
         ...
 
-    def create_implementation(self, llm_output: str) -> Implementation:
+    def create_impl(self, llm_output: str) -> Implementation:
         """Create Implementation from raw LLM output.
 
         Task handles: parsing (strip markdown), naming, language, entry points, build spec.

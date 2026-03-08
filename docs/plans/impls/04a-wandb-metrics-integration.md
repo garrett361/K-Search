@@ -540,7 +540,7 @@ from typing import Callable
 
 from k_search.modular.config import MetricsConfig, SearchConfig, SearchResult
 from k_search.modular.metrics import MetricsTracker, NoOpMetricsTracker
-from k_search.modular.prompts import build_prompt, create_implementation
+from k_search.modular.prompts import build_prompt, create_impl
 from k_search.modular.protocols.evaluator import Evaluator
 from k_search.modular.protocols.results import EvaluationResult
 from k_search.modular.protocols.task_definition import TaskDefinition
@@ -619,7 +619,7 @@ def run_search(
 
         prompt = build_prompt(task, best_outcome)
         code = llm(prompt)
-        impl = create_implementation(code, round_idx, task_name=task.name)
+        impl = create_impl(code, round_idx, task_name=task.name)
         result = evaluator.evaluate(impl)
         score = task.scorer.score(result)
 

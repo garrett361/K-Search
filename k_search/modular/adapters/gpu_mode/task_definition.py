@@ -108,7 +108,7 @@ class GpuModeTriMulTaskDefinition:
     def get_test_cases(self) -> list[dict[str, Any]]:
         return [{"B": 2, "T": 4096, "D": 2048, "W": 4}]
 
-    def create_implementation(self, llm_output: str) -> GpuModeImplementation:
+    def create_impl(self, llm_output: str) -> GpuModeImplementation:
         """Create Implementation from raw LLM output."""
         cleaned_code = strip_markdown_fences(llm_output)
         impl_name = f"{self.name}_r{self._impl_counter}"

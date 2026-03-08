@@ -12,7 +12,7 @@ def _mock_task():
     """Create mock task."""
     task = MagicMock()
     task.get_prompt_text.return_value = "optimize kernel"
-    task.create_implementation.return_value = MagicMock(name="impl")
+    task.create_impl.return_value = MagicMock(name="impl")
     task.scorer.score.return_value = 0.5
     return task
 

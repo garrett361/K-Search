@@ -147,7 +147,7 @@ The loop/orchestrator tracks cycle history and invokes analyzers:
 │   cycle_outcomes: list[Round] = []                        │
 │                                                                 │
 │   for round in cycle:                                           │
-│       impl = create_implementation(llm(prompt))                 │
+│       impl = create_impl(llm(prompt))                 │
 │       result = evaluator.evaluate(impl)                         │
 │       outcome = Round(impl, result)                       │
 │                                                                 │
