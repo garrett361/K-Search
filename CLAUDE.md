@@ -30,7 +30,7 @@ Key types: `Round` (iteration container), `EvaluationResult` (protocol), `Implem
 ## GPU Mode Task Structure
 
 Each task in `k_search/tasks/gpu_mode/<task>/`:
-- `task.py` - GpuModeTask subclass
+- `task.py` - GpuModeTriMulTask subclass
 - `reference.py` - generate_input(), ref_kernel(), check_implementation()
 - `submission.py` - Baseline custom_kernel(data)
 - `spec.py` - SPEC_TEXT_TRITON/CUDA problem description
@@ -54,6 +54,17 @@ pytest -m cuda tests/         # GPU tests only
 ```
 
 GPU tests use `@pytest.mark.cuda`.
+
+## Commits
+
+Use `(v1)` scope for changes to the original V1 code paths:
+- `k_search/kernel_generators/`
+- `k_search/tasks/` (except `modular/adapters/`)
+- `generate_kernels_and_eval.py`
+
+Example: `fix(v1): remove deprecated use_reasoning_api parameter`
+
+The `modular/` subsystem uses standard scopes.
 
 ## Style
 
