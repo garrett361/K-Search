@@ -28,8 +28,6 @@ from k_search.tasks.gpu_mode.evaluator import evaluate_trimul_submission
 from k_search.tasks.gpu_mode import DEFAULT_TRIMUL_TASK_DIR
 
 
-
-
 @dataclass(frozen=True)
 class GpuModeTriMulTaskConfig:
     mode: str = "benchmark"
@@ -83,6 +81,8 @@ class GpuModeTriMulTask:
             raise ValueError(f"Unsupported language for gpumode_trimul definition text: {lang!r}")
         return f"{self.get_definition_text_for_language(language=lang)}\n"
 
+    # Optional helper (not part of the Task Protocol): generators/CLIs can use this
+    # to get language-specific prompt text.
     def get_definition_text_for_language(self, *, language: str) -> str:
         spec_path = self._cfg.task_dir / "spec.py"
         if not spec_path.exists():

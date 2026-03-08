@@ -7,12 +7,9 @@ and only override prompt construction to inject the persistent world model JSON.
 
 from __future__ import annotations
 
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 from pathlib import Path
-
-from openai.types.shared_params import Reasoning
-from openai.types.shared import ReasoningEffort
 
 from k_search.kernel_generators.kernel_generator import KernelGenerator
 from k_search.tasks.task_base import code_from_solution
@@ -107,13 +104,13 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
                 response = self.client.responses.create(
                     model=self.model_name,
                     input=prompt,
-                    reasoning=cast(Reasoning, {"effort": self.reasoning_effort}),
+                    reasoning={"effort": self.reasoning_effort},
                 )
                 return (response.output_text or "").strip()
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=[{"role": "user", "content": prompt}],
-                reasoning_effort=cast(ReasoningEffort, self.reasoning_effort),
+                reasoning_effort=self.reasoning_effort,
             )
             msg = response.choices[0].message
             content = msg.content or getattr(msg, "reasoning_content", None)
@@ -154,6 +151,7 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
         Baseline-aware generator with persistent world model injection/refinement.
         This is a lightly modified copy of KernelGenerator.generate().
         """
+        import random
         import time
         try:
             max_dai = int(num_debug_and_improve_rounds)

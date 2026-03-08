@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 import uuid
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, List, Optional
 import json
 
 def _persist_ksearch_solution(
@@ -221,7 +221,7 @@ def generate_and_evaluate(
         if saved_path:
             print(f"  ✓ Saved solution to: {saved_path}")
         else:
-            print("  ✗ Failed to save solution")
+            print(f"  ✗ Failed to save solution")
 
     def_name = str(getattr(task, "name", "") or "")
     print(f"[{def_name}] Generated solution: {solution.name}")
@@ -368,11 +368,10 @@ def main():
     elif task_source == "gpumode":
         from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
 
-        task_dir = str(args.gpumode_task_dir) if args.gpumode_task_dir else None
         task = GpuModeTriMulTask(
             mode=str(args.gpumode_mode or "benchmark"),
             keep_tmp=bool(args.gpumode_keep_tmp),
-            task_dir=task_dir,
+            task_dir=(str(args.gpumode_task_dir) if args.gpumode_task_dir else None),
             artifacts_dir=args.artifacts_dir,
         )
     else:
