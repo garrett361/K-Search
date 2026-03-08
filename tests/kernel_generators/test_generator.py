@@ -22,7 +22,6 @@ class TestRITSAPIIntegration:
             model_name=os.environ["RITS_MODEL_NAME"],
             api_key=os.environ["RITS_API_KEY"],
             base_url=os.environ["RITS_BASE_URL"],
-            use_reasoning_api=True,
         )
 
         prompt = "Write a Python function that computes factorial iteratively."
@@ -50,7 +49,6 @@ class TestRITSAPIIntegration:
             model_name=os.environ["RITS_MODEL_NAME"],
             api_key=os.environ["RITS_API_KEY"],
             base_url=os.environ["RITS_BASE_URL"],
-            use_reasoning_api=False,
         )
 
         prompt = "Write a Python function that returns 42."

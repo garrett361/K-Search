@@ -46,7 +46,6 @@ class TestWorldModelLLMIntegration:
             model_name=os.environ["RITS_MODEL_NAME"],
             api_key=os.environ["RITS_API_KEY"],
             base_url=os.environ["RITS_BASE_URL"],
-            use_reasoning_api=False,
         )
 
         response = gen.client.chat.completions.create(
@@ -74,7 +73,6 @@ class TestWorldModelLLMIntegration:
             model_name=os.environ["RITS_MODEL_NAME"],
             api_key=os.environ["RITS_API_KEY"],
             base_url=os.environ["RITS_BASE_URL"],
-            use_reasoning_api=False,
         )
 
         response = gen.client.chat.completions.create(
@@ -99,7 +97,6 @@ class TestWorldModelLLMIntegration:
             model_name=os.environ["RITS_MODEL_NAME"],
             api_key=os.environ["RITS_API_KEY"],
             base_url=os.environ["RITS_BASE_URL"],
-            use_reasoning_api=False,
         )
 
         response = gen.client.chat.completions.create(
@@ -138,7 +135,6 @@ class TestWorldModelLLMIntegration:
             model_name=os.environ["RITS_MODEL_NAME"],
             api_key=os.environ["RITS_API_KEY"],
             base_url=os.environ["RITS_BASE_URL"],
-            use_reasoning_api=True,
         )
 
         response = gen.client.responses.create(
