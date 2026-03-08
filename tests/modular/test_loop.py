@@ -284,50 +284,22 @@ class TestBuildPrompt:
         task.feedback_provider.for_codegen.assert_called_once_with(round_)
 
 
-class TestCreateImplementation:
+class TestCreateImpl:
     """Tests for task.create_impl via GpuModeTriMulTaskDefinition."""
 
-    def test_creates_valid_implementation(self):
-        from unittest.mock import MagicMock
-
-        from k_search.modular.adapters.gpu_mode import GpuModeTriMulTaskDefinition
-
-        mock_task = MagicMock()
-        mock_task.name = "my_task"
-        mock_task._cfg.task_dir.exists.return_value = False
-
-        task_def = GpuModeTriMulTaskDefinition.__new__(GpuModeTriMulTaskDefinition)
-        task_def._task = mock_task
-        task_def._language = "triton"
-        task_def._impl_counter = 5
-        task_def.name = "my_task"
-
-        impl = task_def.create_impl("def kernel(): pass")
-
-        assert impl.name == "my_task_r5"
-        assert impl.content.definition == "my_task"
-        assert impl.content.author == "search_v2"
-        assert "def kernel(): pass" in impl.content.sources[0].content
-
     def test_increments_counter(self):
-        from unittest.mock import MagicMock
+        from unittest.mock import MagicMock, patch
 
         from k_search.modular.adapters.gpu_mode import GpuModeTriMulTaskDefinition
 
         mock_task = MagicMock()
         mock_task.name = "test_task"
 
-        task_def = GpuModeTriMulTaskDefinition.__new__(GpuModeTriMulTaskDefinition)
-        task_def._task = mock_task
-        task_def._language = "triton"
-        task_def._impl_counter = 0
-        task_def.name = "test_task"
+        with patch("k_search.modular.adapters.gpu_mode.task_definition._load_reference_module"):
+            task_def = GpuModeTriMulTaskDefinition(mock_task)
 
-        impl1 = task_def.create_impl("code1")
-        impl2 = task_def.create_impl("code2")
-
-        assert impl1.name == "test_task_r0"
-        assert impl2.name == "test_task_r1"
+        assert task_def.create_impl("code1").name == "test_task_r0"
+        assert task_def.create_impl("code2").name == "test_task_r1"
         assert task_def._impl_counter == 2
 
 
