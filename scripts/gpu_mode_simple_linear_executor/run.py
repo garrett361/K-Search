@@ -141,7 +141,7 @@ def main():
     if (rits_api_key := os.getenv("RITS_API_KEY")) is not None:
         client_kwargs["default_headers"] = {"RITS_API_KEY": rits_api_key}
 
-    client = openai.OpenAI(**client_kwargs)
+    client = openai.OpenAI(**client_kwargs)  # type: ignore[arg-type]
     llm = create_llm_call(client, args.model_name)
 
     action_prompt_fn = create_action_prompt_fn(task_def)

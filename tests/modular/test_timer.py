@@ -82,7 +82,7 @@ def test_timer_rejects_non_string_tag():
 
     timer = Timer()
     with pytest.raises(TypeError, match="tag must be str, got int: 123"):
-        with timer[123]:
+        with timer[123]:  # type: ignore[index]
             pass
 
 

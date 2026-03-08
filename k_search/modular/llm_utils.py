@@ -3,7 +3,7 @@
 import re
 
 
-def strip_markdown_fences(code: str) -> str:
+def strip_markdown_fences(code: str | None) -> str | None:
     """Strip markdown code fences from LLM output.
 
     Args:

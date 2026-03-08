@@ -37,6 +37,8 @@ def test_apply_insert_node():
     )
 
     assert result.success is True
+    assert result.value is not None
+    assert result.value.action is not None
     assert result.value.action.title == "Test Action"
     assert result.value._id == "1"
 
@@ -45,6 +47,7 @@ def test_apply_insert_node_invalid_parent():
     tree = Tree(root=Node())
     result = apply_tool_call(tree, "insert_node", {"parent_id": "999", "title": "Test"})
     assert result.success is False
+    assert result.error is not None
     assert "not found" in result.error
 
 
@@ -93,4 +96,5 @@ def test_apply_unknown_tool():
     tree = Tree(root=Node())
     result = apply_tool_call(tree, "unknown_tool", {})
     assert result.success is False
+    assert result.error is not None
     assert "unknown tool" in result.error

@@ -24,6 +24,7 @@ def test_propose_uses_initial_action_on_empty_tree():
     nodes = model.propose(tree)
 
     assert len(nodes) == 1
+    assert nodes[0].action is not None
     assert "optimized" in nodes[0].action.title.lower()
     assert nodes[0].status == "open"
     assert nodes[0].parent is root
@@ -51,6 +52,7 @@ def test_propose_calls_llm_with_history():
     nodes = model.propose(tree)
 
     assert len(nodes) == 1
+    assert nodes[0].action is not None
     assert nodes[0].action.title == "try loop tiling"
     mock_llm.assert_called_once()
 

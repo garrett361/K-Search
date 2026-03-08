@@ -109,6 +109,7 @@ class TestWorldModelLLMIntegration:
         assert parsed is not None
 
         obj = load_world_model_obj(parsed)
+        assert obj is not None
         nodes = obj["decision_tree"]["nodes"]
 
         action_nodes = [

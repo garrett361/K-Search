@@ -91,6 +91,7 @@ class TestRunSearch:
         result = run_search(task, evaluator, stub_llm, config)
 
         assert result.score == 0.5
+        assert result.result is not None
         assert result.result.get_metrics()["speedup_factor"] == 1.5
 
     def test_tracks_best_score_first_best(self):
@@ -111,6 +112,7 @@ class TestRunSearch:
         result = run_search(task, evaluator, stub_llm, config)
 
         assert result.score == 0.9
+        assert result.result is not None
         assert result.result.get_metrics()["speedup_factor"] == 2.0
 
     def test_first_round_no_feedback(self):
@@ -354,5 +356,6 @@ class TestStripMarkdownFences:
         code = "```python\ndef kernel():\n    pass"
         # Should strip the leading fence at minimum
         result = strip_markdown_fences(code)
+        assert result is not None
         assert "```" not in result
         assert "def kernel():" in result

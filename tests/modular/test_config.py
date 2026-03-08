@@ -23,7 +23,8 @@ class TestCollectEnvInfo:
         result = collect_env_info()
         assert "hostname" in result
         assert "python_version" in result
-        assert result["python_version"].startswith("3.")
+        py_version = result["python_version"]
+        assert py_version is not None and py_version.startswith("3.")
 
     def test_returns_empty_dict_on_complete_failure(self):
         from k_search.modular.config import collect_env_info

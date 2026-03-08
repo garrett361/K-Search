@@ -156,6 +156,7 @@ class TestGpuModeImplementationArtifactDir:
         impl = GpuModeImplementation(solution)
 
         with impl.artifact_dir() as src_dir:
+            assert src_dir is not None
             dir_path = src_dir
 
         assert not dir_path.exists()

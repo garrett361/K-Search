@@ -110,7 +110,7 @@ class GpuModeTriMulTaskDefinition:
 
     def create_impl(self, llm_output: str) -> GpuModeImplementation:
         """Create Implementation from raw LLM output."""
-        cleaned_code = strip_markdown_fences(llm_output)
+        cleaned_code = strip_markdown_fences(llm_output) or ""
         impl_name = f"{self.name}_r{self._impl_counter}"
         self._impl_counter += 1
 

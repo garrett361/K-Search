@@ -15,6 +15,7 @@ sys.path.insert(0, str(_TASK_DIR))
 
 def _load_module(name: str):
     spec = importlib.util.spec_from_file_location(f"causal_conv1d_{name}", _TASK_DIR / f"{name}.py")
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
