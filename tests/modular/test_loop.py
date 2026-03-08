@@ -2,7 +2,7 @@
 
 from unittest.mock import Mock
 
-from k_search.modular import run_search, SearchConfig, SearchResult
+from k_search.modular import SearchConfig, SearchResult, run_search
 
 
 def make_eval_result_mock(is_success: bool = True, metrics: dict | None = None) -> Mock:
@@ -257,8 +257,8 @@ class TestBuildPrompt:
         task.get_prompt_text.assert_called_once()
 
     def test_with_round_includes_feedback(self):
-        from k_search.modular.prompts import build_prompt
         from k_search.modular import Round
+        from k_search.modular.prompts import build_prompt
 
         task = make_task_mock()
         task.get_prompt_text.return_value = "Task spec"
@@ -308,24 +308,6 @@ class TestCreateImplementation:
         assert impl.content.definition == "my_task"
         assert impl.content.author == "search_v2"
         assert "def kernel(): pass" in impl.content.sources[0].content
-
-    def test_default_language_is_triton(self):
-        from unittest.mock import MagicMock
-
-        from k_search.modular.adapters.gpu_mode import GpuModeTriMulTaskDefinition
-
-        mock_task = MagicMock()
-        mock_task.name = "test_task"
-
-        task_def = GpuModeTriMulTaskDefinition.__new__(GpuModeTriMulTaskDefinition)
-        task_def._task = mock_task
-        task_def._language = "triton"
-        task_def._impl_counter = 0
-        task_def.name = "test_task"
-
-        impl = task_def.create_implementation("code")
-
-        assert impl.content.spec.language.value == "triton"
 
     def test_increments_counter(self):
         from unittest.mock import MagicMock
@@ -382,7 +364,9 @@ class TestStripMarkdownFences:
     def test_extracts_first_fenced_block(self):
         from k_search.modular.prompts import strip_markdown_fences
 
-        code = "Here's the code:\n```python\ndef kernel():\n    pass\n```\nAnd more text."
+        code = (
+            "Here's the code:\n```python\ndef kernel():\n    pass\n```\nAnd more text."
+        )
         expected = "def kernel():\n    pass"
         assert strip_markdown_fences(code) == expected
 

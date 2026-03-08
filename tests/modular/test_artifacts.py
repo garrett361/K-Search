@@ -7,7 +7,6 @@ from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
-import pytest
 
 from k_search.modular.config import ArtifactConfig
 from k_search.modular.artifacts.noop import NoOpArtifactStore
