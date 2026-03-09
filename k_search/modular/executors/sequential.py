@@ -126,3 +126,8 @@ class SequentialExecutor:
         logger.info(
             f"Round {round_idx + 1}: score={score:.4f}, success={result.succeeded()}"
         )
+
+        if not result.succeeded():
+            log_excerpt = result.get_log()
+            if log_excerpt:
+                logger.debug("Round %d error:\n%s", round_idx + 1, log_excerpt)
