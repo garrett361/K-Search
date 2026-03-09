@@ -141,10 +141,16 @@ def _analyze_failure_for_action(llm: LLMCallable, error_log: str, action: str) -
     return llm(prompt)
 
 
-def create_action_prompt_fn(task_def: GpuModeTriMulTaskDefinition, llm: LLMCallable):
+def create_action_prompt_fn(
+    task_def: GpuModeTriMulTaskDefinition,
+    llm: LLMCallable,
+    *,
+    analyze_failures: bool = False,
+):
     """Create GPU mode specific action prompt function.
 
-    Uses feedback from best round and LLM-analyzed failures to inform next action.
+    Uses feedback from best round to inform next action.
+    If analyze_failures=True, also uses LLM to analyze failures.
     """
 
     def action_prompt_fn(tree: Tree, context: dict[str, Any] | None) -> str:
@@ -159,16 +165,15 @@ def create_action_prompt_fn(task_def: GpuModeTriMulTaskDefinition, llm: LLMCalla
                 feedback_section = f"\n## Previous Best Result\n{feedback}\n"
 
         last_round_section = ""
-        last_node = _get_last_evaluated_node(tree)
-        if last_node and last_node.cycle and last_node.cycle.rounds:
-            last_round = last_node.cycle.rounds[-1]
-            if not last_round.result.succeeded():
-                action = last_node.action.title if last_node.action else "initial"
-                error_log = last_round.result.get_log()
-                analysis = _analyze_failure_for_action(llm, error_log, action)
-                last_round_section = (
-                    f"\n## Last Round (FAILED)\nAction: {action}\nLesson: {analysis}\n"
-                )
+        if analyze_failures:
+            last_node = _get_last_evaluated_node(tree)
+            if last_node and last_node.cycle and last_node.cycle.rounds:
+                last_round = last_node.cycle.rounds[-1]
+                if not last_round.result.succeeded():
+                    action = last_node.action.title if last_node.action else "initial"
+                    error_log = last_round.result.get_log()
+                    analysis = _analyze_failure_for_action(llm, error_log, action)
+                    last_round_section = f"\n## Last Round (FAILED)\nAction: {action}\nLesson: {analysis}\n"
 
         prompt = ACTION_PROMPT_TEMPLATE.format(
             task_spec=task_spec,
@@ -186,14 +191,20 @@ def create_action_prompt_fn(task_def: GpuModeTriMulTaskDefinition, llm: LLMCalla
 
 
 def create_code_prompt_fn(
-    task_def: GpuModeTriMulTaskDefinition, tree: Tree, llm: LLMCallable
+    task_def: GpuModeTriMulTaskDefinition,
+    tree: Tree,
+    llm: LLMCallable,
+    *,
+    analyze_failures: bool = False,
+    v1_feedback: bool = False,
 ):
     """Create GPU mode specific code generation prompt function.
 
     Round 0 (no action): direct code generation from task prompt.
-    Round 1+ (with action): generate code implementing the specific action,
-    with V1-style feedback sections. Includes LLM-generated failure analysis
-    when the previous round failed.
+    Round 1+ (with action): generate code implementing the specific action.
+
+    If v1_feedback=True, includes last round and best solution feedback.
+    If analyze_failures=True, includes LLM-generated failure analysis.
     """
 
     def _format_round_summary(r) -> str:
@@ -214,35 +225,40 @@ def create_code_prompt_fn(
         if node.action:
             prompt += f"\n\nAction: {node.action.title}"
 
-        # Last round feedback with descriptive headers
-        last_node = _get_last_evaluated_node(tree)
-        if last_node and last_node.cycle and last_node.cycle.rounds:
-            last_round = last_node.cycle.rounds[-1]
-            logs = _truncate_log(last_round.result.get_log(), max_lines=30)
-            code = _extract_code_block(last_round.llm_response)
-            summary = _format_round_summary(last_round)
+        last_node = (
+            _get_last_evaluated_node(tree) if v1_feedback or analyze_failures else None
+        )
 
-            prompt += f"\n\nEvaluation Output (from your previous attempt):\n{logs}"
-            prompt += f"\n\nYour Previous Code:\n```python\n{code}\n```"
-            prompt += f"\n\nPrevious Round Summary:\n{summary}"
+        if v1_feedback:
+            # Last round feedback with descriptive headers
+            if last_node and last_node.cycle and last_node.cycle.rounds:
+                last_round = last_node.cycle.rounds[-1]
+                logs = _truncate_log(last_round.result.get_log(), max_lines=30)
+                code = _extract_code_block(last_round.llm_response)
+                summary = _format_round_summary(last_round)
 
-        # Best so far (only if different from last)
-        best_node = tree.get_best_node()
-        if best_node and best_node.cycle and best_node.cycle.best_round:
-            best_round = best_node.cycle.best_round
-            if last_node is None or best_node._id != last_node._id:
-                best_summary = _format_round_summary(best_round)
-                best_code = best_round.llm_response
-                prompt += f"\n\nBest Successful Solution So Far:\n{best_summary}\n\nCode:\n{best_code}"
+                prompt += f"\n\nEvaluation Output (from your previous attempt):\n{logs}"
+                prompt += f"\n\nYour Previous Code:\n```python\n{code}\n```"
+                prompt += f"\n\nPrevious Round Summary:\n{summary}"
 
-        # LLM failure analysis if last round failed
-        if last_node and last_node.cycle and last_node.cycle.rounds:
-            last_round = last_node.cycle.rounds[-1]
-            if not last_round.result.succeeded():
-                error_log = last_round.result.get_log()
-                failed_code = last_round.llm_response
-                analysis = _analyze_failure(llm, error_log, failed_code)
-                prompt += f"\n\n## Failure Analysis\n{analysis}"
+            # Best so far (only if different from last)
+            best_node = tree.get_best_node()
+            if best_node and best_node.cycle and best_node.cycle.best_round:
+                best_round = best_node.cycle.best_round
+                if last_node is None or best_node._id != last_node._id:
+                    best_summary = _format_round_summary(best_round)
+                    best_code = best_round.llm_response
+                    prompt += f"\n\nBest Successful Solution So Far:\n{best_summary}\n\nCode:\n{best_code}"
+
+        if analyze_failures:
+            # LLM failure analysis if last round failed
+            if last_node and last_node.cycle and last_node.cycle.rounds:
+                last_round = last_node.cycle.rounds[-1]
+                if not last_round.result.succeeded():
+                    error_log = last_round.result.get_log()
+                    failed_code = last_round.llm_response
+                    analysis = _analyze_failure(llm, error_log, failed_code)
+                    prompt += f"\n\n## Failure Analysis\n{analysis}"
 
         prompt += "\n\nGenerate the corrected and optimized implementation:"
         logger.debug(
@@ -280,6 +296,22 @@ def main():
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Enable debug logging"
     )
+    parser.add_argument(
+        "--analyze-code-failures",
+        action="store_true",
+        help="Use LLM to analyze failures before code generation",
+    )
+    parser.add_argument(
+        "--analyze-action-failures",
+        action="store_true",
+        help="Use LLM to analyze failures before action selection",
+    )
+    parser.add_argument(
+        "--v1-feedback",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Include V1-style feedback (last round, best solution) in prompts",
+    )
     args = parser.parse_args()
 
     if args.verbose:
@@ -312,8 +344,16 @@ def main():
 
     tree = Tree(root=Node(status="closed"))
 
-    action_prompt_fn = create_action_prompt_fn(task_def, llm)
-    code_prompt_fn = create_code_prompt_fn(task_def, tree, llm)
+    action_prompt_fn = create_action_prompt_fn(
+        task_def, llm, analyze_failures=args.analyze_action_failures
+    )
+    code_prompt_fn = create_code_prompt_fn(
+        task_def,
+        tree,
+        llm,
+        analyze_failures=args.analyze_code_failures,
+        v1_feedback=args.v1_feedback,
+    )
 
     world_model = SimpleWorldModel(llm, action_prompt_fn)
 

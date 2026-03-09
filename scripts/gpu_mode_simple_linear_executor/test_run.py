@@ -130,7 +130,7 @@ Traceback follows"""
 
 
 def test_action_prompt_includes_last_failure():
-    """Action prompt includes last round failure info."""
+    """Action prompt includes last round failure info when analyze_failures=True."""
     mock_task_def = MagicMock()
     mock_task_def.get_prompt_text.return_value = "Optimize kernel X"
     mock_llm = MagicMock(return_value="Index was out of bounds due to wrong tile size")
@@ -148,7 +148,7 @@ def test_action_prompt_includes_last_failure():
     failed.cycle = Cycle(rounds=[mock_round])
     tree.add_node(failed)
 
-    prompt_fn = create_action_prompt_fn(mock_task_def, mock_llm)
+    prompt_fn = create_action_prompt_fn(mock_task_def, mock_llm, analyze_failures=True)
     prompt = prompt_fn(tree, None)
 
     assert "Last Round (FAILED)" in prompt
