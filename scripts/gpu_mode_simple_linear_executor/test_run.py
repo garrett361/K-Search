@@ -9,6 +9,7 @@ from k_search.modular.world.tree import Tree
 
 from scripts.gpu_mode_simple_linear_executor.run import (
     ACTION_PROMPT_TEMPLATE,
+    _extract_error_hint,
     create_action_prompt_fn,
     create_code_prompt_fn,
 )
@@ -110,4 +111,40 @@ def test_action_prompt_template_structure():
     """ACTION_PROMPT_TEMPLATE has expected placeholders."""
     assert "{task_spec}" in ACTION_PROMPT_TEMPLATE
     assert "{feedback_section}" in ACTION_PROMPT_TEMPLATE
+    assert "{last_round_section}" in ACTION_PROMPT_TEMPLATE
     assert "one line" in ACTION_PROMPT_TEMPLATE.lower()
+
+
+def test_extract_error_hint_finds_error():
+    """Extracts first error line from log."""
+    log = """Running kernel...
+CUDA error: misaligned address at line 42
+Traceback follows"""
+    hint = _extract_error_hint(log)
+    assert hint == "CUDA error: misaligned address at line 42"
+
+
+def test_action_prompt_includes_last_failure():
+    """Action prompt includes last round failure info."""
+    mock_task_def = MagicMock()
+    mock_task_def.get_prompt_text.return_value = "Optimize kernel X"
+
+    root = Node(status="closed")
+    tree = Tree(root=root)
+
+    failed = Node(
+        parent=root, status="closed", action=Action(title="try vectorization")
+    )
+    mock_round = MagicMock()
+    mock_round.result.succeeded.return_value = False
+    mock_round.result.get_log.return_value = "Error: index out of bounds"
+    mock_round.score = 0.0
+    failed.cycle = Cycle(rounds=[mock_round])
+    tree.add_node(failed)
+
+    prompt_fn = create_action_prompt_fn(mock_task_def)
+    prompt = prompt_fn(tree, None)
+
+    assert "Last Round (FAILED)" in prompt
+    assert "try vectorization" in prompt
+    assert "index out of bounds" in prompt

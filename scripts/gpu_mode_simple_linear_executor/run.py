@@ -33,11 +33,34 @@ for noisy_logger in ("httpcore", "httpx", "openai", "openai._base_client"):
     logging.getLogger(noisy_logger).setLevel(logging.WARNING)
 
 
+def _extract_error_hint(log: str) -> str:
+    """Extract first meaningful error line from log."""
+    if not log:
+        return ""
+    for line in log.strip().split("\n"):
+        line = line.strip()
+        if any(kw in line.lower() for kw in ("error", "failed", "exception", "assert")):
+            return line
+    return ""
+
+
+def _get_last_evaluated_node(tree: Tree) -> Node | None:
+    """Return most recently evaluated node (highest ID, closed, has cycle)."""
+    evaluated = [
+        n
+        for n in tree._all_nodes()
+        if n.status == "closed" and n.cycle and n.cycle.rounds
+    ]
+    if not evaluated:
+        return None
+    return max(evaluated, key=lambda n: int(n._id))
+
+
 ACTION_PROMPT_TEMPLATE = """You are proposing the next optimization action for a GPU kernel.
 
 ## Task Specification
 {task_spec}
-{feedback_section}
+{feedback_section}{last_round_section}
 ## Your Job
 Propose ONE specific optimization action to try next.
 
@@ -66,9 +89,21 @@ def create_action_prompt_fn(task_def: GpuModeTriMulTaskDefinition):
                 feedback = task_def.feedback_provider.for_codegen(best_round)
                 feedback_section = f"\n## Previous Best Result\n{feedback}\n"
 
+        last_round_section = ""
+        last_node = _get_last_evaluated_node(tree)
+        if last_node and last_node.cycle and last_node.cycle.rounds:
+            last_round = last_node.cycle.rounds[-1]
+            if not last_round.result.succeeded():
+                action = last_node.action.title if last_node.action else "initial"
+                hint = _extract_error_hint(last_round.result.get_log())
+                last_round_section = (
+                    f"\n## Last Round (FAILED)\nAction: {action}\nError: {hint}\n"
+                )
+
         prompt = ACTION_PROMPT_TEMPLATE.format(
             task_spec=task_spec,
             feedback_section=feedback_section,
+            last_round_section=last_round_section,
         )
         logger.debug(
             prompt_color(
@@ -87,17 +122,6 @@ def create_code_prompt_fn(task_def: GpuModeTriMulTaskDefinition, tree: Tree):
     Round 1+ (with action): generate code implementing the specific action,
     with V1-style feedback sections.
     """
-
-    def _get_last_evaluated_node() -> Node | None:
-        """Return most recently evaluated node (highest ID, closed, has cycle)."""
-        evaluated = [
-            n
-            for n in tree._all_nodes()
-            if n.status == "closed" and n.cycle and n.cycle.rounds
-        ]
-        if not evaluated:
-            return None
-        return max(evaluated, key=lambda n: int(n._id))
 
     def _format_round_summary(r) -> str:
         """Format V1-style round summary."""
@@ -118,7 +142,7 @@ def create_code_prompt_fn(task_def: GpuModeTriMulTaskDefinition, tree: Tree):
             prompt += f"\n\nAction: {node.action.title}"
 
         # Last round feedback with descriptive headers
-        last_node = _get_last_evaluated_node()
+        last_node = _get_last_evaluated_node(tree)
         if last_node and last_node.cycle and last_node.cycle.rounds:
             last_round = last_node.cycle.rounds[-1]
             logs = last_round.result.get_log()
