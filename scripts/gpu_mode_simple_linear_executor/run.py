@@ -9,6 +9,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 import openai
@@ -71,6 +72,35 @@ Rules:
 
 Respond with only the action title (one line, no explanation)."""
 
+FAILURE_ANALYSIS_PROMPT = """Analyze this compilation/runtime error:
+
+```
+{error_log}
+```
+
+Code that caused the error:
+```python
+{failed_code}
+```
+
+Provide:
+1. Root cause (1-2 sentences)
+2. How to fix it
+3. Corrected code snippet showing the fix
+
+Be concise."""
+
+LLMCallable = Callable[[str], str]
+
+
+def _analyze_failure(llm: LLMCallable, error_log: str, failed_code: str) -> str:
+    """Ask LLM to analyze a failure and suggest fixes."""
+    prompt = FAILURE_ANALYSIS_PROMPT.format(
+        error_log=error_log[-2000:],
+        failed_code=failed_code[-3000:],
+    )
+    return llm(prompt)
+
 
 def create_action_prompt_fn(task_def: GpuModeTriMulTaskDefinition):
     """Create GPU mode specific action prompt function.
@@ -115,12 +145,15 @@ def create_action_prompt_fn(task_def: GpuModeTriMulTaskDefinition):
     return action_prompt_fn
 
 
-def create_code_prompt_fn(task_def: GpuModeTriMulTaskDefinition, tree: Tree):
+def create_code_prompt_fn(
+    task_def: GpuModeTriMulTaskDefinition, tree: Tree, llm: LLMCallable
+):
     """Create GPU mode specific code generation prompt function.
 
     Round 0 (no action): direct code generation from task prompt.
     Round 1+ (with action): generate code implementing the specific action,
-    with V1-style feedback sections.
+    with V1-style feedback sections. Includes LLM-generated failure analysis
+    when the previous round failed.
     """
 
     def _format_round_summary(r) -> str:
@@ -161,6 +194,15 @@ def create_code_prompt_fn(task_def: GpuModeTriMulTaskDefinition, tree: Tree):
                 best_summary = _format_round_summary(best_round)
                 best_code = best_round.llm_response
                 prompt += f"\n\nBest Successful Solution So Far:\n{best_summary}\n\nCode:\n{best_code}"
+
+        # LLM failure analysis if last round failed
+        if last_node and last_node.cycle and last_node.cycle.rounds:
+            last_round = last_node.cycle.rounds[-1]
+            if not last_round.result.succeeded():
+                error_log = last_round.result.get_log()
+                failed_code = last_round.llm_response
+                analysis = _analyze_failure(llm, error_log, failed_code)
+                prompt += f"\n\n## Failure Analysis\n{analysis}"
 
         prompt += "\n\nGenerate the corrected and optimized implementation:"
         logger.debug(
@@ -231,7 +273,7 @@ def main():
     tree = Tree(root=Node(status="closed"))
 
     action_prompt_fn = create_action_prompt_fn(task_def)
-    code_prompt_fn = create_code_prompt_fn(task_def, tree)
+    code_prompt_fn = create_code_prompt_fn(task_def, tree, llm)
 
     world_model = SimpleWorldModel(llm, action_prompt_fn)
 
