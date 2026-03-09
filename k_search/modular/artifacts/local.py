@@ -18,7 +18,7 @@ class LocalArtifactStore:
         self._only_store_successes = config.only_store_successes
 
     def store(self, round_: Round, round_idx: int) -> None:
-        if self._only_store_successes and not round_.result.is_success():
+        if self._only_store_successes and not round_.result.succeeded():
             return
 
         round_dir = self._output_dir / f"round_{round_idx}"
@@ -31,7 +31,7 @@ class LocalArtifactStore:
 
         metadata = {
             "name": round_.impl.name,
-            "is_success": round_.result.is_success(),
+            "succeeded": round_.result.succeeded(),
             **round_.result.get_metrics(),
         }
         (round_dir / "metadata.json").write_text(json.dumps(metadata, indent=2))

@@ -43,7 +43,7 @@ def test_action_prompt_with_history():
 
     best = Node(parent=root, status="closed")
     mock_round = MagicMock()
-    mock_round.result.is_success.return_value = True
+    mock_round.result.succeeded.return_value = True
     mock_round.score = 0.8
     best.cycle = Cycle(rounds=[mock_round])
     tree.add_node(best)

@@ -70,7 +70,7 @@ from typing import Any, Protocol
 class EvaluationResult(Protocol):
     """Generic evaluation result — framework doesn't prescribe fields."""
 
-    def is_success(self) -> bool: ...
+    def succeeded(self) -> bool: ...
     def get_metrics(self) -> dict[str, Any]: ...
     def get_log(self) -> str: ...
 
@@ -320,7 +320,7 @@ class _GpuModeScorer:
     """Uses inverse latency as score (current behavior)."""
 
     def score(self, result: EvaluationResult) -> float:
-        if not result.is_success():
+        if not result.succeeded():
             return -1.0
         metrics = result.get_metrics()
         latency = metrics.get("latency_ms")
@@ -357,7 +357,7 @@ class _GpuModeEvaluationResult:
     def __init__(self, eval_result: EvalResult):
         self._inner = eval_result
 
-    def is_success(self) -> bool:
+    def succeeded(self) -> bool:
         return self._inner.is_passed()
 
     def get_metrics(self) -> dict[str, Any]:
@@ -492,7 +492,7 @@ class GpuModeEvaluationResult:
         self._inner = inner
 
     # New protocol methods
-    def is_success(self) -> bool:
+    def succeeded(self) -> bool:
         return self._inner.is_passed()
 
     def get_metrics(self) -> dict[str, Any]:

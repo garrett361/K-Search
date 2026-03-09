@@ -18,10 +18,10 @@ class Cycle:
     @property
     def best_round(self) -> Round | None:
         """Return highest-scoring successful round, or None."""
-        successful = [r for r in self.rounds if r.result.is_success()]
+        successful = [r for r in self.rounds if r.result.succeeded()]
         return max(successful, key=lambda r: r.score) if successful else None
 
     @property
     def succeeded(self) -> bool:
         """Return True if any round succeeded."""
-        return any(r.result.is_success() for r in self.rounds)
+        return any(r.result.succeeded() for r in self.rounds)

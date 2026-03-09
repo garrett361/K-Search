@@ -226,7 +226,7 @@ def mock_artifact_dir(files: dict[str, str]) -> Iterator[Path | None]:
 
 
 def make_outcome_mock(
-    is_success: bool = True,
+    succeeded: bool = True,
     name: str = "test_impl",
     metrics: dict | None = None,
     files: dict[str, str] | None = None,
@@ -236,7 +236,7 @@ def make_outcome_mock(
     impl.artifact_dir = lambda: mock_artifact_dir(files or {"kernel.py": "# code"})
 
     result = Mock()
-    result.is_success.return_value = is_success
+    result.succeeded.return_value = succeeded
     result.get_metrics.return_value = metrics or {"latency_ms": 10.0}
 
     return Round(impl=impl, result=result)
@@ -385,10 +385,10 @@ class TestLocalArtifactStore:
         config = ArtifactConfig(output_dir=tmp_path, only_store_successes=True)
         store = LocalArtifactStore(config)
 
-        store.store(make_outcome_mock(is_success=False), round_idx=0)
+        store.store(make_outcome_mock(succeeded=False), round_idx=0)
         assert not (tmp_path / "round_0").exists()
 
-        store.store(make_outcome_mock(is_success=True), round_idx=1)
+        store.store(make_outcome_mock(succeeded=True), round_idx=1)
         assert (tmp_path / "round_1").is_dir()
 
     def test_handles_nested_file_paths(self, tmp_path):
@@ -433,7 +433,7 @@ class LocalArtifactStore:
         self._only_store_successes = config.only_store_successes
 
     def store(self, outcome: Round, round_idx: int) -> None:
-        if self._only_store_successes and not outcome.result.is_success():
+        if self._only_store_successes and not outcome.result.succeeded():
             return
 
         round_dir = self._output_dir / f"round_{round_idx}"
@@ -448,7 +448,7 @@ class LocalArtifactStore:
         # Write metadata
         metadata = {
             "name": outcome.impl.name,
-            "is_success": outcome.result.is_success(),
+            "succeeded": outcome.result.succeeded(),
             **outcome.result.get_metrics(),
         }
         (round_dir / "metadata.json").write_text(json.dumps(metadata, indent=2))
@@ -530,7 +530,7 @@ class TestWandbArtifactStore:
 
             store = WandbArtifactStore(ArtifactConfig(wandb=True, only_store_successes=True))
 
-            store.store(make_outcome_mock(is_success=False), round_idx=0)
+            store.store(make_outcome_mock(succeeded=False), round_idx=0)
             mock_wandb.Artifact.assert_not_called()
 ```
 
@@ -573,13 +573,13 @@ class WandbArtifactStore:
         self._only_store_successes = config.only_store_successes
 
     def store(self, outcome: Round, round_idx: int) -> None:
-        if self._only_store_successes and not outcome.result.is_success():
+        if self._only_store_successes and not outcome.result.succeeded():
             return
 
         metadata = {
             "name": outcome.impl.name,
             "round_idx": round_idx,
-            "is_success": outcome.result.is_success(),
+            "succeeded": outcome.result.succeeded(),
             **outcome.result.get_metrics(),
         }
 

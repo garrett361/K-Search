@@ -15,7 +15,7 @@ class GpuModeEvaluationResult:
     def __init__(self, inner: EvalResult) -> None:
         self._inner = inner
 
-    def is_success(self) -> bool:
+    def succeeded(self) -> bool:
         return self._inner.is_passed()
 
     def get_metrics(self, max_str_chars: int = 0) -> dict[str, Any]:

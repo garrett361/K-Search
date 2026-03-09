@@ -29,13 +29,13 @@ class WandbArtifactStore:
         self._only_store_successes = config.only_store_successes
 
     def store(self, round_: Round, round_idx: int) -> None:
-        if self._only_store_successes and not round_.result.is_success():
+        if self._only_store_successes and not round_.result.succeeded():
             return
 
         metadata = {
             "name": round_.impl.name,
             "round_idx": round_idx,
-            "is_success": round_.result.is_success(),
+            "succeeded": round_.result.succeeded(),
             **round_.result.get_metrics(),
         }
 

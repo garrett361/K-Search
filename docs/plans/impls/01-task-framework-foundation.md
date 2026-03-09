@@ -110,7 +110,7 @@ from typing import Any, Protocol
 class EvaluationResult(Protocol):
     """Generic evaluation result."""
 
-    def is_success(self) -> bool:
+    def succeeded(self) -> bool:
         """Return True if evaluation passed."""
         ...
 
@@ -172,7 +172,7 @@ class TestGpuModeEvaluationResult:
         inner = EvalResult(status="passed", latency_ms=1.5, log_excerpt="test log")
         wrapper = GpuModeEvaluationResult(inner)
 
-        assert wrapper.is_success() is True
+        assert wrapper.succeeded() is True
         assert wrapper.get_log() == "test log"
 
     def test_is_success_false_for_failed(self):
@@ -181,7 +181,7 @@ class TestGpuModeEvaluationResult:
         inner = EvalResult(status="failed", log_excerpt="error")
         wrapper = GpuModeEvaluationResult(inner)
 
-        assert wrapper.is_success() is False
+        assert wrapper.succeeded() is False
 
     def test_get_metrics_excludes_log(self):
         from k_search.modular.adapters.wrappers import GpuModeEvaluationResult
@@ -271,7 +271,7 @@ class GpuModeEvaluationResult:
         self._inner = inner
 
     # New protocol methods
-    def is_success(self) -> bool:
+    def succeeded(self) -> bool:
         return self._inner.is_passed()
 
     def get_metrics(self) -> dict[str, Any]:
@@ -409,7 +409,7 @@ class TestRound:
         )
 
         assert outcome.solution.name == "test"
-        assert outcome.result.is_success()
+        assert outcome.result.succeeded()
 ```
 
 **Step 2: Run test to verify it fails**
@@ -976,7 +976,7 @@ class _GpuModeScorer:
     """Uses inverse latency as score."""
 
     def score(self, result: EvaluationResult) -> float:
-        if not result.is_success():
+        if not result.succeeded():
             return -1.0
         metrics = result.get_metrics()
         latency = metrics.get("latency_ms")

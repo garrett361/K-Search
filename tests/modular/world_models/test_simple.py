@@ -44,7 +44,7 @@ def test_propose_calls_llm_with_history():
     first = Node(parent=root, status="closed")
     mock_round = MagicMock()
     mock_round.score = 0.5
-    mock_round.result.is_success.return_value = True
+    mock_round.result.succeeded.return_value = True
     first.cycle = Cycle(rounds=[mock_round])
     tree.add_node(first)
 
@@ -85,7 +85,7 @@ def test_propose_passes_context_to_prompt_fn():
     first = Node(parent=root, status="closed")
     mock_round = MagicMock()
     mock_round.score = 0.5
-    mock_round.result.is_success.return_value = True
+    mock_round.result.succeeded.return_value = True
     first.cycle = Cycle(rounds=[mock_round])
     tree.add_node(first)
 

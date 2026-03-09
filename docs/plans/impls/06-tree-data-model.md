@@ -143,7 +143,7 @@ from k_search.modular.world.cycle import Cycle
 
 def _mock_round(success: bool, score: float) -> MagicMock:
     r = MagicMock()
-    r.result.is_success.return_value = success
+    r.result.succeeded.return_value = success
     r.score = score
     return r
 
@@ -193,13 +193,13 @@ class Cycle:
     @property
     def best_round(self) -> Round | None:
         """Return highest-scoring successful round, or None."""
-        successful = [r for r in self.rounds if r.result.is_success()]
+        successful = [r for r in self.rounds if r.result.succeeded()]
         return max(successful, key=lambda r: r.score) if successful else None
 
     @property
     def succeeded(self) -> bool:
         """Return True if any round succeeded."""
-        return any(r.result.is_success() for r in self.rounds)
+        return any(r.result.succeeded() for r in self.rounds)
 ```
 
 **Step 4: Run test (should pass)**

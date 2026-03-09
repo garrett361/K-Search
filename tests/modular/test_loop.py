@@ -5,10 +5,10 @@ from unittest.mock import Mock
 from k_search.modular import SearchConfig, SearchResult, run_search
 
 
-def make_eval_result_mock(is_success: bool = True, metrics: dict | None = None) -> Mock:
+def make_eval_result_mock(succeeded: bool = True, metrics: dict | None = None) -> Mock:
     """Create a mock EvaluationResult."""
     result = Mock()
-    result.is_success.return_value = is_success
+    result.succeeded.return_value = succeeded
     result.get_metrics.return_value = metrics or {"speedup_factor": 1.0}
     result.get_log.return_value = "test log"
     return result

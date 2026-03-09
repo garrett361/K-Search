@@ -155,7 +155,7 @@ while rounds < max_rounds:
 - Retry/fallback behavior on world model failures
 
 **Naming cleanup:**
-- Rename `EvaluationResult.is_success()` to `succeeded` property for consistency with `Cycle.succeeded`
+- Rename `EvaluationResult.succeeded()` to `succeeded` property for consistency with `Cycle.succeeded`
 
 ## References
 

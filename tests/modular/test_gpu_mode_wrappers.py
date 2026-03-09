@@ -16,7 +16,7 @@ class TestGpuModeEvaluationResult:
         inner = EvalResult(status="passed", latency_ms=1.5, log_excerpt="test log")
         wrapper = GpuModeEvaluationResult(inner)
 
-        assert wrapper.is_success() is True
+        assert wrapper.succeeded() is True
         assert wrapper.get_log() == "test log"
 
     def test_is_success_false_for_failed(self):
@@ -25,7 +25,7 @@ class TestGpuModeEvaluationResult:
         inner = EvalResult(status="failed", log_excerpt="error")
         wrapper = GpuModeEvaluationResult(inner)
 
-        assert wrapper.is_success() is False
+        assert wrapper.succeeded() is False
 
     def test_get_metrics_excludes_log(self):
         from k_search.modular.adapters.gpu_mode import GpuModeEvaluationResult
@@ -202,4 +202,4 @@ class TestRound:
         )
 
         assert round_.impl.name == "test"
-        assert round_.result.is_success()
+        assert round_.result.succeeded()

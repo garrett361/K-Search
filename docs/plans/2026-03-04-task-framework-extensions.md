@@ -516,7 +516,7 @@ class NcuAnalyzer:
         ]
 
     def analyze(self, solution: Implementation, result: EvaluationResult) -> AnalysisResult:
-        if not result.is_success():
+        if not result.succeeded():
             return AnalysisResult(summary="Skipped (eval failed)", metrics={})
 
         # Run NCU
@@ -629,8 +629,8 @@ class SmartFeedbackProvider:
             return self._single_feedback(outcomes)
 
         # Analyze patterns
-        passed = [o for o in outcomes if o.result.is_success()]
-        failed = [o for o in outcomes if not o.result.is_success()]
+        passed = [o for o in outcomes if o.result.succeeded()]
+        failed = [o for o in outcomes if not o.result.succeeded()]
 
         sections = []
 

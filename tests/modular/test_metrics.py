@@ -94,7 +94,7 @@ class TestBuildRoundMetrics:
     @pytest.fixture
     def mock_eval_result(self):
         result = Mock()
-        result.is_success.return_value = True
+        result.succeeded.return_value = True
         result.get_metrics.return_value = {"speedup_factor": 1.5}
         return result
 
@@ -114,7 +114,7 @@ class TestBuildRoundMetrics:
         assert metrics == {
             "round_time_secs": 3.5,
             "score": 0.6,
-            "is_success": 1,
+            "succeeded": 1,
             "best_score": 0.7,
             "toks/prompt": 200,
             "toks/completion": 100,
@@ -126,7 +126,7 @@ class TestBuildRoundMetrics:
         }
 
     def test_is_success_converts_to_int(self, mock_eval_result):
-        mock_eval_result.is_success.return_value = False
+        mock_eval_result.succeeded.return_value = False
         metrics = _build_round_metrics(
             round_time_secs=5.0,
             score=0.0,
@@ -138,7 +138,7 @@ class TestBuildRoundMetrics:
             cumulative_completion_toks=50,
         )
 
-        assert metrics["is_success"] == 0
+        assert metrics["succeeded"] == 0
 
     def test_includes_numeric_eval_metrics(self, mock_eval_result):
         mock_eval_result.get_metrics.return_value = {
@@ -202,7 +202,7 @@ class TestBuildRoundMetrics:
         expected_keys = {
             "round_time_secs",
             "score",
-            "is_success",
+            "succeeded",
             "best_score",
             "toks/prompt",
             "toks/completion",

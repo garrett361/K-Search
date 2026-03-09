@@ -332,7 +332,7 @@ class TestBuildRoundMetrics:
         from k_search.modular.loop import _build_round_metrics
 
         result = make_eval_result_mock(
-            is_success=True, metrics={"latency_ms": 5.0, "speedup_factor": 2.0}
+            succeeded=True, metrics={"latency_ms": 5.0, "speedup_factor": 2.0}
         )
 
         metrics = _build_round_metrics(
@@ -346,7 +346,7 @@ class TestBuildRoundMetrics:
 
         assert metrics["round_time_secs"] == 1.5
         assert metrics["score"] == 0.8
-        assert metrics["is_success"] == 1
+        assert metrics["succeeded"] == 1
         assert metrics["best_score"] == 0.8
         assert metrics["prompt_tokens_est"] == 100
         assert metrics["completion_tokens_est"] == 50
@@ -358,7 +358,7 @@ class TestBuildRoundMetrics:
         from k_search.modular.loop import _build_round_metrics
 
         result = make_eval_result_mock(
-            is_success=True,
+            succeeded=True,
             metrics={"latency_ms": 5.0, "status": "passed", "passed": True},
         )
 
@@ -396,7 +396,7 @@ def _build_round_metrics(
     metrics: dict[str, float | int] = {
         "round_time_secs": round_time_secs,
         "score": score,
-        "is_success": int(result.is_success()),
+        "succeeded": int(result.succeeded()),
         "best_score": best_score,
         "prompt_tokens_est": cumulative_prompt_tokens,
         "completion_tokens_est": cumulative_completion_tokens,
@@ -459,7 +459,7 @@ class TestRunSearchWithMetrics:
         task = make_task_mock()
         task.scorer.score.return_value = 0.75
         result = make_eval_result_mock(
-            is_success=True, metrics={"latency_ms": 10.0, "speedup_factor": 1.5}
+            succeeded=True, metrics={"latency_ms": 10.0, "speedup_factor": 1.5}
         )
         evaluator = make_evaluator_mock(result)
         config = SearchConfig(max_rounds=1)
@@ -469,7 +469,7 @@ class TestRunSearchWithMetrics:
 
         logged = tracker.log.call_args[0][0]
         assert logged["score"] == 0.75
-        assert logged["is_success"] == 1
+        assert logged["succeeded"] == 1
         assert logged["latency_ms"] == 10.0
         assert logged["speedup_factor"] == 1.5
 
@@ -562,7 +562,7 @@ def _build_round_metrics(
     metrics: dict[str, float | int] = {
         "round_time_secs": round_time_secs,
         "score": score,
-        "is_success": int(result.is_success()),
+        "succeeded": int(result.succeeded()),
         "best_score": best_score,
         "prompt_tokens_est": cumulative_prompt_tokens,
         "completion_tokens_est": cumulative_completion_tokens,

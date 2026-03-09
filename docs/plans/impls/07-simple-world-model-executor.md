@@ -344,7 +344,7 @@ class SequentialExecutor:
         for store in self._artifact_stores:
             store.store(round, round_idx)
 
-        logger.info(f"Round {round_idx + 1}: score={score:.4f}, success={result.is_success()}")
+        logger.info(f"Round {round_idx + 1}: score={score:.4f}, success={result.succeeded()}")
 ```
 
 **Commit:**
@@ -502,7 +502,7 @@ def _mock_evaluator(success=True):
     """Create mock evaluator."""
     evaluator = MagicMock()
     result = MagicMock()
-    result.is_success.return_value = success
+    result.succeeded.return_value = success
     result.get_metrics.return_value = {}
     result.get_log.return_value = ""
     evaluator.evaluate.return_value = result
@@ -815,7 +815,7 @@ def test_action_prompt_with_history():
 
     best = Node(parent=root, status="closed")
     mock_round = MagicMock()
-    mock_round.result.is_success.return_value = True
+    mock_round.result.succeeded.return_value = True
     mock_round.score = 0.8
     best.cycle = Cycle(rounds=[mock_round])
     tree.add_node(best)

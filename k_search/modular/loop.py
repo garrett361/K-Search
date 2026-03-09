@@ -35,7 +35,7 @@ def _build_round_metrics(
     metrics = {
         "round_time_secs": round_time_secs,
         "score": score,
-        "is_success": int(result.is_success()),
+        "succeeded": int(result.succeeded()),
         "best_score": best_score,
         "toks/prompt": prompt_toks,
         "toks/completion": completion_toks,

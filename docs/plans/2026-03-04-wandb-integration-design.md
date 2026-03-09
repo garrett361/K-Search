@@ -61,7 +61,7 @@ class ArtifactStore(Protocol):
 
 `Round` already contains:
 - `impl: Implementation` → code content via `impl.content`
-- `result: EvaluationResult` → metrics via `result.get_metrics()`, status via `result.is_success()`
+- `result: EvaluationResult` → metrics via `result.get_metrics()`, status via `result.succeeded()`
 
 ## Configuration
 
@@ -137,7 +137,7 @@ Per-round (step=round_idx), all cumulative where applicable:
 |--------|--------|
 | `round_time_secs` | this round's duration |
 | `score` | `task.scorer.score(result)` |
-| `is_success` | `result.is_success()` as 0/1 |
+| `succeeded` | `result.succeeded()` as 0/1 |
 | `best_score` | running best |
 | `prompt_tokens_est` | cumulative |
 | `completion_tokens_est` | cumulative |
@@ -160,7 +160,7 @@ def _build_round_metrics(
     metrics = {
         "round_time_secs": round_time_secs,
         "score": score,
-        "is_success": int(result.is_success()),
+        "succeeded": int(result.succeeded()),
         "best_score": best_score,
         "prompt_tokens_est": cumulative_prompt_tokens,
         "completion_tokens_est": cumulative_completion_tokens,
@@ -228,12 +228,12 @@ class GpuModeImplementation:
 └── round_{idx}/
     ├── code/
     │   └── kernel.py      # copied from artifact_dir()
-    └── metadata.json      # { name, is_success, ...get_metrics() }
+    └── metadata.json      # { name, succeeded, ...get_metrics() }
 ```
 
 ### Storage Behavior
 
-- `only_store_successes=True` (default): only store when `result.is_success()`
+- `only_store_successes=True` (default): only store when `result.succeeded()`
 - `only_store_successes=False`: store every round
 
 ### Artifact Store Usage

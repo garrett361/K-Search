@@ -21,7 +21,7 @@ def _mock_evaluator(success=True):
     """Create mock evaluator."""
     evaluator = MagicMock()
     result = MagicMock()
-    result.is_success.return_value = success
+    result.succeeded.return_value = success
     result.get_metrics.return_value = {}
     result.get_log.return_value = ""
     evaluator.evaluate.return_value = result

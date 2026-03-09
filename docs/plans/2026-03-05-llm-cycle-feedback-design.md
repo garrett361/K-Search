@@ -91,7 +91,7 @@ class LLMFailureAnalyzer:
         context: dict[str, Any] | None = None,
     ) -> AnalysisResult | None:
         cycle_outcomes = (context or {}).get("cycle_outcomes", [])
-        failures = [o for o in cycle_outcomes if not o.result.is_success()]
+        failures = [o for o in cycle_outcomes if not o.result.succeeded()]
 
         if len(failures) < self.config.min_failures:
             return None
@@ -151,7 +151,7 @@ The loop/orchestrator tracks cycle history and invokes analyzers:
 │       result = evaluator.evaluate(impl)                         │
 │       outcome = Round(impl, result)                       │
 │                                                                 │
-│       if not result.is_success():                                   │
+│       if not result.succeeded():                                   │
 │           cycle_outcomes.append(outcome)                        │
 │           if analyzer:                                          │
 │               analysis = analyzer.analyze(                      │

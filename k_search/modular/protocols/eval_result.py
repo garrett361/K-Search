@@ -6,7 +6,7 @@ from typing import Any, Protocol
 class EvaluationResult(Protocol):
     """Generic evaluation result."""
 
-    def is_success(self) -> bool:
+    def succeeded(self) -> bool:
         """Return True if evaluation passed."""
         ...
 

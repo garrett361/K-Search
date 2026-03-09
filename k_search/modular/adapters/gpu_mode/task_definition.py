@@ -66,7 +66,7 @@ class _CorrectnessChecker:
 
 class _Scorer:
     def score(self, result: EvaluationResult) -> float:
-        if not result.is_success():
+        if not result.succeeded():
             return 0.0
         metrics = result.get_metrics()
         latency = metrics.get("latency_ms")

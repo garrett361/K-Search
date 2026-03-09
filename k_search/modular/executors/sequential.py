@@ -93,7 +93,7 @@ class SequentialExecutor:
         score = self._task.scorer.score(result)
 
         logger.debug(
-            "Evaluation result: success=%s, score=%.4f", result.is_success(), score
+            "Evaluation result: success=%s, score=%.4f", result.succeeded(), score
         )
         metrics = result.get_metrics()
         if metrics:
@@ -124,5 +124,5 @@ class SequentialExecutor:
             store.store(round, round_idx)
 
         logger.info(
-            f"Round {round_idx + 1}: score={score:.4f}, success={result.is_success()}"
+            f"Round {round_idx + 1}: score={score:.4f}, success={result.succeeded()}"
         )

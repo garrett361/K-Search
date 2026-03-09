@@ -29,7 +29,7 @@ def mock_artifact_dir(files: dict[str, str]) -> Iterator[Path | None]:
 
 
 def make_round_mock(
-    is_success: bool = True,
+    succeeded: bool = True,
     name: str = "test_impl",
     metrics: dict | None = None,
     files: dict[str, str] | None = None,
@@ -39,7 +39,7 @@ def make_round_mock(
     impl.artifact_dir = lambda: mock_artifact_dir(files or {"kernel.py": "# code"})
 
     result = Mock()
-    result.is_success.return_value = is_success
+    result.succeeded.return_value = succeeded
     result.get_metrics.return_value = metrics or {"latency_ms": 10.0}
 
     return Round(
@@ -50,7 +50,7 @@ def make_round_mock(
         prompt_tokens=0,
         completion_tokens=0,
         duration_secs=0.0,
-        score=1.0 if is_success else 0.0,
+        score=1.0 if succeeded else 0.0,
     )
 
 
@@ -100,10 +100,10 @@ class TestLocalArtifactStore:
         config = ArtifactConfig(output_dir=tmp_path, only_store_successes=True)
         store = LocalArtifactStore(config)
 
-        store.store(make_round_mock(is_success=False), round_idx=0)
+        store.store(make_round_mock(succeeded=False), round_idx=0)
         assert not (tmp_path / "round_0").exists()
 
-        store.store(make_round_mock(is_success=True), round_idx=1)
+        store.store(make_round_mock(succeeded=True), round_idx=1)
         assert (tmp_path / "round_1").is_dir()
 
     def test_handles_nested_file_paths(self, tmp_path):
@@ -148,7 +148,7 @@ class TestWandbArtifactStore:
 
             store = WandbArtifactStore(ArtifactConfig(wandb=True, only_store_successes=True))
 
-            store.store(make_round_mock(is_success=False), round_idx=0)
+            store.store(make_round_mock(succeeded=False), round_idx=0)
             mock_wandb.Artifact.assert_not_called()
 
 

@@ -168,7 +168,7 @@ Single-source visual reference consolidating `2026-03-04-task-framework-design.m
 │  ┌─────────────────────────────────┐  ┌─────────────────────────────────┐   │
 │  │ CheckResult (dataclass) ✅      │  │ EvaluationResult (Protocol) ✅  │   │
 │  │                                 │  │                                 │   │
-│  │ passed: bool                    │  │ is_success() -> bool            │   │
+│  │ passed: bool                    │  │ succeeded() -> bool            │   │
 │  │ message: str                    │  │ get_metrics() -> dict[str, Any] │   │
 │  │ criteria: dict[str, Any] | None │  │ get_log() -> str                │   │
 │  └─────────────────────────────────┘  └─────────────────────────────────┘   │

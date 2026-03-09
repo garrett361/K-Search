@@ -7,7 +7,7 @@ from k_search.modular.world.cycle import Cycle
 
 def _mock_round(success: bool, score: float) -> MagicMock:
     r = MagicMock()
-    r.result.is_success.return_value = success
+    r.result.succeeded.return_value = success
     r.score = score
     return r
 
