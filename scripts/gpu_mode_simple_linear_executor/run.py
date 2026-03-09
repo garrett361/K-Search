@@ -72,23 +72,24 @@ Rules:
 
 Respond with only the action title (one line, no explanation)."""
 
-FAILURE_ANALYSIS_PROMPT = """Analyze this compilation/runtime error:
+FAILURE_ANALYSIS_PROMPT = """Review this Triton/CUDA code that failed. The error shown may be just the first issue encountered - analyze the ENTIRE code for ALL potential problems.
 
+Error that was raised:
 ```
 {error_log}
 ```
 
-Code that caused the error:
+Code to review:
 ```python
 {failed_code}
 ```
 
 Provide:
-1. Root cause (1-2 sentences)
-2. How to fix it
-3. Corrected code snippet showing the fix
+1. List ALL issues you find (not just the one that triggered the error)
+2. For each issue: what's wrong and how to fix it
+3. A corrected code snippet addressing all issues
 
-Be concise."""
+Be thorough but concise."""
 
 LLMCallable = Callable[[str], str]
 
