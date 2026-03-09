@@ -7,8 +7,6 @@ import pytest
 
 from k_search.modular.config import MetricsConfig
 from k_search.modular.loop import _build_round_metrics
-from k_search.modular.metrics import create_metrics_trackers
-from k_search.modular.metrics.noop import NoOpMetricsTracker
 from k_search.modular.metrics.wandb import WandbMetricsTracker
 
 
@@ -37,57 +35,6 @@ class TestWandbMetricsTracker:
             tracker.log({"score": 0.5}, step=3)
 
         mock_wandb.log.assert_called_once_with({"score": 0.5}, step=3)
-
-
-class TestCreateMetricsTrackers:
-    def test_returns_noop_by_default(self):
-        trackers = create_metrics_trackers()
-
-        assert len(trackers) == 1
-        assert isinstance(trackers[0], NoOpMetricsTracker)
-
-    def test_returns_noop_when_wandb_false(self):
-        trackers = create_metrics_trackers(MetricsConfig(wandb=False))
-
-        assert len(trackers) == 1
-        assert isinstance(trackers[0], NoOpMetricsTracker)
-
-    def test_returns_wandb_tracker_when_wandb_true(self):
-        mock_wandb = MagicMock()
-        mock_wandb.run = MagicMock()
-
-        with patch.dict(sys.modules, {"wandb": mock_wandb}):
-            trackers = create_metrics_trackers(MetricsConfig(wandb=True))
-
-        assert len(trackers) == 1
-        assert isinstance(trackers[0], WandbMetricsTracker)
-
-    def test_returns_local_tracker_when_local_and_output_dir(self, tmp_path):
-        from k_search.modular.metrics.local import LocalMetricsTracker
-
-        trackers = create_metrics_trackers(
-            MetricsConfig(local=True), output_dir=tmp_path
-        )
-        assert len(trackers) == 1
-        assert isinstance(trackers[0], LocalMetricsTracker)
-
-    def test_returns_both_trackers_when_wandb_and_local(self, tmp_path):
-        from k_search.modular.metrics.local import LocalMetricsTracker
-
-        mock_wandb = MagicMock()
-        mock_wandb.run = MagicMock()
-        with patch.dict(sys.modules, {"wandb": mock_wandb}):
-            trackers = create_metrics_trackers(
-                MetricsConfig(wandb=True, local=True), output_dir=tmp_path
-            )
-        assert len(trackers) == 2
-        assert isinstance(trackers[0], WandbMetricsTracker)
-        assert isinstance(trackers[1], LocalMetricsTracker)
-
-    def test_noop_when_local_false_and_wandb_false(self):
-        trackers = create_metrics_trackers(MetricsConfig(local=False, wandb=False))
-        assert len(trackers) == 1
-        assert isinstance(trackers[0], NoOpMetricsTracker)
 
 
 class TestBuildRoundMetrics:

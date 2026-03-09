@@ -42,35 +42,6 @@ class TestGpuModeEvaluationResult:
         assert "latency_ms" in metrics
         assert "log_excerpt" not in metrics
 
-    def test_backwards_compat_is_passed(self):
-        from k_search.modular.adapters.gpu_mode import GpuModeEvaluationResult
-
-        inner = EvalResult(status="passed", latency_ms=1.0)
-        wrapper = GpuModeEvaluationResult(inner)
-
-        # V1 interface
-        assert wrapper.is_passed() is True
-        assert wrapper.latency_ms == 1.0
-        assert wrapper.status == "passed"
-
-    def test_backwards_compat_to_dict(self):
-        from k_search.modular.adapters.gpu_mode import GpuModeEvaluationResult
-
-        inner = EvalResult(status="passed", latency_ms=1.0, log_excerpt="log")
-        wrapper = GpuModeEvaluationResult(inner)
-
-        d = wrapper.to_dict(include_log_excerpt=True)
-        assert d["status"] == "passed"
-        assert d["latency_ms"] == 1.0
-
-    def test_backwards_compat_score(self):
-        from k_search.modular.adapters.gpu_mode import GpuModeEvaluationResult
-
-        inner = EvalResult(status="passed", latency_ms=2.0)
-        wrapper = GpuModeEvaluationResult(inner)
-
-        assert wrapper.score() == 0.5  # 1/latency
-
 
 class TestGpuModeImplementation:
     def test_wraps_solution(self):

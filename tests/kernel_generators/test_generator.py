@@ -45,10 +45,8 @@ class TestRITSAPIIntegration:
         assert response.output_text is not None
         assert len(response.output_text) > 0
 
-        assert hasattr(response, "usage"), "Response should have usage statistics"
-        assert hasattr(response.usage, "output_tokens_details"), (
-            "Usage should have output_tokens_details"
-        )
+        assert response.usage is not None
+        assert response.usage.output_tokens_details is not None
         reasoning_tokens = getattr(
             response.usage.output_tokens_details, "reasoning_tokens", 0
         )

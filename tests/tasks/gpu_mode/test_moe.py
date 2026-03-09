@@ -7,14 +7,22 @@ from pathlib import Path
 import pytest
 import torch
 
-_TASK_DIR = Path(__file__).parent.parent.parent.parent / "k_search" / "tasks" / "gpu_mode" / "moe"
+_TASK_DIR = (
+    Path(__file__).parent.parent.parent.parent
+    / "k_search"
+    / "tasks"
+    / "gpu_mode"
+    / "moe"
+)
 
 # Add task dir to sys.path for internal imports within the task modules
 sys.path.insert(0, str(_TASK_DIR))
 
 
 def _load_module(name: str):
-    spec = importlib.util.spec_from_file_location(f"moe_{name}", _TASK_DIR / f"{name}.py")
+    spec = importlib.util.spec_from_file_location(
+        f"moe_{name}", _TASK_DIR / f"{name}.py"
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -147,7 +155,9 @@ class TestGenerateInput:
         assert w1.is_cuda, f"w1 should be on CUDA, got {w1.device}"
         assert w2.is_cuda, f"w2 should be on CUDA, got {w2.device}"
         assert w3.is_cuda, f"w3 should be on CUDA, got {w3.device}"
-        assert num_tokens_per_expert.is_cuda, f"num_tokens_per_expert should be on CUDA, got {num_tokens_per_expert.device}"
+        assert num_tokens_per_expert.is_cuda, (
+            f"num_tokens_per_expert should be on CUDA, got {num_tokens_per_expert.device}"
+        )
 
 
 @pytest.mark.cuda

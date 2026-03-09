@@ -36,7 +36,9 @@ class TestFindConfigFile:
 
         assert _find_config_file() == config_file
 
-    def test_raises_when_not_found(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    def test_raises_when_not_found(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
         monkeypatch.delenv("MODEL_ENDPOINTS_FILE", raising=False)
         monkeypatch.chdir(tmp_path)
 
@@ -66,7 +68,9 @@ class TestGetEndpoints:
 
         assert get_endpoint("model-b") == "https://b.com/v1"
 
-    def test_get_endpoint_missing_model(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    def test_get_endpoint_missing_model(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
         config_file = tmp_path / "model_endpoints.json"
         config_file.write_text(json.dumps({"model-c": "https://c.com/v1"}))
         monkeypatch.setenv("MODEL_ENDPOINTS_FILE", str(config_file))

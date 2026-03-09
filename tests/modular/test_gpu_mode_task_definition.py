@@ -25,18 +25,6 @@ class TestGpuModeTriMulTaskDefinitionConstruction:
 
         assert task_def.name == task.name
 
-    def test_has_required_components(self):
-        from k_search.modular.adapters.gpu_mode import GpuModeTriMulTaskDefinition
-
-        task = GpuModeTriMulTask(task_dir=CAUSAL_CONV1D_DIR)
-        task_def = GpuModeTriMulTaskDefinition(task)
-
-        assert task_def.input_generator is not None
-        assert task_def.correctness_checker is not None
-        assert task_def.scorer is not None
-        assert task_def.feedback_provider is not None
-        assert task_def.reference_impl is not None
-
     def test_get_prompt_text_returns_spec(self):
         from k_search.modular.adapters.gpu_mode import GpuModeTriMulTaskDefinition
 

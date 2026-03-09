@@ -37,7 +37,7 @@ def pytest_configure(config: pytest.Config) -> None:
     # tests claim it.
     config.addinivalue_line(
         "markers",
-        "cuda_subprocess: spawns CUDA subprocess (must run before in-process CUDA tests)"
+        "cuda_subprocess: spawns CUDA subprocess (must run before in-process CUDA tests)",
     )
     config.addinivalue_line("markers", "slow: marks tests as slow")
 

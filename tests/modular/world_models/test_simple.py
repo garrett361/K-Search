@@ -41,6 +41,7 @@ def test_propose_calls_llm_with_history():
 
     # Add a successful node so tree has history
     from k_search.modular.world.cycle import Cycle
+
     first = Node(parent=root, status="closed")
     mock_round = MagicMock()
     mock_round.score = 0.5
@@ -82,6 +83,7 @@ def test_propose_passes_context_to_prompt_fn():
 
     # Add history so prompt_fn is called
     from k_search.modular.world.cycle import Cycle
+
     first = Node(parent=root, status="closed")
     mock_round = MagicMock()
     mock_round.score = 0.5

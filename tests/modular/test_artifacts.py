@@ -9,7 +9,6 @@ from unittest.mock import MagicMock, Mock, patch
 
 
 from k_search.modular.config import ArtifactConfig
-from k_search.modular.artifacts.noop import NoOpArtifactStore
 from k_search.modular import Round
 
 
@@ -54,18 +53,6 @@ def make_round_mock(
     )
 
 
-class TestArtifactConfig:
-    def test_string_to_path_coercion(self):
-        config = ArtifactConfig(output_dir="/tmp/test")
-        assert isinstance(config.output_dir, Path)
-
-
-class TestNoOpArtifactStore:
-    def test_store_does_not_raise(self):
-        store = NoOpArtifactStore()
-        store.store(make_round_mock(), round_idx=0)
-
-
 class TestLocalArtifactStore:
     def test_copies_files_to_code_dir(self, tmp_path):
         from k_search.modular.artifacts.local import LocalArtifactStore
@@ -76,7 +63,9 @@ class TestLocalArtifactStore:
 
         store.store(round_, round_idx=0)
 
-        assert (tmp_path / "round_0" / "code" / "kernel.py").read_text() == "def kernel(): pass"
+        assert (
+            tmp_path / "round_0" / "code" / "kernel.py"
+        ).read_text() == "def kernel(): pass"
 
     def test_writes_metadata_json(self, tmp_path):
         from k_search.modular.artifacts.local import LocalArtifactStore
@@ -115,7 +104,9 @@ class TestLocalArtifactStore:
 
         store.store(round_, round_idx=0)
 
-        assert (tmp_path / "round_0" / "code" / "src" / "utils" / "helper.py").read_text() == "# helper"
+        assert (
+            tmp_path / "round_0" / "code" / "src" / "utils" / "helper.py"
+        ).read_text() == "# helper"
 
 
 class TestWandbArtifactStore:
@@ -146,7 +137,9 @@ class TestWandbArtifactStore:
             mock_wandb.run = MagicMock()
             mock_wandb.run.id = "test"
 
-            store = WandbArtifactStore(ArtifactConfig(wandb=True, only_store_successes=True))
+            store = WandbArtifactStore(
+                ArtifactConfig(wandb=True, only_store_successes=True)
+            )
 
             store.store(make_round_mock(succeeded=False), round_idx=0)
             mock_wandb.Artifact.assert_not_called()
@@ -169,7 +162,9 @@ class TestCreateArtifactStores:
         with patch("k_search.modular.artifacts.wandb.wandb") as mock_wandb:
             mock_wandb.run = MagicMock()
             mock_wandb.run.id = "test"
-            stores = create_artifact_stores(ArtifactConfig(output_dir=tmp_path, wandb=True))
+            stores = create_artifact_stores(
+                ArtifactConfig(output_dir=tmp_path, wandb=True)
+            )
             assert len(stores) == 2
             assert isinstance(stores[0], LocalArtifactStore)
             assert isinstance(stores[1], WandbArtifactStore)

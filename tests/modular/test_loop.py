@@ -297,7 +297,9 @@ class TestCreateImpl:
         mock_task = MagicMock()
         mock_task.name = "test_task"
 
-        with patch("k_search.modular.adapters.gpu_mode.task_definition._load_reference_module"):
+        with patch(
+            "k_search.modular.adapters.gpu_mode.task_definition._load_reference_module"
+        ):
             task_def = GpuModeTriMulTaskDefinition(mock_task)
 
         assert task_def.create_impl("code1").name == "test_task_r0"

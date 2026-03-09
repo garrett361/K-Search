@@ -78,7 +78,9 @@ class TestWorldModelLLMIntegration:
 
         obj = load_world_model_obj(parsed)
         assert obj is not None, "Failed to load world model object"
-        assert "decision_tree" in obj, f"Missing decision_tree. Keys: {list(obj.keys())}"
+        assert "decision_tree" in obj, (
+            f"Missing decision_tree. Keys: {list(obj.keys())}"
+        )
 
     def test_chat_completion_has_executable_action_nodes(
         self, generator: KernelGenerator, real_init_prompt: str
@@ -128,7 +130,9 @@ class TestWorldModelLLMIntegration:
             action = node["action"]
             node_id = node.get("node_id", "unknown")
             assert action.get("title"), f"Node {node_id} missing action.title"
-            assert "score_0_to_1" in action, f"Node {node_id} missing action.score_0_to_1"
+            assert "score_0_to_1" in action, (
+                f"Node {node_id} missing action.score_0_to_1"
+            )
             assert "difficulty_1_to_5" in action, (
                 f"Node {node_id} missing action.difficulty_1_to_5"
             )

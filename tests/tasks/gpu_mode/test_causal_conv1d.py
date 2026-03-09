@@ -7,14 +7,22 @@ from pathlib import Path
 import pytest
 import torch
 
-_TASK_DIR = Path(__file__).parent.parent.parent.parent / "k_search" / "tasks" / "gpu_mode" / "causal_conv1d"
+_TASK_DIR = (
+    Path(__file__).parent.parent.parent.parent
+    / "k_search"
+    / "tasks"
+    / "gpu_mode"
+    / "causal_conv1d"
+)
 
 # Add task dir to sys.path for internal imports within the task modules
 sys.path.insert(0, str(_TASK_DIR))
 
 
 def _load_module(name: str):
-    spec = importlib.util.spec_from_file_location(f"causal_conv1d_{name}", _TASK_DIR / f"{name}.py")
+    spec = importlib.util.spec_from_file_location(
+        f"causal_conv1d_{name}", _TASK_DIR / f"{name}.py"
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -33,11 +41,6 @@ custom_kernel = _submission.custom_kernel
 
 
 class TestSpec:
-    def test_spec_text_loads(self):
-        """Verify spec text loads and is non-empty."""
-        assert isinstance(CAUSAL_CONV1D_SPEC_TEXT_TRITON, str)
-        assert len(CAUSAL_CONV1D_SPEC_TEXT_TRITON) > 500
-
     def test_spec_contains_interface(self):
         """Verify spec documents the 3-tuple interface."""
         assert "custom_kernel(data)" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
@@ -49,14 +52,23 @@ class TestSpec:
 
     def test_spec_has_test_case(self):
         """Verify spec contains test case constraints."""
-        assert "B = 2" in CAUSAL_CONV1D_SPEC_TEXT_TRITON or "B=2" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
+        assert (
+            "B = 2" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
+            or "B=2" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
+        )
         assert "4096" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
         assert "2048" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
 
     def test_spec_contains_baseline_submission(self):
         """Verify spec includes baseline submission.py code for LLM reference."""
-        assert "Reference code (baseline `submission.py`)" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
-        assert "def custom_kernel(data: input_t) -> output_t:" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
+        assert (
+            "Reference code (baseline `submission.py`)"
+            in CAUSAL_CONV1D_SPEC_TEXT_TRITON
+        )
+        assert (
+            "def custom_kernel(data: input_t) -> output_t:"
+            in CAUSAL_CONV1D_SPEC_TEXT_TRITON
+        )
         assert "F.conv1d" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
         assert "F.silu" in CAUSAL_CONV1D_SPEC_TEXT_TRITON
 

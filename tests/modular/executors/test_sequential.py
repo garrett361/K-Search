@@ -55,8 +55,13 @@ def test_run_completes_rounds():
     evaluator = _mock_evaluator()
 
     executor = SequentialExecutor(
-        world_model, task, evaluator, mock_llm,
-        _simple_code_prompt_fn, tree, max_rounds=3
+        world_model,
+        task,
+        evaluator,
+        mock_llm,
+        _simple_code_prompt_fn,
+        tree,
+        max_rounds=3,
     )
     executor.run()
 
@@ -76,8 +81,13 @@ def test_run_adds_nodes_to_tree():
     evaluator = _mock_evaluator()
 
     executor = SequentialExecutor(
-        world_model, task, evaluator, mock_llm,
-        _simple_code_prompt_fn, tree, max_rounds=1
+        world_model,
+        task,
+        evaluator,
+        mock_llm,
+        _simple_code_prompt_fn,
+        tree,
+        max_rounds=1,
     )
     executor.run()
 
@@ -104,8 +114,13 @@ def test_run_stops_on_empty_select():
     evaluator = _mock_evaluator()
 
     executor = SequentialExecutor(
-        world_model, task, evaluator, mock_llm,
-        _simple_code_prompt_fn, tree, max_rounds=10
+        world_model,
+        task,
+        evaluator,
+        mock_llm,
+        _simple_code_prompt_fn,
+        tree,
+        max_rounds=10,
     )
     executor.run()
 
