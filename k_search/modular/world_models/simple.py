@@ -4,6 +4,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+from k_search.modular.logging import response_color
 from k_search.modular.world.action import Action
 from k_search.modular.world.node import Node
 from k_search.modular.world.tree import Tree
@@ -41,7 +42,7 @@ class SimpleWorldModel:
             logger.debug("Requesting action from LLM (prior rounds exist)")
             prompt = self._action_prompt_fn(tree, context)
             raw_response = self._llm(prompt)
-            logger.debug("[ACTION_RESPONSE] %s", raw_response.strip())
+            logger.debug(response_color(f"[ACTION_RESPONSE] {raw_response.strip()}"))
             action_description = raw_response.strip()
 
         action = Action(title=action_description)

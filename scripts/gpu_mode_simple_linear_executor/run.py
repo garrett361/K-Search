@@ -15,6 +15,7 @@ import openai
 
 from k_search.modular.adapters import GpuModeEvaluator, GpuModeTriMulTaskDefinition
 from k_search.modular.executors import SequentialExecutor
+from k_search.modular.logging import prompt_color
 from k_search.modular.protocols.task_definition import TaskDefinition
 from k_search.modular.world.node import Node
 from k_search.modular.world.tree import Tree
@@ -69,7 +70,11 @@ def create_action_prompt_fn(task_def: GpuModeTriMulTaskDefinition):
             task_spec=task_spec,
             feedback_section=feedback_section,
         )
-        logger.debug("[ACTION_PROMPT] (%d chars, ~%d toks):\n\n%s\n", len(prompt), len(prompt) // 4, prompt)
+        logger.debug(
+            prompt_color(
+                f"[ACTION_PROMPT] ({len(prompt)} chars, ~{len(prompt) // 4} toks):\n\n{prompt}\n"
+            )
+        )
         return prompt
 
     return action_prompt_fn
@@ -134,7 +139,11 @@ def create_code_prompt_fn(task_def: GpuModeTriMulTaskDefinition, tree: Tree):
                 prompt += f"\n\nBest Successful Solution So Far:\n{best_summary}\n\nCode:\n{best_code}"
 
         prompt += "\n\nGenerate the corrected and optimized implementation:"
-        logger.debug("[CODE_PROMPT] (%d chars, ~%d toks):\n\n%s\n", len(prompt), len(prompt) // 4, prompt)
+        logger.debug(
+            prompt_color(
+                f"[CODE_PROMPT] ({len(prompt)} chars, ~{len(prompt) // 4} toks):\n\n{prompt}\n"
+            )
+        )
         return prompt
 
     return code_prompt_fn

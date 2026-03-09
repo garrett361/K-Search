@@ -6,6 +6,7 @@ from typing import Any
 
 from k_search.modular.artifacts import NoOpArtifactStore
 from k_search.modular.config import MetricsConfig
+from k_search.modular.logging import response_color
 from k_search.modular.metrics import NoOpMetricsTracker
 from k_search.modular.protocols import ArtifactStore, Evaluator, MetricsTracker
 from k_search.modular.protocols.task_definition import TaskDefinition
@@ -56,7 +57,9 @@ class SequentialExecutor:
         TODO: termination responsibility (executor vs world model vs tree) not yet defined.
         """
         for round_idx in range(self._max_rounds):
-            logger.info("[ROUND_START] === Round %d/%d ===", round_idx + 1, self._max_rounds)
+            logger.info(
+                "[ROUND_START] === Round %d/%d ===", round_idx + 1, self._max_rounds
+            )
 
             proposed = self._world_model.propose(self._tree)
             logger.debug("World model proposed %d node(s)", len(proposed))
@@ -85,15 +88,17 @@ class SequentialExecutor:
 
         prompt = self._code_prompt_fn(node, self._task)
         code = self._llm(prompt)
-        logger.debug("[CODE_RESPONSE] (%d chars, ~%d toks):\n\n%s\n", len(code), len(code) // 4, code)
+        logger.debug(
+            response_color(
+                f"[CODE_RESPONSE] ({len(code)} chars, ~{len(code) // 4} toks):\n\n{code}\n"
+            )
+        )
 
         impl = self._task.create_impl(code)
         result = self._evaluator.evaluate(impl, context={"round_idx": round_idx})
         score = self._task.scorer.score(result)
 
-        logger.debug(
-            "[EVAL_RESULT] success=%s, score=%.4f", result.succeeded(), score
-        )
+        logger.debug("[EVAL_RESULT] success=%s, score=%.4f", result.succeeded(), score)
         metrics = result.get_metrics()
         if metrics:
             logger.debug("Evaluation metrics:\n\n%s\n", metrics)
