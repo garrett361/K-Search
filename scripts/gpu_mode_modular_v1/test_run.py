@@ -1,8 +1,20 @@
-"""Tests for modular loop module."""
+"""Tests for GPU mode modular V1 entry point."""
 
-from unittest.mock import Mock
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
-from k_search.modular import SearchConfig, SearchResult, run_search
+import pytest
+
+from k_search.modular import SearchConfig, SearchResult, Round
+from k_search.modular.adapters import GpuModeEvaluator, GpuModeTriMulTaskDefinition
+from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
+
+from scripts.gpu_mode_modular_v1.run import (
+    build_prompt,
+    run_search,
+    strip_markdown_fences,
+    _build_round_metrics,
+)
 
 
 def make_eval_result_mock(succeeded: bool = True, metrics: dict | None = None) -> Mock:
@@ -245,11 +257,7 @@ class TestSearchResult:
 
 
 class TestBuildPrompt:
-    """Tests for build_prompt function."""
-
     def test_first_round_returns_task_prompt(self):
-        from k_search.modular.prompts import build_prompt
-
         task = make_task_mock()
         task.get_prompt_text.return_value = "Task specification here"
 
@@ -259,9 +267,6 @@ class TestBuildPrompt:
         task.get_prompt_text.assert_called_once()
 
     def test_with_round_includes_feedback(self):
-        from k_search.modular import Round
-        from k_search.modular.prompts import build_prompt
-
         task = make_task_mock()
         task.get_prompt_text.return_value = "Task spec"
         task.feedback_provider.for_codegen.return_value = "Error on line 42"
@@ -287,13 +292,7 @@ class TestBuildPrompt:
 
 
 class TestCreateImpl:
-    """Tests for task.create_impl via GpuModeTriMulTaskDefinition."""
-
     def test_increments_counter(self):
-        from unittest.mock import MagicMock, patch
-
-        from k_search.modular.adapters.gpu_mode import GpuModeTriMulTaskDefinition
-
         mock_task = MagicMock()
         mock_task.name = "test_task"
 
@@ -308,38 +307,26 @@ class TestCreateImpl:
 
 
 class TestStripMarkdownFences:
-    """Tests for strip_markdown_fences function."""
-
     def test_no_fences_unchanged(self):
-        from k_search.modular.prompts import strip_markdown_fences
-
         code = "def custom_kernel():\n    pass"
         assert strip_markdown_fences(code) == code
 
     def test_strips_python_fences(self):
-        from k_search.modular.prompts import strip_markdown_fences
-
         code = "```python\ndef custom_kernel():\n    pass\n```"
         expected = "def custom_kernel():\n    pass"
         assert strip_markdown_fences(code) == expected
 
     def test_strips_triton_fences(self):
-        from k_search.modular.prompts import strip_markdown_fences
-
         code = "```triton\n@triton.jit\ndef kernel():\n    pass\n```"
         expected = "@triton.jit\ndef kernel():\n    pass"
         assert strip_markdown_fences(code) == expected
 
     def test_strips_bare_fences(self):
-        from k_search.modular.prompts import strip_markdown_fences
-
         code = "```\ndef custom_kernel():\n    pass\n```"
         expected = "def custom_kernel():\n    pass"
         assert strip_markdown_fences(code) == expected
 
     def test_extracts_first_fenced_block(self):
-        from k_search.modular.prompts import strip_markdown_fences
-
         code = (
             "Here's the code:\n```python\ndef kernel():\n    pass\n```\nAnd more text."
         )
@@ -347,17 +334,202 @@ class TestStripMarkdownFences:
         assert strip_markdown_fences(code) == expected
 
     def test_handles_empty_string(self):
-        from k_search.modular.prompts import strip_markdown_fences
-
         assert strip_markdown_fences("") == ""
         assert strip_markdown_fences(None) is None
 
     def test_handles_unclosed_fence(self):
-        from k_search.modular.prompts import strip_markdown_fences
-
         code = "```python\ndef kernel():\n    pass"
-        # Should strip the leading fence at minimum
         result = strip_markdown_fences(code)
         assert result is not None
         assert "```" not in result
         assert "def kernel():" in result
+
+
+class TestBuildRoundMetrics:
+    @pytest.fixture
+    def mock_eval_result(self):
+        result = Mock()
+        result.succeeded.return_value = True
+        result.get_metrics.return_value = {"speedup_factor": 1.5}
+        return result
+
+    def test_builds_correct_structure(self, mock_eval_result):
+        mock_eval_result.get_metrics.return_value = {"speedup_factor": 1.2}
+        metrics = _build_round_metrics(
+            round_time_secs=3.5,
+            score=0.6,
+            result=mock_eval_result,
+            best_score=0.7,
+            prompt_toks=200,
+            completion_toks=100,
+            cumulative_prompt_toks=800,
+            cumulative_completion_toks=400,
+        )
+
+        assert metrics == {
+            "round_time_secs": 3.5,
+            "score": 0.6,
+            "succeeded": 1,
+            "best_score": 0.7,
+            "toks/prompt": 200,
+            "toks/completion": 100,
+            "toks/total": 300,
+            "toks/cumulative_prompt": 800,
+            "toks/cumulative_completion": 400,
+            "toks/cumulative_total": 1200,
+            "speedup_factor": 1.2,
+        }
+
+    def test_is_success_converts_to_int(self, mock_eval_result):
+        mock_eval_result.succeeded.return_value = False
+        metrics = _build_round_metrics(
+            round_time_secs=5.0,
+            score=0.0,
+            result=mock_eval_result,
+            best_score=0.0,
+            prompt_toks=100,
+            completion_toks=50,
+            cumulative_prompt_toks=100,
+            cumulative_completion_toks=50,
+        )
+
+        assert metrics["succeeded"] == 0
+
+    def test_includes_numeric_eval_metrics(self, mock_eval_result):
+        mock_eval_result.get_metrics.return_value = {
+            "speedup_factor": 2.5,
+            "latency_ms": 10.3,
+            "memory_mb": 512,
+        }
+        metrics = _build_round_metrics(
+            round_time_secs=5.0,
+            score=0.5,
+            result=mock_eval_result,
+            best_score=0.5,
+            prompt_toks=100,
+            completion_toks=50,
+            cumulative_prompt_toks=100,
+            cumulative_completion_toks=50,
+        )
+
+        assert metrics["speedup_factor"] == 2.5
+        assert metrics["latency_ms"] == 10.3
+        assert metrics["memory_mb"] == 512
+
+    def test_excludes_non_numeric_and_bool_metrics(self, mock_eval_result):
+        mock_eval_result.get_metrics.return_value = {
+            "speedup_factor": 1.5,
+            "status": "success",
+            "error_msg": None,
+            "passed": True,
+            "has_errors": False,
+        }
+        metrics = _build_round_metrics(
+            round_time_secs=5.0,
+            score=0.5,
+            result=mock_eval_result,
+            best_score=0.5,
+            prompt_toks=100,
+            completion_toks=50,
+            cumulative_prompt_toks=100,
+            cumulative_completion_toks=50,
+        )
+
+        assert metrics["speedup_factor"] == 1.5
+        assert "status" not in metrics
+        assert "error_msg" not in metrics
+        assert "passed" not in metrics
+        assert "has_errors" not in metrics
+
+    def test_returns_expected_keys(self, mock_eval_result):
+        mock_eval_result.get_metrics.return_value = {"speedup_factor": 1.2}
+        metrics = _build_round_metrics(
+            round_time_secs=3.5,
+            score=0.6,
+            result=mock_eval_result,
+            best_score=0.7,
+            prompt_toks=200,
+            completion_toks=100,
+            cumulative_prompt_toks=800,
+            cumulative_completion_toks=400,
+        )
+
+        expected_keys = {
+            "round_time_secs",
+            "score",
+            "succeeded",
+            "best_score",
+            "toks/prompt",
+            "toks/completion",
+            "toks/total",
+            "toks/cumulative_prompt",
+            "toks/cumulative_completion",
+            "toks/cumulative_total",
+            "speedup_factor",
+        }
+        assert set(metrics.keys()) == expected_keys
+
+
+CAUSAL_CONV1D_DIR = (
+    Path(__file__).parent.parent.parent
+    / "k_search"
+    / "tasks"
+    / "gpu_mode"
+    / "causal_conv1d"
+)
+
+
+@pytest.mark.cuda
+@pytest.mark.cuda_subprocess
+class TestE2ESearch:
+    """E2E tests validating modular loop with real GPU evaluation."""
+
+    @pytest.fixture
+    def task_dir(self) -> Path:
+        return CAUSAL_CONV1D_DIR
+
+    @pytest.fixture
+    def valid_triton_code(self, task_dir: Path) -> str:
+        submission_path = task_dir / "submission.py"
+        return submission_path.read_text()
+
+    def test_single_round_with_valid_code(self, task_dir: Path, valid_triton_code: str):
+        """Run single search round with valid Triton code, verify score and metrics."""
+        gpu_task = GpuModeTriMulTask(task_dir=task_dir)
+        task_def = GpuModeTriMulTaskDefinition(gpu_task)
+        evaluator = GpuModeEvaluator(gpu_task)
+
+        def mock_llm(prompt: str) -> str:
+            return valid_triton_code
+
+        config = SearchConfig(max_rounds=1)
+        result = run_search(task_def, evaluator, mock_llm, config)
+
+        assert result.rounds_completed == 1
+        assert result.impl is not None
+        assert result.result is not None
+        assert result.score > 0, "Valid code should produce positive score"
+
+        metrics = result.result.get_metrics()
+        assert "speedup_factor" in metrics or "latency_ms" in metrics
+
+    def test_two_rounds_best_tracked(self, task_dir: Path, valid_triton_code: str):
+        """Run two rounds, verify best result is tracked correctly."""
+        gpu_task = GpuModeTriMulTask(task_dir=task_dir)
+        task_def = GpuModeTriMulTaskDefinition(gpu_task)
+        evaluator = GpuModeEvaluator(gpu_task)
+
+        call_count = 0
+
+        def mock_llm(prompt: str) -> str:
+            nonlocal call_count
+            call_count += 1
+            return valid_triton_code
+
+        config = SearchConfig(max_rounds=2)
+        result = run_search(task_def, evaluator, mock_llm, config)
+
+        assert result.rounds_completed == 2
+        assert call_count == 2
+        assert result.score > 0
+        assert result.result is not None

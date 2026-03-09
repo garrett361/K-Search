@@ -24,7 +24,7 @@ flashinfer = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["k_search*"]
+include = ["k_search*", "scripts*"]
 
 # V1 code is vendored/legacy - only lint the new modular subsystem
 [tool.ruff]

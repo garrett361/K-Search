@@ -6,7 +6,6 @@ from k_search.modular.config import (
     SearchConfig,
     SearchResult,
 )
-from k_search.modular.loop import LLMCall, run_search
 from k_search.modular.results import AnalysisResult, CheckResult
 from k_search.modular.world import Action, Cycle, Node, Round, Tree
 
@@ -43,9 +42,6 @@ __all__ = [
     "MetricsConfig",
     "SearchConfig",
     "SearchResult",
-    # Loop
-    "LLMCall",
-    "run_search",
     # Types
     "AnalysisResult",
     "CheckResult",

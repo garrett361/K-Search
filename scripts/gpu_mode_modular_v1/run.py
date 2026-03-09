@@ -1,18 +1,32 @@
 #!/usr/bin/env python3
-"""V2 Search Loop entry point."""
+"""V2 Search Loop entry point - modular framework with metrics and artifacts.
+
+Inlines the core search loop for visibility while importing shared infrastructure.
+"""
 
 import argparse
 import logging
 import os
+import re
 import sys
+import time
 from pathlib import Path
+from typing import Callable
 
 import openai
 
-from k_search.modular import run_search, SearchConfig, ArtifactConfig
-from k_search.modular.artifacts import create_artifact_stores
-from k_search.modular.config import MetricsConfig, build_run_config
-from k_search.modular.metrics import create_metrics_trackers
+from k_search.modular import SearchConfig, ArtifactConfig
+from k_search.modular.artifacts import NoOpArtifactStore, create_artifact_stores
+from k_search.modular.config import MetricsConfig, SearchResult, build_run_config
+from k_search.modular.metrics import NoOpMetricsTracker, create_metrics_trackers
+from k_search.modular.protocols import (
+    ArtifactStore,
+    Evaluator,
+    EvaluationResult,
+    MetricsTracker,
+    TaskDefinition,
+)
+from k_search.modular.world.round import Round
 from k_search.modular.adapters import GpuModeEvaluator, GpuModeTriMulTaskDefinition
 from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
 
@@ -21,6 +35,166 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+LLMCall = Callable[[str], str]
+
+
+def strip_markdown_fences(code: str | None) -> str | None:
+    """Strip markdown code fences from LLM output."""
+    if not code or "```" not in code:
+        return code
+
+    m = re.search(r"```[a-zA-Z0-9_+-]*\n([\s\S]*?)\n```", code)
+    if m:
+        return (m.group(1) or "").strip()
+
+    if code.startswith("```"):
+        lines = code.split("\n")
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        code = "\n".join(lines)
+
+    if code.endswith("```"):
+        lines = code.split("\n")
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        code = "\n".join(lines)
+
+    return code.replace("```", "").strip()
+
+
+def build_prompt(task: TaskDefinition, last_round: Round | None) -> str:
+    """Build prompt for next code generation round."""
+    base = task.get_prompt_text()
+    if last_round:
+        feedback = task.feedback_provider.for_codegen(last_round)
+        return f"{base}\n\n{feedback}"
+    return base
+
+
+def _build_round_metrics(
+    round_time_secs: float,
+    score: float,
+    result: EvaluationResult,
+    best_score: float,
+    prompt_toks: int,
+    completion_toks: int,
+    cumulative_prompt_toks: int,
+    cumulative_completion_toks: int,
+) -> dict[str, float | int]:
+    metrics = {
+        "round_time_secs": round_time_secs,
+        "score": score,
+        "succeeded": int(result.succeeded()),
+        "best_score": best_score,
+        "toks/prompt": prompt_toks,
+        "toks/completion": completion_toks,
+        "toks/total": prompt_toks + completion_toks,
+        "toks/cumulative_prompt": cumulative_prompt_toks,
+        "toks/cumulative_completion": cumulative_completion_toks,
+        "toks/cumulative_total": cumulative_prompt_toks + cumulative_completion_toks,
+    }
+
+    for key, val in result.get_metrics().items():
+        if isinstance(val, (int, float)) and not isinstance(val, bool):
+            metrics[key] = val
+
+    return metrics
+
+
+def run_search(
+    task: TaskDefinition,
+    evaluator: Evaluator,
+    llm: LLMCall,
+    config: SearchConfig,
+    metrics_trackers: list[MetricsTracker] | None = None,
+    metrics_config: MetricsConfig | None = None,
+    artifact_stores: list[ArtifactStore] | None = None,
+) -> SearchResult:
+    """Run simple sequential optimization loop."""
+    metrics_trackers = metrics_trackers or [NoOpMetricsTracker()]
+    artifact_stores = artifact_stores or [NoOpArtifactStore()]
+    metrics_config = metrics_config or MetricsConfig()
+
+    cumulative_prompt_toks = 0
+    cumulative_completion_toks = 0
+
+    best_round: Round | None = None
+    best_score = 0.0
+
+    for round_idx in range(config.max_rounds):
+        if best_round:
+            metrics = best_round.result.get_metrics()
+            speedup = metrics.get("speedup_factor", "N/A")
+            logger.info(
+                f"Round {round_idx + 1}/{config.max_rounds} | "
+                f"Best: {best_score:.4f} (speedup: {speedup})"
+            )
+        else:
+            logger.info(
+                f"Round {round_idx + 1}/{config.max_rounds} | No solution found yet"
+            )
+
+        round_start = time.perf_counter()
+
+        prompt = build_prompt(task, best_round)
+        code = llm(prompt)
+        impl = task.create_impl(code)
+        result = evaluator.evaluate(impl)
+        score = task.scorer.score(result)
+
+        prompt_toks = len(prompt) // metrics_config.chars_per_token
+        completion_toks = len(code) // metrics_config.chars_per_token
+        cumulative_prompt_toks += prompt_toks
+        cumulative_completion_toks += completion_toks
+
+        round_elapsed = time.perf_counter() - round_start
+
+        round_ = Round(
+            impl=impl,
+            result=result,
+            prompt=prompt,
+            llm_response=code,
+            prompt_tokens=prompt_toks,
+            completion_tokens=completion_toks,
+            duration_secs=round_elapsed,
+            score=score,
+        )
+
+        if score > best_score:
+            best_round = round_
+            best_score = score
+
+        cumulative_total_toks = cumulative_prompt_toks + cumulative_completion_toks
+        logger.info(
+            f"Round {round_idx + 1} complete | "
+            f"Score: {score:.4f} | "
+            f"Time: {round_elapsed:.1f}s | "
+            f"Toks: {cumulative_total_toks:,} ({cumulative_prompt_toks:,} prompt + {cumulative_completion_toks:,} completion)"
+        )
+
+        round_metrics = _build_round_metrics(
+            round_time_secs=round_elapsed,
+            score=score,
+            result=result,
+            best_score=best_score,
+            prompt_toks=prompt_toks,
+            completion_toks=completion_toks,
+            cumulative_prompt_toks=cumulative_prompt_toks,
+            cumulative_completion_toks=cumulative_completion_toks,
+        )
+        for tracker in metrics_trackers:
+            tracker.log(round_metrics, step=round_idx)
+
+        for store in artifact_stores:
+            store.store(round_, round_idx)
+
+    return SearchResult(
+        impl=best_round.impl if best_round else None,
+        score=best_score,
+        result=best_round.result if best_round else None,
+        rounds_completed=config.max_rounds,
+    )
 
 
 def create_llm_call(
@@ -123,7 +297,13 @@ def main():
         logger.error("API key is required (pass --api-key or set LLM_API_KEY)")
         sys.exit(1)
 
-    task_dir = Path(__file__).parent / "k_search" / "tasks" / "gpu_mode" / args.task
+    task_dir = (
+        Path(__file__).parent.parent.parent
+        / "k_search"
+        / "tasks"
+        / "gpu_mode"
+        / args.task
+    )
     if not task_dir.exists():
         logger.error(f"Task directory not found: {task_dir}")
         sys.exit(1)

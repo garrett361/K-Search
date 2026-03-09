@@ -2,7 +2,7 @@
 
 LLM-driven GPU kernel optimization with co-evolving world model.
 Entry points:
-- `run_search_v2.py` - Modular search loop
+- `scripts/gpu_mode_modular_v1/run.py` - Modular search loop
 - `generate_kernels_and_eval.py` - V1 kernel generation
 
 ## Architecture
@@ -14,9 +14,11 @@ k_search/
 │   ├── adapters/       # Task-specific adapters (gpu_mode/)
 │   ├── metrics/        # Metrics tracking (noop, wandb)
 │   ├── artifacts/      # Artifact storage (local, wandb)
-│   ├── loop.py         # Search loop (run_search)
-│   ├── round.py        # Round container
 │   └── config.py       # SearchConfig, MetricsConfig, ArtifactConfig
+scripts/
+├── gpu_mode_modular_v1/  # Self-contained search loop script
+│   ├── run.py          # Main entry point with inlined loop logic
+│   └── test_run.py     # Tests
 ├── kernel_generators/  # LLM generation + world model
 ├── tasks/              # Task backends
 │   ├── task_base.py    # Task protocol, Solution, EvalResult
