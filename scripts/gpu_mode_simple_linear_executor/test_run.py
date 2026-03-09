@@ -19,11 +19,12 @@ def test_action_prompt_first_round():
     """First round prompt includes task spec, no feedback."""
     mock_task_def = MagicMock()
     mock_task_def.get_prompt_text.return_value = "Optimize kernel X"
+    mock_llm = MagicMock(return_value="analysis")
 
     root = Node(status="closed")
     tree = Tree(root=root)
 
-    prompt_fn = create_action_prompt_fn(mock_task_def)
+    prompt_fn = create_action_prompt_fn(mock_task_def, mock_llm)
     prompt = prompt_fn(tree, None)
 
     assert "Optimize kernel X" in prompt
@@ -38,6 +39,7 @@ def test_action_prompt_with_history():
     mock_task_def.feedback_provider.for_codegen.return_value = (
         "Previous attempt: loop tiling failed"
     )
+    mock_llm = MagicMock(return_value="analysis")
 
     root = Node(status="closed")
     tree = Tree(root=root)
@@ -49,7 +51,7 @@ def test_action_prompt_with_history():
     best.cycle = Cycle(rounds=[mock_round])
     tree.add_node(best)
 
-    prompt_fn = create_action_prompt_fn(mock_task_def)
+    prompt_fn = create_action_prompt_fn(mock_task_def, mock_llm)
     prompt = prompt_fn(tree, None)
 
     assert "Optimize kernel X" in prompt
@@ -62,6 +64,7 @@ def test_action_prompt_no_successful_cycle():
     """No feedback if best node has no successful round."""
     mock_task_def = MagicMock()
     mock_task_def.get_prompt_text.return_value = "Optimize kernel X"
+    mock_llm = MagicMock(return_value="analysis")
 
     root = Node(status="closed")
     tree = Tree(root=root)
@@ -70,7 +73,7 @@ def test_action_prompt_no_successful_cycle():
     failed.cycle = Cycle(rounds=[])
     tree.add_node(failed)
 
-    prompt_fn = create_action_prompt_fn(mock_task_def)
+    prompt_fn = create_action_prompt_fn(mock_task_def, mock_llm)
     prompt = prompt_fn(tree, None)
 
     assert "Previous Best Result" not in prompt
@@ -130,6 +133,7 @@ def test_action_prompt_includes_last_failure():
     """Action prompt includes last round failure info."""
     mock_task_def = MagicMock()
     mock_task_def.get_prompt_text.return_value = "Optimize kernel X"
+    mock_llm = MagicMock(return_value="Index was out of bounds due to wrong tile size")
 
     root = Node(status="closed")
     tree = Tree(root=root)
@@ -144,9 +148,10 @@ def test_action_prompt_includes_last_failure():
     failed.cycle = Cycle(rounds=[mock_round])
     tree.add_node(failed)
 
-    prompt_fn = create_action_prompt_fn(mock_task_def)
+    prompt_fn = create_action_prompt_fn(mock_task_def, mock_llm)
     prompt = prompt_fn(tree, None)
 
     assert "Last Round (FAILED)" in prompt
     assert "try vectorization" in prompt
-    assert "index out of bounds" in prompt
+    assert "Lesson:" in prompt
+    mock_llm.assert_called_once()

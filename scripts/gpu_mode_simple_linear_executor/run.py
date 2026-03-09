@@ -111,11 +111,20 @@ Code:
 
 List ALL issues and how to fix each. Be concise - no code snippets needed."""
 
+ACTION_FAILURE_ANALYSIS_PROMPT = """The previous optimization attempt failed with this error:
+```
+{error_log}
+```
+
+The attempted action was: {action}
+
+In 2-3 sentences: What went wrong and what should the next action avoid or do differently?"""
+
 LLMCallable = Callable[[str], str]
 
 
 def _analyze_failure(llm: LLMCallable, error_log: str, failed_code: str) -> str:
-    """Ask LLM to analyze a failure and suggest fixes."""
+    """Ask LLM to analyze a failure and suggest fixes for code generation."""
     prompt = FAILURE_ANALYSIS_PROMPT.format(
         error_log=error_log[-2000:],
         failed_code=failed_code[-3000:],
@@ -123,10 +132,19 @@ def _analyze_failure(llm: LLMCallable, error_log: str, failed_code: str) -> str:
     return llm(prompt)
 
 
-def create_action_prompt_fn(task_def: GpuModeTriMulTaskDefinition):
+def _analyze_failure_for_action(llm: LLMCallable, error_log: str, action: str) -> str:
+    """Ask LLM to explain failure and guide next action selection."""
+    prompt = ACTION_FAILURE_ANALYSIS_PROMPT.format(
+        error_log=error_log[-1000:],
+        action=action,
+    )
+    return llm(prompt)
+
+
+def create_action_prompt_fn(task_def: GpuModeTriMulTaskDefinition, llm: LLMCallable):
     """Create GPU mode specific action prompt function.
 
-    Uses feedback from best round to inform next action proposal.
+    Uses feedback from best round and LLM-analyzed failures to inform next action.
     """
 
     def action_prompt_fn(tree: Tree, context: dict[str, Any] | None) -> str:
@@ -146,9 +164,10 @@ def create_action_prompt_fn(task_def: GpuModeTriMulTaskDefinition):
             last_round = last_node.cycle.rounds[-1]
             if not last_round.result.succeeded():
                 action = last_node.action.title if last_node.action else "initial"
-                hint = _extract_error_hint(last_round.result.get_log())
+                error_log = last_round.result.get_log()
+                analysis = _analyze_failure_for_action(llm, error_log, action)
                 last_round_section = (
-                    f"\n## Last Round (FAILED)\nAction: {action}\nError: {hint}\n"
+                    f"\n## Last Round (FAILED)\nAction: {action}\nLesson: {analysis}\n"
                 )
 
         prompt = ACTION_PROMPT_TEMPLATE.format(
@@ -293,7 +312,7 @@ def main():
 
     tree = Tree(root=Node(status="closed"))
 
-    action_prompt_fn = create_action_prompt_fn(task_def)
+    action_prompt_fn = create_action_prompt_fn(task_def, llm)
     code_prompt_fn = create_code_prompt_fn(task_def, tree, llm)
 
     world_model = SimpleWorldModel(llm, action_prompt_fn)
