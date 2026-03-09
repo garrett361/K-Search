@@ -76,10 +76,35 @@ class _Scorer:
 
 
 class _FeedbackProvider:
+    """V1-style feedback provider for GPU mode tasks."""
+
     def for_codegen(self, rounds: Round | list[Round]) -> str:
+        """Format rounds as V1-style feedback for code generation.
+
+        Includes status, metrics, previous code, and error logs.
+        """
         if isinstance(rounds, Round):
             rounds = [rounds]
-        return "\n\n".join(r.result.get_log() for r in rounds)
+
+        parts = []
+        for r in rounds:
+            metrics = r.result.get_metrics()
+            status = "passed" if r.result.succeeded() else "failed"
+
+            lines = [f"Status: {status}"]
+            if latency := metrics.get("latency_ms"):
+                lines.append(f"Latency: {latency:.2f}ms")
+            if speedup := metrics.get("speedup_factor"):
+                lines.append(f"Speedup: {speedup:.2f}x")
+            lines.append(f"Score: {r.score:.4f}")
+
+            summary = " | ".join(lines)
+            code = r.llm_response
+            logs = r.result.get_log()
+
+            parts.append(f"{summary}\n\nCode:\n{code}\n\nLogs:\n{logs}")
+
+        return "\n\n---\n\n".join(parts)
 
     def for_world_model(self, rounds: Round | list[Round]) -> list[dict[str, Any]]:
         if isinstance(rounds, Round):

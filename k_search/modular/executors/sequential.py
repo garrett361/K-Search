@@ -56,8 +56,7 @@ class SequentialExecutor:
         TODO: termination responsibility (executor vs world model vs tree) not yet defined.
         """
         for round_idx in range(self._max_rounds):
-            logger.info(f"Round {round_idx + 1}/{self._max_rounds}")
-            logger.debug("=== ROUND %d START ===", round_idx + 1)
+            logger.info("[ROUND_START] === Round %d/%d ===", round_idx + 1, self._max_rounds)
 
             proposed = self._world_model.propose(self._tree)
             logger.debug("World model proposed %d node(s)", len(proposed))
@@ -75,7 +74,7 @@ class SequentialExecutor:
                 self._execute_node(node, round_idx)
 
             self._world_model.update(self._tree)
-            logger.debug("=== ROUND %d END ===", round_idx + 1)
+            logger.info("[ROUND_END] === Round %d END ===", round_idx + 1)
 
         return self._tree.get_best_node()
 
@@ -86,14 +85,14 @@ class SequentialExecutor:
 
         prompt = self._code_prompt_fn(node, self._task)
         code = self._llm(prompt)
-        logger.debug("LLM code response:\n\n%s\n", code)
+        logger.debug("[CODE_RESPONSE] (%d chars, ~%d toks):\n\n%s\n", len(code), len(code) // 4, code)
 
         impl = self._task.create_impl(code)
         result = self._evaluator.evaluate(impl, context={"round_idx": round_idx})
         score = self._task.scorer.score(result)
 
         logger.debug(
-            "Evaluation result: success=%s, score=%.4f", result.succeeded(), score
+            "[EVAL_RESULT] success=%s, score=%.4f", result.succeeded(), score
         )
         metrics = result.get_metrics()
         if metrics:

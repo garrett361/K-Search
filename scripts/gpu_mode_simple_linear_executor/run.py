@@ -27,6 +27,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Suppress noisy HTTP client logs
+for noisy_logger in ("httpcore", "httpx", "openai", "openai._base_client"):
+    logging.getLogger(noisy_logger).setLevel(logging.WARNING)
+
 
 ACTION_PROMPT_TEMPLATE = """You are proposing the next optimization action for a GPU kernel.
 
@@ -65,25 +69,72 @@ def create_action_prompt_fn(task_def: GpuModeTriMulTaskDefinition):
             task_spec=task_spec,
             feedback_section=feedback_section,
         )
-        logger.debug("ACTION PROMPT:\n\n%s\n", prompt)
+        logger.debug("[ACTION_PROMPT] (%d chars, ~%d toks):\n\n%s\n", len(prompt), len(prompt) // 4, prompt)
         return prompt
 
     return action_prompt_fn
 
 
-def create_code_prompt_fn(task_def: GpuModeTriMulTaskDefinition):
+def create_code_prompt_fn(task_def: GpuModeTriMulTaskDefinition, tree: Tree):
     """Create GPU mode specific code generation prompt function.
 
     Round 0 (no action): direct code generation from task prompt.
-    Round 1+ (with action): generate code implementing the specific action.
+    Round 1+ (with action): generate code implementing the specific action,
+    with V1-style feedback sections.
     """
 
+    def _get_last_evaluated_node() -> Node | None:
+        """Return most recently evaluated node (highest ID, closed, has cycle)."""
+        evaluated = [
+            n
+            for n in tree._all_nodes()
+            if n.status == "closed" and n.cycle and n.cycle.rounds
+        ]
+        if not evaluated:
+            return None
+        return max(evaluated, key=lambda n: int(n._id))
+
+    def _format_round_summary(r) -> str:
+        """Format V1-style round summary."""
+        metrics = r.result.get_metrics()
+        status = "passed" if r.result.succeeded() else "failed"
+        lines = [f"Status: {status}"]
+        if latency := metrics.get("latency_ms"):
+            lines.append(f"Latency: {latency:.2f}ms")
+        if speedup := metrics.get("speedup_factor"):
+            lines.append(f"Speedup: {speedup:.2f}x")
+        lines.append(f"Score: {r.score:.4f}")
+        return " | ".join(lines)
+
     def code_prompt_fn(node: Node, task: TaskDefinition) -> str:
+        prompt = task_def.get_prompt_text()
+
         if node.action:
-            prompt = f"{task_def.get_prompt_text()}\n\nAction: {node.action.title}\n\nGenerate the implementation:"
-        else:
-            prompt = f"{task_def.get_prompt_text()}\n\nGenerate the implementation:"
-        logger.debug("CODE PROMPT:\n\n%s\n", prompt)
+            prompt += f"\n\nAction: {node.action.title}"
+
+        # Last round feedback with descriptive headers
+        last_node = _get_last_evaluated_node()
+        if last_node and last_node.cycle and last_node.cycle.rounds:
+            last_round = last_node.cycle.rounds[-1]
+            logs = last_round.result.get_log()
+            code = last_round.llm_response
+            summary = _format_round_summary(last_round)
+
+            prompt += f"\n\nEvaluation Output (from your previous attempt):\n{logs}"
+            prompt += f"\n\nYour Previous Code:\n{code}"
+            prompt += f"\n\nPrevious Round Summary:\n{summary}"
+
+        # Best so far (only if different from last)
+        best_node = tree.get_best_node()
+        if best_node and best_node.cycle and best_node.cycle.best_round:
+            best_round = best_node.cycle.best_round
+            if last_node is None or best_node._id != last_node._id:
+                best_summary = _format_round_summary(best_round)
+                best_code = best_round.llm_response
+                prompt += f"\n\nBest Successful Solution So Far:\n{best_summary}\n\nCode:\n{best_code}"
+
+        prompt += "\n\nGenerate the corrected and optimized implementation:"
+        logger.debug("[CODE_PROMPT] (%d chars, ~%d toks):\n\n%s\n", len(prompt), len(prompt) // 4, prompt)
         return prompt
 
     return code_prompt_fn
@@ -144,11 +195,12 @@ def main():
     client = openai.OpenAI(**client_kwargs)  # type: ignore[arg-type]
     llm = create_llm_call(client, args.model_name)
 
+    tree = Tree(root=Node(status="closed"))
+
     action_prompt_fn = create_action_prompt_fn(task_def)
-    code_prompt_fn = create_code_prompt_fn(task_def)
+    code_prompt_fn = create_code_prompt_fn(task_def, tree)
 
     world_model = SimpleWorldModel(llm, action_prompt_fn)
-    tree = Tree(root=Node(status="closed"))
 
     executor = SequentialExecutor(
         world_model=world_model,

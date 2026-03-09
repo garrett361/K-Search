@@ -81,8 +81,9 @@ def test_code_prompt_includes_action():
     mock_task_def.get_prompt_text.return_value = "Optimize kernel X"
 
     node = Node(status="open", action=Action(title="try loop tiling"))
+    tree = Tree(root=Node(status="closed"))
 
-    prompt_fn = create_code_prompt_fn(mock_task_def)
+    prompt_fn = create_code_prompt_fn(mock_task_def, tree)
     prompt = prompt_fn(node, mock_task_def)
 
     assert "Optimize kernel X" in prompt
@@ -96,8 +97,9 @@ def test_code_prompt_no_action():
     mock_task_def.get_prompt_text.return_value = "Optimize kernel X"
 
     node = Node(status="open")
+    tree = Tree(root=Node(status="closed"))
 
-    prompt_fn = create_code_prompt_fn(mock_task_def)
+    prompt_fn = create_code_prompt_fn(mock_task_def, tree)
     prompt = prompt_fn(node, mock_task_def)
 
     assert "Optimize kernel X" in prompt

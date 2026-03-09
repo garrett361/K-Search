@@ -41,7 +41,7 @@ class SimpleWorldModel:
             logger.debug("Requesting action from LLM (prior rounds exist)")
             prompt = self._action_prompt_fn(tree, context)
             raw_response = self._llm(prompt)
-            logger.debug("LLM action response:\n\n%s\n", raw_response)
+            logger.debug("[ACTION_RESPONSE] %s", raw_response.strip())
             action_description = raw_response.strip()
 
         action = Action(title=action_description)
