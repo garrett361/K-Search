@@ -45,6 +45,31 @@ def _extract_error_hint(log: str) -> str:
     return ""
 
 
+def _truncate_log(log: str, max_lines: int = 30) -> str:
+    """Keep only the last N lines of an error log."""
+    if not log:
+        return ""
+    lines = log.strip().split("\n")
+    if len(lines) <= max_lines:
+        return log
+    return f"[...truncated {len(lines) - max_lines} lines...]\n" + "\n".join(
+        lines[-max_lines:]
+    )
+
+
+def _extract_code_block(llm_response: str) -> str:
+    """Extract just the code from an LLM response, stripping prose."""
+    import re
+
+    match = re.search(r"```python\n(.*?)```", llm_response, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    match = re.search(r"```\n(.*?)```", llm_response, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return llm_response
+
+
 def _get_last_evaluated_node(tree: Tree) -> Node | None:
     """Return most recently evaluated node (highest ID, closed, has cycle)."""
     evaluated = [
@@ -72,24 +97,19 @@ Rules:
 
 Respond with only the action title (one line, no explanation)."""
 
-FAILURE_ANALYSIS_PROMPT = """Review this Triton/CUDA code that failed. The error shown may be just the first issue encountered - analyze the ENTIRE code for ALL potential problems.
+FAILURE_ANALYSIS_PROMPT = """Review this Triton/CUDA code that failed. Analyze the ENTIRE code for ALL potential problems, not just the error shown.
 
-Error that was raised:
+Error:
 ```
 {error_log}
 ```
 
-Code to review:
+Code:
 ```python
 {failed_code}
 ```
 
-Provide:
-1. List ALL issues you find (not just the one that triggered the error)
-2. For each issue: what's wrong and how to fix it
-3. A corrected code snippet addressing all issues
-
-Be thorough but concise."""
+List ALL issues and how to fix each. Be concise - no code snippets needed."""
 
 LLMCallable = Callable[[str], str]
 
@@ -179,12 +199,12 @@ def create_code_prompt_fn(
         last_node = _get_last_evaluated_node(tree)
         if last_node and last_node.cycle and last_node.cycle.rounds:
             last_round = last_node.cycle.rounds[-1]
-            logs = last_round.result.get_log()
-            code = last_round.llm_response
+            logs = _truncate_log(last_round.result.get_log(), max_lines=30)
+            code = _extract_code_block(last_round.llm_response)
             summary = _format_round_summary(last_round)
 
             prompt += f"\n\nEvaluation Output (from your previous attempt):\n{logs}"
-            prompt += f"\n\nYour Previous Code:\n{code}"
+            prompt += f"\n\nYour Previous Code:\n```python\n{code}\n```"
             prompt += f"\n\nPrevious Round Summary:\n{summary}"
 
         # Best so far (only if different from last)
