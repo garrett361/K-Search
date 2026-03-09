@@ -12,16 +12,20 @@ from k_search.tasks.task_base import EvalResult, Solution
 class GpuModeEvaluationResult:
     """Wraps EvalResult to implement EvaluationResult protocol."""
 
-    def __init__(self, inner: EvalResult) -> None:
+    def __init__(
+        self, inner: EvalResult, reference_latency_ms: float | None = None
+    ) -> None:
         self._inner = inner
+        self._reference_latency_ms = reference_latency_ms
 
     def succeeded(self) -> bool:
         return self._inner.is_passed()
 
     def get_metrics(self, max_str_chars: int = 0) -> dict[str, Any]:
-        return self._inner.to_dict(
-            include_log_excerpt=False, max_str_chars=max_str_chars
-        )
+        d = self._inner.to_dict(include_log_excerpt=False, max_str_chars=max_str_chars)
+        d["reference_latency_ms"] = self._reference_latency_ms
+        d["speedup_factor"] = self.speedup_factor
+        return d
 
     def get_log(self) -> str:
         return self._inner.log_excerpt
@@ -36,7 +40,11 @@ class GpuModeEvaluationResult:
 
     @property
     def speedup_factor(self) -> float | None:
-        return self._inner.speedup_factor
+        ref = self._reference_latency_ms
+        lat = self._inner.latency_ms
+        if ref and lat and lat > 0:
+            return ref / lat
+        return None
 
     def is_passed(self) -> bool:
         return self._inner.is_passed()
