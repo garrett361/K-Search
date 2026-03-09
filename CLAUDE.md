@@ -74,6 +74,13 @@ The `modular/` subsystem uses standard scopes.
 - Comment only the *why*, never the *what*
 - No decorative comment headers or section separators
 
+## Logging
+
+- Use `logging` module, not print
+- Prompts: wrap with `prompt_color()` from `k_search.modular.logging` (cyan)
+- LLM responses: wrap with `response_color()` (green)
+- Tag format: `[ACTION_PROMPT]`, `[CODE_PROMPT]`, `[ACTION_RESPONSE]`, `[CODE_RESPONSE]`
+
 ## Worktrees
 
 Always create worktrees under `.claude/worktrees/`, not `worktrees/`.
