@@ -7,26 +7,39 @@ import pytest
 from k_search.kernel_generators.kernel_generator import KernelGenerator
 
 
+def _endpoints_available() -> bool:
+    """Check if endpoints config exists without raising."""
+    try:
+        from k_search.modular.llm import get_all_endpoints
+
+        return bool(get_all_endpoints())
+    except FileNotFoundError:
+        return False
+
+
 @pytest.mark.skipif(
-    not os.getenv("RITS_API_KEY")
-    or not os.getenv("RITS_BASE_URL")
-    or not os.getenv("RITS_MODEL_NAME"),
-    reason="RITS credentials not available",
+    not _endpoints_available() or not os.getenv("RITS_API_KEY"),
+    reason="No endpoints configured or RITS_API_KEY not set",
 )
 class TestRITSAPIIntegration:
     """Integration tests with actual RITS API calls."""
 
-    def test_reasoning_api_produces_reasoning_tokens(self):
-        """Verify responses.create() produces reasoning tokens."""
-        gen = KernelGenerator(
-            model_name=os.environ["RITS_MODEL_NAME"],
+    @pytest.fixture
+    def generator(self) -> KernelGenerator:
+        from k_search.modular.llm import get_all_endpoints, get_endpoint
+
+        model_name = next(iter(get_all_endpoints().keys()))
+        return KernelGenerator(
+            model_name=model_name,
             api_key=os.environ["RITS_API_KEY"],
-            base_url=os.environ["RITS_BASE_URL"],
+            base_url=get_endpoint(model_name),
         )
 
+    def test_reasoning_api_produces_reasoning_tokens(self, generator: KernelGenerator):
+        """Verify responses.create() produces reasoning tokens."""
         prompt = "Write a Python function that computes factorial iteratively."
-        response = gen.client.responses.create(
-            model=gen.model_name, input=prompt, reasoning={"effort": "medium"}
+        response = generator.client.responses.create(
+            model=generator.model_name, input=prompt, reasoning={"effort": "medium"}
         )
 
         assert response.output_text is not None
@@ -43,17 +56,11 @@ class TestRITSAPIIntegration:
             f"Reasoning API should produce reasoning_tokens > 0, got {reasoning_tokens}"
         )
 
-    def test_chat_completions_no_reasoning_tokens(self):
+    def test_chat_completions_no_reasoning_tokens(self, generator: KernelGenerator):
         """Verify chat.completions.create() does not produce reasoning tokens."""
-        gen = KernelGenerator(
-            model_name=os.environ["RITS_MODEL_NAME"],
-            api_key=os.environ["RITS_API_KEY"],
-            base_url=os.environ["RITS_BASE_URL"],
-        )
-
         prompt = "Write a Python function that returns 42."
-        response = gen.client.chat.completions.create(
-            model=gen.model_name, messages=[{"role": "user", "content": prompt}]
+        response = generator.client.chat.completions.create(
+            model=generator.model_name, messages=[{"role": "user", "content": prompt}]
         )
 
         assert response.choices[0].message.content is not None

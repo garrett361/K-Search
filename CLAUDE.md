@@ -72,6 +72,10 @@ The `modular/` subsystem uses standard scopes.
 - Comment only the *why*, never the *what*
 - No decorative comment headers or section separators
 
+## Worktrees
+
+Always create worktrees under `.claude/worktrees/`, not `worktrees/`.
+
 ## Documentation
 
 Implementation details and design decisions are documented in `docs/` with descriptive filenames.

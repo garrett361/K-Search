@@ -14,6 +14,16 @@ from k_search.kernel_generators.world_model import (
 from k_search.tasks.gpu_mode.causal_conv1d.spec import CAUSAL_CONV1D_SPEC_TEXT_TRITON
 
 
+def _endpoints_available() -> bool:
+    """Check if endpoints config exists without raising."""
+    try:
+        from k_search.modular.llm import get_all_endpoints
+
+        return bool(get_all_endpoints())
+    except FileNotFoundError:
+        return False
+
+
 @pytest.fixture
 def real_init_prompt() -> str:
     """Generate a real world model init prompt using actual task definition."""
@@ -32,24 +42,29 @@ def real_init_prompt() -> str:
 
 @pytest.mark.timeout(180)
 @pytest.mark.skipif(
-    not os.getenv("RITS_API_KEY")
-    or not os.getenv("RITS_BASE_URL")
-    or not os.getenv("RITS_MODEL_NAME"),
-    reason="RITS credentials not available",
+    not _endpoints_available() or not os.getenv("RITS_API_KEY"),
+    reason="No endpoints configured or RITS_API_KEY not set",
 )
 class TestWorldModelLLMIntegration:
     """Integration tests for world model responses from actual LLM calls."""
 
-    def test_chat_completion_parses_to_valid_world_model(self, real_init_prompt):
-        """Chat completion response should parse into valid world model JSON."""
-        gen = KernelGenerator(
-            model_name=os.environ["RITS_MODEL_NAME"],
+    @pytest.fixture
+    def generator(self) -> KernelGenerator:
+        from k_search.modular.llm import get_all_endpoints, get_endpoint
+
+        model_name = next(iter(get_all_endpoints().keys()))
+        return KernelGenerator(
+            model_name=model_name,
             api_key=os.environ["RITS_API_KEY"],
-            base_url=os.environ["RITS_BASE_URL"],
+            base_url=get_endpoint(model_name),
         )
 
-        response = gen.client.chat.completions.create(
-            model=gen.model_name,
+    def test_chat_completion_parses_to_valid_world_model(
+        self, generator: KernelGenerator, real_init_prompt: str
+    ):
+        """Chat completion response should parse into valid world model JSON."""
+        response = generator.client.chat.completions.create(
+            model=generator.model_name,
             messages=[{"role": "user", "content": real_init_prompt}],
         )
 
@@ -63,20 +78,14 @@ class TestWorldModelLLMIntegration:
 
         obj = load_world_model_obj(parsed)
         assert obj is not None, "Failed to load world model object"
-        assert "decision_tree" in obj, (
-            f"Missing decision_tree. Keys: {list(obj.keys())}"
-        )
+        assert "decision_tree" in obj, f"Missing decision_tree. Keys: {list(obj.keys())}"
 
-    def test_chat_completion_has_executable_action_nodes(self, real_init_prompt):
+    def test_chat_completion_has_executable_action_nodes(
+        self, generator: KernelGenerator, real_init_prompt: str
+    ):
         """Parsed world model should have executable action nodes (not '(none)')."""
-        gen = KernelGenerator(
-            model_name=os.environ["RITS_MODEL_NAME"],
-            api_key=os.environ["RITS_API_KEY"],
-            base_url=os.environ["RITS_BASE_URL"],
-        )
-
-        response = gen.client.chat.completions.create(
-            model=gen.model_name,
+        response = generator.client.chat.completions.create(
+            model=generator.model_name,
             messages=[{"role": "user", "content": real_init_prompt}],
         )
 
@@ -91,16 +100,12 @@ class TestWorldModelLLMIntegration:
             f"Raw response start:\n{raw[:1500]}"
         )
 
-    def test_action_nodes_have_required_fields(self, real_init_prompt):
+    def test_action_nodes_have_required_fields(
+        self, generator: KernelGenerator, real_init_prompt: str
+    ):
         """Action nodes should have title, score_0_to_1, difficulty_1_to_5."""
-        gen = KernelGenerator(
-            model_name=os.environ["RITS_MODEL_NAME"],
-            api_key=os.environ["RITS_API_KEY"],
-            base_url=os.environ["RITS_BASE_URL"],
-        )
-
-        response = gen.client.chat.completions.create(
-            model=gen.model_name,
+        response = generator.client.chat.completions.create(
+            model=generator.model_name,
             messages=[{"role": "user", "content": real_init_prompt}],
         )
 
@@ -123,23 +128,17 @@ class TestWorldModelLLMIntegration:
             action = node["action"]
             node_id = node.get("node_id", "unknown")
             assert action.get("title"), f"Node {node_id} missing action.title"
-            assert "score_0_to_1" in action, (
-                f"Node {node_id} missing action.score_0_to_1"
-            )
+            assert "score_0_to_1" in action, f"Node {node_id} missing action.score_0_to_1"
             assert "difficulty_1_to_5" in action, (
                 f"Node {node_id} missing action.difficulty_1_to_5"
             )
 
-    def test_reasoning_api_parses_to_valid_world_model(self, real_init_prompt):
+    def test_reasoning_api_parses_to_valid_world_model(
+        self, generator: KernelGenerator, real_init_prompt: str
+    ):
         """Reasoning API response should also parse into valid world model JSON."""
-        gen = KernelGenerator(
-            model_name=os.environ["RITS_MODEL_NAME"],
-            api_key=os.environ["RITS_API_KEY"],
-            base_url=os.environ["RITS_BASE_URL"],
-        )
-
-        response = gen.client.responses.create(
-            model=gen.model_name,
+        response = generator.client.responses.create(
+            model=generator.model_name,
             input=real_init_prompt,
             reasoning={"effort": "medium"},
         )
