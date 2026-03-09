@@ -19,6 +19,7 @@ from typing import Any, Callable
 import openai
 
 from k_search.kernel_generators.world_model import render_world_model_section
+from k_search.modular.logging import prompt_color, response_color
 from k_search.kernel_generators.world_model_manager import (
     WorldModelConfig,
     WorldModelManager,
@@ -47,6 +48,10 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# Suppress noisy HTTP client logs
+for noisy_logger in ("httpcore", "httpx", "openai", "openai._base_client"):
+    logging.getLogger(noisy_logger).setLevel(logging.WARNING)
 
 LLMCall = Callable[[str], str]
 
@@ -468,6 +473,7 @@ class V1SequentialExecutor:
         """Run multiple attempts on a single action with stagnation detection."""
         rounds: list[Round] = []
         best_score = 0.0
+        best_speedup: float | None = None
         no_improve = 0
         no_improve_over_base = 0
 
@@ -478,17 +484,17 @@ class V1SequentialExecutor:
         base_code = action_ctx.get("base_code", "")
         base_score = action_ctx.get("base_score", 0.0)
 
-        max_attempts = min(
-            self._cycle_config.max_attempts_per_action, rounds_remaining
-        )
+        max_attempts = min(self._cycle_config.max_attempts_per_action, rounds_remaining)
 
         current_code = ""
         for attempt in range(max_attempts):
+            best_speedup_str = f"{best_speedup:.2f}x" if best_speedup else "-"
             logger.info(
-                "[ATTEMPT] %d/%d | best=%.4f | no_improve=%d/%d",
+                "[ATTEMPT] %d/%d | best=%.4f (%s) | no_improve=%d/%d",
                 attempt + 1,
                 max_attempts,
                 best_score,
+                best_speedup_str,
                 no_improve,
                 self._cycle_config.stagnation_window,
             )
@@ -511,8 +517,18 @@ class V1SequentialExecutor:
             if wm_section:
                 prompt = prompt + "\n\n" + wm_section
 
+            logger.debug(
+                prompt_color(
+                    f"[CODE_PROMPT] ({len(prompt)} chars, ~{len(prompt) // 4} toks):\n\n{prompt}\n"
+                )
+            )
+
             code = self._llm(prompt)
             current_code = code
+
+            logger.debug(
+                response_color(f"[CODE_RESPONSE] ({len(code)} chars):\n\n{code}\n")
+            )
 
             impl = self._task.create_impl(code)
             result = self._evaluator.evaluate(impl, context={"round_idx": attempt})
@@ -530,13 +546,25 @@ class V1SequentialExecutor:
             )
             rounds.append(round_)
 
+            metrics = result.get_metrics()
+            speedup = metrics.get("speedup_factor")
+            speedup_str = f"{speedup:.2f}x" if speedup else "-"
+
             if result.succeeded() and score > best_score:
                 best_score = score
+                best_speedup = speedup
                 no_improve = 0
-                logger.info("[IMPROVED] score=%.4f", score)
+                logger.info("[IMPROVED] score=%.4f, speedup=%s", score, speedup_str)
             else:
                 no_improve += 1
-                logger.info("[NO_IMPROVE] score=%.4f, streak=%d", score, no_improve)
+                best_speedup_str = f"{best_speedup:.2f}x" if best_speedup else "-"
+                logger.info(
+                    "[NO_IMPROVE] score=%.4f, speedup=%s, best_speedup=%s, streak=%d",
+                    score,
+                    speedup_str,
+                    best_speedup_str,
+                    no_improve,
+                )
 
             if best_score > 0 and base_score > 0:
                 if best_score > base_score:
@@ -611,8 +639,14 @@ def main():
     parser.add_argument("--max-attempts", type=int, default=10)
     parser.add_argument("--stagnation-window", type=int, default=5)
     parser.add_argument("--stagnation-over-base-window", type=int, default=5)
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Enable debug logging"
+    )
 
     args = parser.parse_args()
+
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
 
     api_key = args.api_key or os.getenv("LLM_API_KEY")
     if not api_key:
