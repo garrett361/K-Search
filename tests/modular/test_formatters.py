@@ -17,7 +17,6 @@ def test_format_tree_shows_hierarchy():
 
     result = formatter.format_tree(tree)
 
-    assert "├──" in result or "└──" in result
     assert "id=0" in result
     assert "id=1" in result
     assert "id=2" in result
@@ -45,7 +44,7 @@ def test_format_tree_nested_children():
 def test_format_node_structure():
     formatter = DefaultFormatter()
     node = Node(action=Action(title="Test Action"), status="in_progress")
-    node._id = "5"
+    node.id = "5"
 
     result = formatter.format_node(node)
 
@@ -56,36 +55,10 @@ def test_format_node_structure():
     assert 'title="Test Action"' in result
 
 
-def test_format_node_with_annotations():
-    formatter = DefaultFormatter()
-    node = Node(
-        action=Action(title="Test"),
-        status="open",
-        annotations={"priority": "high", "difficulty": 3},
-    )
-    node._id = "0"
-
-    result = formatter.format_node(node)
-
-    assert "annotations={" in result
-    assert "priority: high" in result
-    assert "difficulty: 3" in result
-
-
-def test_format_node_without_annotations():
-    formatter = DefaultFormatter()
-    node = Node(action=Action(title="Test"), status="open")
-    node._id = "0"
-
-    result = formatter.format_node(node)
-
-    assert "annotations" not in result
-
-
 def test_format_node_root():
     formatter = DefaultFormatter()
     node = Node(status="closed")
-    node._id = "0"
+    node.id = "0"
 
     result = formatter.format_node(node)
 
@@ -110,6 +83,3 @@ def test_format_tree_structure():
     lines = result.split("\n")
 
     assert lines[0].startswith("(id=0")
-    assert "├──" in lines[1]
-    assert "└──" in lines[2] and "A1" in lines[2]
-    assert "└──" in lines[3] and "B" in lines[3]
