@@ -582,18 +582,29 @@ def create_llm_call(
     """Create LLM callable for search loop."""
 
     def llm_call(prompt: str) -> str:
+        logger.debug(
+            prompt_color(
+                f"[ACTION_PROMPT] ({len(prompt)} chars, ~{len(prompt) // 4} toks):\n\n{prompt}\n"
+            )
+        )
         if use_reasoning_api:
             response = client.responses.create(
                 model=model_name,
                 input=prompt,
                 reasoning={"effort": reasoning_effort},
             )
-            return (response.output_text or "").strip()
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=[{"role": "user", "content": prompt}],
+            result = (response.output_text or "").strip()
+        else:
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            result = (response.choices[0].message.content or "").strip()
+
+        logger.debug(
+            response_color(f"[ACTION_RESPONSE] ({len(result)} chars):\n\n{result}\n")
         )
-        return (response.choices[0].message.content or "").strip()
+        return result
 
     return llm_call
 
