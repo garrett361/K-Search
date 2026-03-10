@@ -17,6 +17,7 @@ import openai
 
 from k_search.modular import SearchConfig, ArtifactConfig
 from k_search.modular.artifacts import NoOpArtifactStore, create_artifact_stores
+from k_search.modular.llm import get_endpoint
 from k_search.modular.config import MetricsConfig, SearchResult, build_run_config
 from k_search.modular.metrics import NoOpMetricsTracker, create_metrics_trackers
 from k_search.modular.protocols import (
@@ -230,7 +231,6 @@ def main():
     parser.add_argument("--language", default="triton", choices=["triton", "cuda"])
     parser.add_argument("--max-rounds", type=int, default=10)
     parser.add_argument("--model-name", required=True, help="LLM model name")
-    parser.add_argument("--base-url", default=None, help="OpenAI-compatible base URL")
     parser.add_argument(
         "--api-key", default=None, help="API key; if omitted, uses LLM_API_KEY env var"
     )
@@ -313,9 +313,11 @@ def main():
     task_def = GpuModeTriMulTaskDefinition(gpu_task, language=args.language)
     evaluator = GpuModeEvaluator(gpu_task)
 
-    client_kwargs = {"api_key": api_key, "timeout": args.timeout}
-    if args.base_url is not None:
-        client_kwargs["base_url"] = args.base_url
+    client_kwargs = {
+        "api_key": api_key,
+        "timeout": args.timeout,
+        "base_url": get_endpoint(args.model_name),
+    }
     if (rits_api_key := os.getenv("RITS_API_KEY")) is not None:
         client_kwargs["default_headers"] = {"RITS_API_KEY": rits_api_key}
 
