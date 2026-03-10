@@ -294,7 +294,9 @@ class V1WorldModel:
         v1_node = node  # type: V1Node
         v1_action = node.action  # type: V1Action | None
 
-        parent_is_root = getattr(v1_node, "parent_is_root", node.parent is None or node.parent.parent is None)
+        parent_is_root = getattr(
+            v1_node, "parent_is_root", node.parent is None or node.parent.parent is None
+        )
 
         base_code = ""
         base_score = 0.0
