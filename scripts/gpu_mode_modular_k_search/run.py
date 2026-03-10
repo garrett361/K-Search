@@ -584,7 +584,7 @@ class V1SequentialExecutor:
                 best_score = score
                 best_speedup = speedup
                 no_improve = 0
-                logger.info("[IMPROVED] score=%.4f, speedup=%s", score, speedup_str)
+                logger.info("[IMPROVED] score=%.4f, speedup=%s, best_speedup=%s", score, speedup_str, speedup_str)
             else:
                 no_improve += 1
                 best_speedup_str = f"{best_speedup:.2f}x" if best_speedup else "-"
