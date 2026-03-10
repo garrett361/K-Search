@@ -583,31 +583,38 @@ def create_llm_call(
     """Create LLM callable for search loop."""
 
     def llm_call(prompt: str) -> str:
-        logger.debug(
-            prompt_color(
-                f"[ACTION_PROMPT] ({len(prompt)} chars, ~{len(prompt) // 4} toks):\n\n{prompt}\n"
-            )
-        )
         if use_reasoning_api:
             response = client.responses.create(
                 model=model_name,
                 input=prompt,
                 reasoning={"effort": reasoning_effort},
             )
-            result = (response.output_text or "").strip()
-        else:
-            response = client.chat.completions.create(
-                model=model_name,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            result = (response.choices[0].message.content or "").strip()
+            return (response.output_text or "").strip()
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return (response.choices[0].message.content or "").strip()
 
+    return llm_call
+
+
+def wrap_with_action_logging(llm: LLMCall) -> LLMCall:
+    """Wrap LLM call with ACTION_PROMPT/ACTION_RESPONSE logging."""
+
+    def logged_llm_call(prompt: str) -> str:
+        logger.debug(
+            prompt_color(
+                f"[ACTION_PROMPT] ({len(prompt)} chars, ~{len(prompt) // 4} toks):\n\n{prompt}\n"
+            )
+        )
+        result = llm(prompt)
         logger.debug(
             response_color(f"[ACTION_RESPONSE] ({len(result)} chars):\n\n{result}\n")
         )
         return result
 
-    return llm_call
+    return logged_llm_call
 
 
 def main():
@@ -697,7 +704,7 @@ def main():
         selection_policy=selection_policy,
     )
     wm_manager = WorldModelManager(
-        llm_call=llm,
+        llm_call=wrap_with_action_logging(llm),
         target_gpu="H100",
         language=args.language,
         config=wm_config,
