@@ -14,7 +14,7 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Literal, TypedDict
 
 import openai
 
@@ -57,6 +57,25 @@ for noisy_logger in ("httpcore", "httpx", "openai", "openai._base_client"):
 LLMCall = Callable[[str], str]
 
 
+class ProposeContext(TypedDict):
+    """Required context for V1WorldModel.propose()."""
+
+    round_idx: int
+    current_code: str
+
+
+class UpdateContext(TypedDict):
+    """Required context for V1WorldModel.update()."""
+
+    cycle_succeeded: bool
+    best_round: Round | None
+    node: Node
+    code: str
+    round_idx: int
+    attempts: int
+    logs: str
+
+
 @dataclass
 class CycleConfig:
     """Configuration for cycle-based execution."""
@@ -97,12 +116,11 @@ class V1WorldModel:
         )
         self._initialized = True
 
-    def propose(self, tree: Tree, context: dict[str, Any] | None = None) -> list[Node]:
+    def propose(self, tree: Tree, context: ProposeContext) -> list[Node]:
         """Generate new action nodes by calling V1 manager's propose_action_nodes."""
         self._ensure_initialized()
-        ctx = context or {}
-        current_code = ctx.get("current_code", "")
-        round_idx = ctx.get("round_idx", 0)
+        current_code: str = context["current_code"]
+        round_idx: int = context["round_idx"]
 
         self._manager.propose_action_nodes(
             definition_name=self._task_name,
@@ -133,14 +151,13 @@ class V1WorldModel:
             return [node]
         return []
 
-    def update(self, tree: Tree, context: dict[str, Any] | None = None) -> None:
+    def update(self, tree: Tree, context: UpdateContext) -> None:
         """Update tree after cycle - attach solution or mark too hard."""
-        ctx = context or {}
-        success = ctx.get("cycle_succeeded", False)
-        best_round = ctx.get("best_round")
-        round_idx = ctx.get("round_idx", 0)
-        code = ctx.get("code", "")
-        node = ctx.get("node")
+        success: bool = context["cycle_succeeded"]
+        best_round: Round | None = context["best_round"]
+        round_idx: int = context["round_idx"]
+        code: str = context["code"]
+        node: Node = context["node"]
 
         # Get action text from modular Node (authoritative source)
         action_text = ""
@@ -178,7 +195,7 @@ class V1WorldModel:
                     definition_name=self._task_name
                 ),
                 eval_result=None,
-                debug_and_improve_round=ctx.get("attempts", 0),
+                debug_and_improve_round=context["attempts"],
                 debug_and_improve_max_rounds=10,
                 baseline_targets_text="",
                 round_index=round_idx,
