@@ -1,4 +1,4 @@
-"""Tests for Tree methods (add_node, get_frontier, get_best_node, get_path_to_root)."""
+"""Tests for Tree methods."""
 
 from unittest.mock import MagicMock
 
@@ -6,6 +6,7 @@ import pytest
 
 from k_search.modular.world.tree import Tree
 from k_search.modular.world.node import Node
+from k_search.modular.world.action import Action
 
 
 def test_add_node_attaches_to_parent_children():
@@ -53,7 +54,7 @@ def test_get_best_node_by_score():
 
     low = _node_with_cycle(0.5, True)
     high = _node_with_cycle(0.9, True)
-    failed = _node_with_cycle(1.0, False)  # ignored
+    failed = _node_with_cycle(1.0, False)
 
     tree.add_node(low)
     tree.add_node(high)
@@ -82,9 +83,9 @@ def test_tree_assigns_sequential_ids():
     tree.add_node(child1)
     tree.add_node(child2)
 
-    assert root._id == "0"
-    assert child1._id == "1"
-    assert child2._id == "2"
+    assert root.id == "0"
+    assert child1.id == "1"
+    assert child2.id == "2"
 
 
 def test_get_node_by_id():
@@ -93,46 +94,27 @@ def test_get_node_by_id():
     child = Node(parent=root)
     tree.add_node(child)
 
-    assert tree._get_node_by_id("0") is root
-    assert tree._get_node_by_id("1") is child
-    assert tree._get_node_by_id("999") is None
+    assert tree.get_node_by_id("0") is root
+    assert tree.get_node_by_id("1") is child
+    assert tree.get_node_by_id("999") is None
 
 
-def test_update_node_merges_annotations():
-    root = Node(annotations={"a": 1})
-    tree = Tree(root=root)
-    tree.update_node(root, {"b": 2})
-    assert root.annotations == {"a": 1, "b": 2}
-
-
-def test_update_node_creates_annotations_if_none():
-    root = Node(annotations=None)
-    tree = Tree(root=root)
-    tree.update_node(root, {"x": "y"})
-    assert root.annotations == {"x": "y"}
-
-
-def test_split_node_creates_children():
+def test_split_node_adds_children():
     root = Node(status="open")
     tree = Tree(root=root)
 
-    children = tree.split_node(
-        root,
-        [
-            {"title": "Option A"},
-            {"title": "Option B", "annotations": {"priority": "high"}},
-        ],
-    )
+    child1 = Node(action=Action(title="Option A"), status="open")
+    child2 = Node(action=Action(title="Option B"), status="open")
 
-    assert len(children) == 2
+    tree.split_node(root, [child1, child2])
+
     assert root.status == "closed"
-    assert children[0].parent is root
-    assert children[0].action is not None
-    assert children[0].action.title == "Option A"
-    assert children[1].action is not None
-    assert children[1].action.annotations == {"priority": "high"}
-    assert children[0]._id == "1"
-    assert children[1]._id == "2"
+    assert child1.parent is root
+    assert child2.parent is root
+    assert child1 in root.children
+    assert child2 in root.children
+    assert child1.id == "1"
+    assert child2.id == "2"
 
 
 def test_delete_node_soft_deletes():
