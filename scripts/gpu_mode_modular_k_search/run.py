@@ -44,6 +44,27 @@ from k_search.modular.world.round import Round
 from k_search.modular.world.tree import Tree
 from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
 
+
+@dataclass
+class V1Action(Action):
+    """V1-specific action with difficulty/confidence metadata."""
+
+    difficulty: int = 3
+    expected_vs_baseline_factor: float | None = None
+    confidence: float = 0.5
+    rationale: str = ""
+    v1_action_data: dict[str, Any] | None = None
+
+
+@dataclass
+class V1Node(Node):
+    """V1-specific node with v1 ID mapping."""
+
+    v1_node_id: str = ""
+    v1_parent_id: str = ""
+    parent_is_root: bool = False
+
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -244,25 +265,20 @@ class V1WorldModel:
 
             parent_node = self._node_id_map.get(parent_id, tree.root)
 
-            # Store V1 metadata in both Action.annotations and Node.annotations
-            new_node = Node(
+            new_node = V1Node(
                 parent=parent_node,
                 status="open",
-                action=Action(
+                action=V1Action(
                     title=title,
-                    annotations={
-                        "difficulty": difficulty,
-                        "expected_vs_baseline_factor": expected_vs_baseline,
-                        "confidence": confidence,
-                        "rationale": rationale,
-                        "v1_action_data": action_data,
-                    },
+                    difficulty=difficulty,
+                    expected_vs_baseline_factor=expected_vs_baseline,
+                    confidence=confidence,
+                    rationale=rationale,
+                    v1_action_data=action_data,
                 ),
-                annotations={
-                    "v1_node_id": node_id,
-                    "v1_parent_id": parent_id,
-                    "parent_is_root": parent_id == "root" or parent_id is None,
-                },
+                v1_node_id=node_id,
+                v1_parent_id=parent_id,
+                parent_is_root=parent_id == "root" or parent_id is None,
             )
             tree.add_node(new_node)
             self._node_id_map[node_id] = new_node
@@ -271,18 +287,15 @@ class V1WorldModel:
         return new_nodes
 
     def get_action_context(self, node: Node) -> dict[str, Any]:
-        """Get context for the selected action node - reads from modular Node."""
+        """Get context for the selected action node - reads from V1Node/V1Action fields."""
         if not node:
             return {}
 
-        node_annot = node.annotations or {}
-        action_annot = (node.action.annotations if node.action else None) or {}
+        v1_node = node  # type: V1Node
+        v1_action = node.action  # type: V1Action | None
 
-        parent_is_root = node_annot.get(
-            "parent_is_root", node.parent is None or node.parent.parent is None
-        )
+        parent_is_root = getattr(v1_node, "parent_is_root", node.parent is None or node.parent.parent is None)
 
-        # Get base code/score from parent's cycle if it exists
         base_code = ""
         base_score = 0.0
         if node.parent and node.parent.cycle and node.parent.cycle.best_round:
@@ -291,11 +304,11 @@ class V1WorldModel:
             base_score = best.score
 
         return {
-            "v1_node_id": node_annot.get("v1_node_id", ""),
+            "v1_node_id": getattr(v1_node, "v1_node_id", ""),
             "action_text": node.action.title if node.action else "",
-            "difficulty": action_annot.get("difficulty", 3),
-            "confidence": action_annot.get("confidence", 0.5),
-            "rationale": action_annot.get("rationale", ""),
+            "difficulty": getattr(v1_action, "difficulty", 3) if v1_action else 3,
+            "confidence": getattr(v1_action, "confidence", 0.5) if v1_action else 0.5,
+            "rationale": getattr(v1_action, "rationale", "") if v1_action else "",
             "parent_is_root": parent_is_root,
             "base_code": base_code,
             "base_score": base_score,
