@@ -535,8 +535,8 @@ Note: `world_model_json`, `definition_text`, and `current_tree_path` are interna
 
 ## Migration Path
 
-### Phase 1: Update Protocols
-- [ ] Update `WorldModel` protocol (`k_search/modular/protocols/world_model.py`):
+### Phase 1: Update Protocols ✅ COMPLETE
+- [x] Update `WorldModel` protocol (`k_search/modular/protocols/world_model.py`):
   - Remove `tree: Tree` as separate parameter (fold into context)
   - Change `context: dict[str, Any] | None` to `context: Any`
   - This is a breaking change - update existing implementations:
@@ -544,7 +544,7 @@ Note: `world_model_json`, `definition_text`, and `current_tree_path` are interna
     - `scripts/gpu_mode_async_pipeline_executor/` - uses `AsyncSimpleWorldModel`
     - `scripts/gpu_mode_simple_linear_executor/` - uses `SimpleWorldModel`
   - Note: `scripts/gpu_mode_modular_v1/` does NOT use WorldModel protocol (simple loop)
-- [ ] Async handling: The `WorldModel` protocol stays sync. `AsyncSimpleWorldModel` is an async implementation that satisfies the protocol when awaited externally. No separate `AsyncWorldModel` protocol needed - the caller (executor) decides sync/async invocation.
+- [x] Async handling: The `WorldModel` protocol stays sync. `AsyncSimpleWorldModel` is an async implementation that satisfies the protocol when awaited externally. No separate `AsyncWorldModel` protocol needed - the caller (executor) decides sync/async invocation.
 
 ### Phase 2: Create New v2 Directory
 - [ ] Create `scripts/gpu_mode_modular_k_search_v2/`
