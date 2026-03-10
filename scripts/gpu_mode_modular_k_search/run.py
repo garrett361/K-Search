@@ -445,6 +445,8 @@ class V1SequentialExecutor:
         self._tree = tree
         self._max_rounds = max_rounds
         self._cycle_config = cycle_config or CycleConfig()
+        self._global_best_round: Round | None = None
+        self._global_best_score: float = 0.0
 
     def run(self) -> Node | None:
         """Execute search, return best node."""
@@ -491,6 +493,10 @@ class V1SequentialExecutor:
                     "logs": cycle.rounds[-1].result.get_log() if cycle.rounds else "",
                 },
             )
+
+            if cycle.best_round and cycle.best_round.score > self._global_best_score:
+                self._global_best_round = cycle.best_round
+                self._global_best_score = cycle.best_round.score
 
             rounds_used += len(cycle.rounds)
             logger.info(
@@ -784,10 +790,10 @@ def main():
 
     logger.info("=" * 60)
     logger.info("SEARCH COMPLETE")
-    if best_node and best_node.cycle and best_node.cycle.best_round:
-        best = best_node.cycle.best_round
-        logger.info("Best score: %.4f", best.score)
-        logger.info("Best round metrics: %s", best.result.get_metrics())
+    global_best = executor._global_best_round
+    if global_best:
+        logger.info("Best score: %.4f", global_best.score)
+        logger.info("Best round metrics: %s", global_best.result.get_metrics())
     else:
         logger.info("No successful solution found")
     logger.info("=" * 60)
