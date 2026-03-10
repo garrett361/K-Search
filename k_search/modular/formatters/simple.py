@@ -42,14 +42,10 @@ class DefaultFormatter:
         return node_str
 
     def format_node(self, node: Node) -> str:
-        parts: list[str] = [f"id={node._id}"]
+        parts: list[str] = [f"id={node.id}"]
         parts.append(f"status={node.status}")
 
         title = node.action.title if node.action else "root"
         parts.append(f'title="{title}"')
-
-        if node.annotations:
-            ann_str = ", ".join(f"{k}: {v}" for k, v in node.annotations.items())
-            parts.append(f"annotations={{{ann_str}}}")
 
         return "(" + ", ".join(parts) + ")"
