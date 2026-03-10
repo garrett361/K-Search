@@ -14,7 +14,7 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 import openai
 
@@ -60,9 +60,8 @@ LLMCall = Callable[[str], str]
 class CycleConfig:
     """Configuration for cycle-based execution."""
 
-    max_attempts_per_action: int = 10
-    stagnation_window: int = 5
-    stagnation_over_base_window: int = 5
+    max_rounds_per_cycle: int = 10
+    stagnation_rounds: int = 5
 
 
 class V1WorldModel:
@@ -259,7 +258,7 @@ class V1WorldModel:
             return {}
 
         node_annot = node.annotations or {}
-        action_annot = node.action.annotations if node.action else {}
+        action_annot = (node.action.annotations if node.action else None) or {}
 
         parent_is_root = node_annot.get(
             "parent_is_root", node.parent is None or node.parent.parent is None
@@ -475,16 +474,14 @@ class V1SequentialExecutor:
         best_score = 0.0
         best_speedup: float | None = None
         no_improve = 0
-        no_improve_over_base = 0
 
         # All metadata from action_ctx (which reads from modular Node)
         action_text = action_ctx.get(
             "action_text", node.action.title if node.action else ""
         )
         base_code = action_ctx.get("base_code", "")
-        base_score = action_ctx.get("base_score", 0.0)
 
-        max_attempts = min(self._cycle_config.max_attempts_per_action, rounds_remaining)
+        max_attempts = min(self._cycle_config.max_rounds_per_cycle, rounds_remaining)
 
         current_code = ""
         for attempt in range(max_attempts):
@@ -496,7 +493,7 @@ class V1SequentialExecutor:
                 best_score,
                 best_speedup_str,
                 no_improve,
-                self._cycle_config.stagnation_window,
+                self._cycle_config.stagnation_rounds,
             )
 
             last_round = rounds[-1] if rounds else None
@@ -566,34 +563,21 @@ class V1SequentialExecutor:
                     no_improve,
                 )
 
-            if best_score > 0 and base_score > 0:
-                if best_score > base_score:
-                    no_improve_over_base = 0
-                else:
-                    no_improve_over_base += 1
-
-            if no_improve >= self._cycle_config.stagnation_window:
+            if no_improve >= self._cycle_config.stagnation_rounds:
                 logger.info("[STAGNATION] no improvement for %d rounds", no_improve)
                 break
 
-            if (
-                no_improve_over_base >= self._cycle_config.stagnation_over_base_window
-                and best_score > 0
-            ):
-                logger.info(
-                    "[STAGNATION] no improvement over base for %d rounds",
-                    no_improve_over_base,
-                )
-                break
-
         return Cycle(rounds=rounds)
+
+
+ReasoningEffort = Literal["low", "medium", "high"]
 
 
 def create_llm_call(
     client: openai.OpenAI,
     model_name: str,
     use_reasoning_api: bool = True,
-    reasoning_effort: str = "medium",
+    reasoning_effort: ReasoningEffort = "medium",
 ) -> LLMCall:
     """Create LLM callable for search loop."""
 
@@ -620,7 +604,7 @@ def main():
         "--task", required=True, help="Task name (e.g., causal_conv1d, trimul)"
     )
     parser.add_argument("--language", default="triton", choices=["triton", "cuda"])
-    parser.add_argument("--max-rounds", type=int, default=50)
+    parser.add_argument("--max-rounds", type=int, default=128)
     parser.add_argument("--model-name", required=True, help="LLM model name")
     parser.add_argument("--base-url", default=None, help="OpenAI-compatible base URL")
     parser.add_argument(
@@ -636,9 +620,14 @@ def main():
     parser.add_argument(
         "--reasoning-effort", default="medium", choices=["low", "medium", "high"]
     )
-    parser.add_argument("--max-attempts", type=int, default=10)
-    parser.add_argument("--stagnation-window", type=int, default=5)
-    parser.add_argument("--stagnation-over-base-window", type=int, default=5)
+    parser.add_argument("--max-rounds-per-cycle", type=int, default=10)
+    parser.add_argument("--stagnation-rounds", type=int, default=5)
+    parser.add_argument(
+        "--max-difficulty",
+        type=int,
+        default=None,
+        help="Max difficulty (1-5) for action selection",
+    )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Enable debug logging"
     )
@@ -678,16 +667,21 @@ def main():
         client_kwargs["default_headers"] = {"RITS_API_KEY": rits_key}
 
     client = openai.OpenAI(**client_kwargs)
+    reasoning_effort: ReasoningEffort = args.reasoning_effort
     llm = create_llm_call(
         client,
         args.model_name,
         use_reasoning_api=args.use_reasoning_api,
-        reasoning_effort=args.reasoning_effort,
+        reasoning_effort=reasoning_effort,
     )
+
+    selection_policy = WorldModelSelectionPolicy()
+    if args.max_difficulty is not None:
+        selection_policy.max_difficulty_1_to_5 = int(args.max_difficulty)
 
     wm_config = WorldModelConfig(
         enabled=True,
-        selection_policy=WorldModelSelectionPolicy(),
+        selection_policy=selection_policy,
     )
     wm_manager = WorldModelManager(
         llm_call=llm,
@@ -711,9 +705,8 @@ def main():
     )
 
     cycle_config = CycleConfig(
-        max_attempts_per_action=args.max_attempts,
-        stagnation_window=args.stagnation_window,
-        stagnation_over_base_window=args.stagnation_over_base_window,
+        max_rounds_per_cycle=args.max_rounds_per_cycle,
+        stagnation_rounds=args.stagnation_rounds,
     )
 
     tree = Tree(root=Node(status="closed"))

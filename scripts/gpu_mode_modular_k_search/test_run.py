@@ -82,10 +82,10 @@ def test_stagnation_ends_cycle_early():
         prompt_builder=prompt_builder,
         tree=tree,
         max_rounds=20,
-        cycle_config=CycleConfig(max_attempts_per_action=10, stagnation_window=3),
+        cycle_config=CycleConfig(max_rounds_per_cycle=10, stagnation_rounds=3),
     )
 
     executor.run()
 
-    # Should stop after stagnation_window+1 (first success + 3 no-improve)
+    # Should stop after stagnation_rounds+1 (first success + 3 no-improve)
     assert evaluator._idx <= 5
