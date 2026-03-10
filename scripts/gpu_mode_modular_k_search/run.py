@@ -14,7 +14,7 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Literal, TypedDict
+from typing import Any, Callable, Literal
 
 import openai
 
@@ -78,23 +78,30 @@ for noisy_logger in ("httpcore", "httpx", "openai", "openai._base_client"):
 LLMCall = Callable[[str], str]
 
 
-class ProposeContext(TypedDict):
-    """Required context for V1WorldModel.propose()."""
+@dataclass
+class V1ProposeContext:
+    """Context for V1WorldModel.propose()."""
 
+    tree: Tree
     round_idx: int
-    current_code: str
+    current_code: str = ""
 
 
-class UpdateContext(TypedDict):
-    """Required context for V1WorldModel.update()."""
+@dataclass
+class V1SelectContext:
+    """Context for V1WorldModel.select()."""
 
-    cycle_succeeded: bool
-    best_round: Round | None
+    tree: Tree
+
+
+@dataclass
+class V1UpdateContext:
+    """Context for V1WorldModel.update()."""
+
+    tree: Tree
     node: Node
-    code: str
+    cycle: Cycle
     round_idx: int
-    attempts: int
-    logs: str
 
 
 @dataclass
@@ -137,26 +144,24 @@ class V1WorldModel:
         )
         self._initialized = True
 
-    def propose(self, tree: Tree, context: ProposeContext) -> list[Node]:
+    def propose(self, context: V1ProposeContext) -> list[Node]:
         """Generate new action nodes by calling V1 manager's propose_action_nodes."""
         self._ensure_initialized()
-        current_code: str = context["current_code"]
-        round_idx: int = context["round_idx"]
 
         self._manager.propose_action_nodes(
             definition_name=self._task_name,
             definition_text=self._definition_text,
-            current_code_excerpt=current_code if current_code else None,
+            current_code_excerpt=context.current_code if context.current_code else None,
             current_tree_path=self._manager.get_tree_path_text(
                 definition_name=self._task_name
             ),
             baseline_targets_text="",
-            round_index=round_idx,
+            round_index=context.round_idx,
         )
 
-        return self._sync_frontier_from_manager(tree)
+        return self._sync_frontier_from_manager(context.tree)
 
-    def select(self, tree: Tree, context: dict[str, Any] | None = None) -> list[Node]:
+    def select(self, context: V1SelectContext) -> list[Node]:
         """Select next action using V1's policy-based chooser."""
         node_id = self._manager.choose_next_action_node_id(
             definition_name=self._task_name
@@ -172,20 +177,19 @@ class V1WorldModel:
             return [node]
         return []
 
-    def update(self, tree: Tree, context: UpdateContext) -> None:
+    def update(self, context: V1UpdateContext) -> None:
         """Update tree after cycle - attach solution or mark too hard."""
-        success: bool = context["cycle_succeeded"]
-        best_round: Round | None = context["best_round"]
-        round_idx: int = context["round_idx"]
-        code: str = context["code"]
-        node: Node = context["node"]
+        node = context.node
+        cycle = context.cycle
+        best_round = cycle.best_round
+        succeeded = best_round is not None
+        code = best_round.llm_response if best_round else ""
 
-        # Get action text from modular Node (authoritative source)
         action_text = ""
         if node and node.action:
             action_text = node.action.title
 
-        if success and best_round:
+        if succeeded:
             from k_search.tasks.task_base import EvalResult
 
             eval_dict = best_round.result.get_metrics()
@@ -204,7 +208,7 @@ class V1WorldModel:
                 ),
                 eval_result=eval_result,
                 prediction=None,
-                round_index=round_idx,
+                round_index=context.round_idx,
             )
         else:
             self._manager.note_action_too_hard(
@@ -216,10 +220,10 @@ class V1WorldModel:
                     definition_name=self._task_name
                 ),
                 eval_result=None,
-                debug_and_improve_round=context["attempts"],
+                debug_and_improve_round=len(cycle.rounds),
                 debug_and_improve_max_rounds=10,
                 baseline_targets_text="",
-                round_index=round_idx,
+                round_index=context.round_idx,
             )
 
     def _get_prompt_section(self, max_chars: int = 6000) -> str:
@@ -451,17 +455,20 @@ class V1SequentialExecutor:
     def run(self) -> Node | None:
         """Execute search, return best node."""
         rounds_used = 0
+        select_context = V1SelectContext(tree=self._tree)
 
         while rounds_used < self._max_rounds:
             logger.info(
                 "[CYCLE_START] rounds_used=%d/%d", rounds_used, self._max_rounds
             )
 
-            self._world_model.propose(
-                self._tree, context={"round_idx": rounds_used, "current_code": ""}
+            propose_context = V1ProposeContext(
+                tree=self._tree,
+                round_idx=rounds_used,
             )
+            self._world_model.propose(propose_context)
 
-            selected = self._world_model.select(self._tree, context={})
+            selected = self._world_model.select(select_context)
             if not selected:
                 logger.info("No more actions to select, stopping")
                 break
@@ -481,18 +488,13 @@ class V1SequentialExecutor:
             node.cycle = cycle
             node.status = "closed"
 
-            self._world_model.update(
-                self._tree,
-                context={
-                    "cycle_succeeded": cycle.succeeded,
-                    "best_round": cycle.best_round,
-                    "node": node,
-                    "code": cycle.best_round.llm_response if cycle.best_round else "",
-                    "round_idx": rounds_used + len(cycle.rounds) - 1,
-                    "attempts": len(cycle.rounds),
-                    "logs": cycle.rounds[-1].result.get_log() if cycle.rounds else "",
-                },
+            update_context = V1UpdateContext(
+                tree=self._tree,
+                node=node,
+                cycle=cycle,
+                round_idx=rounds_used + len(cycle.rounds) - 1,
             )
+            self._world_model.update(update_context)
 
             if cycle.best_round and cycle.best_round.score > self._global_best_score:
                 self._global_best_round = cycle.best_round
@@ -590,7 +592,12 @@ class V1SequentialExecutor:
                 best_score = score
                 best_speedup = speedup
                 no_improve = 0
-                logger.info("[IMPROVED] score=%.4f, speedup=%s, best_speedup=%s", score, speedup_str, speedup_str)
+                logger.info(
+                    "[IMPROVED] score=%.4f, speedup=%s, best_speedup=%s",
+                    score,
+                    speedup_str,
+                    speedup_str,
+                )
             else:
                 no_improve += 1
                 best_speedup_str = f"{best_speedup:.2f}x" if best_speedup else "-"
@@ -790,6 +797,10 @@ def main():
 
     logger.info("=" * 60)
     logger.info("SEARCH COMPLETE")
+    if best_node:
+        logger.info(
+            "Best node: %s", best_node.action.title if best_node.action else "root"
+        )
     global_best = executor._global_best_round
     if global_best:
         logger.info("Best score: %.4f", global_best.score)

@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import Callable
-from typing import Any
+from dataclasses import dataclass
 
 from k_search.modular.logging import response_color
 from k_search.modular.world.action import Action
@@ -11,7 +11,15 @@ from k_search.modular.world.tree import Tree
 
 logger = logging.getLogger(__name__)
 
-ActionPromptFn = Callable[[Tree, dict[str, Any] | None], str]
+
+@dataclass
+class SimpleWorldModelContext:
+    """Context for SimpleWorldModel methods."""
+
+    tree: Tree
+
+
+ActionPromptFn = Callable[[SimpleWorldModelContext], str]
 
 
 INITIAL_ACTION = "Write an optimized implementation."
@@ -31,8 +39,9 @@ class SimpleWorldModel:
         self._llm = llm
         self._action_prompt_fn = action_prompt_fn
 
-    def propose(self, tree: Tree, context: dict[str, Any] | None = None) -> list[Node]:
+    def propose(self, context: SimpleWorldModelContext) -> list[Node]:
         """Generate action via LLM, return node (don't add to tree)."""
+        tree = context.tree
         parent = self._get_last_node(tree)
 
         if not tree.root.children:
@@ -40,7 +49,7 @@ class SimpleWorldModel:
             action_description = INITIAL_ACTION
         else:
             logger.debug("Requesting action from LLM (prior rounds exist)")
-            prompt = self._action_prompt_fn(tree, context)
+            prompt = self._action_prompt_fn(context)
             raw_response = self._llm(prompt)
             logger.debug(response_color(f"[ACTION_RESPONSE] {raw_response.strip()}"))
             action_description = raw_response.strip()
@@ -56,12 +65,13 @@ class SimpleWorldModel:
         logger.info(f"Proposed action: {action.title[:50]}...")
         return [node]
 
-    def select(self, tree: Tree, context: dict[str, Any] | None = None) -> list[Node]:
+    def select(self, context: SimpleWorldModelContext) -> list[Node]:
         """Return latest node (last in frontier)."""
+        tree = context.tree
         frontier = tree.get_frontier()
         return frontier[-1:] if frontier else []
 
-    def update(self, tree: Tree, context: dict[str, Any] | None = None) -> None:
+    def update(self, context: SimpleWorldModelContext) -> None:
         """No-op for simple model."""
         pass
 

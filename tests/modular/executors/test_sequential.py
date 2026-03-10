@@ -5,7 +5,10 @@ from unittest.mock import MagicMock
 from k_search.modular.executors.sequential import SequentialExecutor
 from k_search.modular.world.node import Node
 from k_search.modular.world.tree import Tree
-from k_search.modular.world_models.simple import SimpleWorldModel
+from k_search.modular.world_models.simple import (
+    SimpleWorldModel,
+    SimpleWorldModelContext,
+)
 
 
 def _mock_task():
@@ -28,7 +31,7 @@ def _mock_evaluator(success=True):
     return evaluator
 
 
-def _simple_action_prompt_fn(tree, context):
+def _simple_action_prompt_fn(context: SimpleWorldModelContext) -> str:
     return "What to try next?"
 
 

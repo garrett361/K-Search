@@ -11,6 +11,7 @@ from k_search.modular.metrics import NoOpMetricsTracker
 from k_search.modular.protocols import ArtifactStore, Evaluator, MetricsTracker
 from k_search.modular.protocols.task_definition import TaskDefinition
 from k_search.modular.world.cycle import Cycle
+from k_search.modular.world_models.simple import SimpleWorldModelContext
 from k_search.modular.world.node import Node
 from k_search.modular.world.round import Round
 from k_search.modular.world.tree import Tree
@@ -56,18 +57,19 @@ class SequentialExecutor:
         Termination: runs for max_rounds or until select() returns empty.
         TODO: termination responsibility (executor vs world model vs tree) not yet defined.
         """
+        context = SimpleWorldModelContext(tree=self._tree)
         for round_idx in range(self._max_rounds):
             logger.info(
                 "[ROUND_START] === Round %d/%d ===", round_idx + 1, self._max_rounds
             )
 
-            proposed = self._world_model.propose(self._tree)
+            proposed = self._world_model.propose(context)
             logger.debug("World model proposed %d node(s)", len(proposed))
 
             for node in proposed:
                 self._tree.add_node(node)
 
-            nodes = self._world_model.select(self._tree)
+            nodes = self._world_model.select(context)
             if not nodes:
                 logger.info("No nodes to evaluate, stopping")
                 break
@@ -76,7 +78,7 @@ class SequentialExecutor:
             for node in nodes:
                 self._execute_node(node, round_idx)
 
-            self._world_model.update(self._tree)
+            self._world_model.update(context)
             logger.info("[ROUND_END] === Round %d END ===", round_idx + 1)
 
         return self._tree.get_best_node()

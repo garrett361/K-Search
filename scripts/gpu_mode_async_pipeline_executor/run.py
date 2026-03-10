@@ -8,6 +8,7 @@ import os
 import re
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -68,16 +69,27 @@ def _extract_code_block(llm_response: str) -> str:
     return llm_response
 
 
+def _collect_all_nodes(tree: Tree) -> list[Node]:
+    """Collect all nodes in tree via BFS."""
+    result = []
+    queue = [tree.root]
+    while queue:
+        node = queue.pop(0)
+        result.append(node)
+        queue.extend(node.children)
+    return result
+
+
 def _get_last_evaluated_node(tree: Tree) -> Node | None:
     """Return most recently evaluated node (highest ID, closed, has cycle)."""
     evaluated = [
         n
-        for n in tree._all_nodes()
+        for n in _collect_all_nodes(tree)
         if n.status == "closed" and n.cycle and n.cycle.rounds
     ]
     if not evaluated:
         return None
-    return max(evaluated, key=lambda n: int(n._id))
+    return max(evaluated, key=lambda n: int(n.id))
 
 
 ACTION_PROMPT_TEMPLATE = """You are proposing the next optimization action for a GPU kernel.
@@ -151,8 +163,9 @@ def create_action_prompt_fn(
 ):
     """Create GPU mode specific action prompt function."""
 
-    async def action_prompt_fn(tree: Tree, context: dict[str, Any] | None) -> str:
+    async def action_prompt_fn(context: AsyncSimpleWorldModelContext) -> str:
         task_spec = task_def.get_prompt_text()
+        tree = context.tree
 
         feedback_section = ""
         best_node = tree.get_best_node()
@@ -233,7 +246,7 @@ def create_code_prompt_fn(
             best_node = tree.get_best_node()
             if best_node and best_node.cycle and best_node.cycle.best_round:
                 best_round = best_node.cycle.best_round
-                if last_node is None or best_node._id != last_node._id:
+                if last_node is None or best_node.id != last_node.id:
                     best_summary = _format_round_summary(best_round)
                     best_code = best_round.llm_response
                     prompt += f"\n\nBest Successful Solution So Far:\n{best_summary}\n\nCode:\n{best_code}"
@@ -251,7 +264,15 @@ def create_code_prompt_fn(
 
 INITIAL_ACTION = "Write an optimized implementation."
 
-AsyncActionPromptFn = Callable[[Tree, dict[str, Any] | None], Any]
+
+@dataclass
+class AsyncSimpleWorldModelContext:
+    """Context for AsyncSimpleWorldModel methods."""
+
+    tree: Tree
+
+
+AsyncActionPromptFn = Callable[[AsyncSimpleWorldModelContext], Any]
 
 
 class AsyncSimpleWorldModel:
@@ -261,17 +282,18 @@ class AsyncSimpleWorldModel:
         self._llm = llm
         self._action_prompt_fn = action_prompt_fn
 
-    async def propose(
-        self, tree: Tree, context: dict[str, Any] | None = None
-    ) -> list[Node]:
-        completed = [n for n in tree._all_nodes() if n.status == "closed" and n.cycle]
+    async def propose(self, context: AsyncSimpleWorldModelContext) -> list[Node]:
+        tree = context.tree
+        completed = [
+            n for n in _collect_all_nodes(tree) if n.status == "closed" and n.cycle
+        ]
 
         if not completed:
             logger.debug("No completed nodes yet, using initial action")
             action_desc = INITIAL_ACTION
         else:
             logger.debug("Completed nodes exist, requesting action from LLM")
-            prompt = await self._action_prompt_fn(tree, context)
+            prompt = await self._action_prompt_fn(context)
             raw_response = await self._llm(prompt)
             logger.debug(response_color(f"[ACTION_RESPONSE] {raw_response.strip()}"))
             action_desc = raw_response.strip()
@@ -282,25 +304,25 @@ class AsyncSimpleWorldModel:
         logger.debug(
             "Created node: action=%r, parent_id=%s, status=%s",
             action.title[:50],
-            parent._id,
+            parent.id,
             node.status,
         )
         logger.info(f"Proposed action: {action.title[:50]}...")
         return [node]
 
-    async def select(
-        self, tree: Tree, context: dict[str, Any] | None = None
-    ) -> list[Node]:
+    async def select(self, context: AsyncSimpleWorldModelContext) -> list[Node]:
         return []
 
-    async def update(self, tree: Tree, context: dict[str, Any] | None = None) -> None:
+    async def update(self, context: AsyncSimpleWorldModelContext) -> None:
         pass
 
     def _get_last_closed_node(self, tree: Tree) -> Node | None:
-        closed = [n for n in tree._all_nodes() if n.status == "closed" and n.cycle]
+        closed = [
+            n for n in _collect_all_nodes(tree) if n.status == "closed" and n.cycle
+        ]
         if not closed:
             return None
-        return max(closed, key=lambda n: int(n._id))
+        return max(closed, key=lambda n: int(n.id))
 
 
 CodePromptFn = Callable[[Node, TaskDefinition], str]
@@ -359,10 +381,11 @@ class AsyncPipelineExecutor:
         llm_queue: asyncio.Queue[Node | None],
         completion_queue: asyncio.Queue[Node],
     ) -> None:
+        context = AsyncSimpleWorldModelContext(tree=self._tree)
         initial_count = min(self._llm_queue_depth, self._max_rounds)
         logger.info(f"[PROPOSER] Initial burst: proposing {initial_count} nodes")
         for i in range(initial_count):
-            nodes = await self._world_model.propose(self._tree)
+            nodes = await self._world_model.propose(context)
             for node in nodes:
                 self._tree.add_node(node)
                 await llm_queue.put(node)
@@ -377,7 +400,7 @@ class AsyncPipelineExecutor:
                 f"proposing next"
             )
 
-            nodes = await self._world_model.propose(self._tree)
+            nodes = await self._world_model.propose(context)
             for node in nodes:
                 self._tree.add_node(node)
                 await llm_queue.put(node)

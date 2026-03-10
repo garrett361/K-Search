@@ -6,6 +6,7 @@ from k_search.modular.world.action import Action
 from k_search.modular.world.cycle import Cycle
 from k_search.modular.world.node import Node
 from k_search.modular.world.tree import Tree
+from k_search.modular.world_models.simple import SimpleWorldModelContext
 
 from scripts.gpu_mode_simple_linear_executor.run import (
     ACTION_PROMPT_TEMPLATE,
@@ -25,7 +26,7 @@ def test_action_prompt_first_round():
     tree = Tree(root=root)
 
     prompt_fn = create_action_prompt_fn(mock_task_def, mock_llm)
-    prompt = prompt_fn(tree, None)
+    prompt = prompt_fn(SimpleWorldModelContext(tree=tree))
 
     assert "Optimize kernel X" in prompt
     assert "Task Specification" in prompt
@@ -52,7 +53,7 @@ def test_action_prompt_with_history():
     tree.add_node(best)
 
     prompt_fn = create_action_prompt_fn(mock_task_def, mock_llm)
-    prompt = prompt_fn(tree, None)
+    prompt = prompt_fn(SimpleWorldModelContext(tree=tree))
 
     assert "Optimize kernel X" in prompt
     assert "Previous Best Result" in prompt
@@ -74,7 +75,7 @@ def test_action_prompt_no_successful_cycle():
     tree.add_node(failed)
 
     prompt_fn = create_action_prompt_fn(mock_task_def, mock_llm)
-    prompt = prompt_fn(tree, None)
+    prompt = prompt_fn(SimpleWorldModelContext(tree=tree))
 
     assert "Previous Best Result" not in prompt
 
@@ -149,7 +150,7 @@ def test_action_prompt_includes_last_failure():
     tree.add_node(failed)
 
     prompt_fn = create_action_prompt_fn(mock_task_def, mock_llm, analyze_failures=True)
-    prompt = prompt_fn(tree, None)
+    prompt = prompt_fn(SimpleWorldModelContext(tree=tree))
 
     assert "Last Round (FAILED)" in prompt
     assert "try vectorization" in prompt

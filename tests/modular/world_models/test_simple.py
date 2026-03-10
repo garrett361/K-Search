@@ -6,10 +6,13 @@ import pytest
 
 from k_search.modular.world.node import Node
 from k_search.modular.world.tree import Tree
-from k_search.modular.world_models.simple import SimpleWorldModel
+from k_search.modular.world_models.simple import (
+    SimpleWorldModel,
+    SimpleWorldModelContext,
+)
 
 
-def _simple_action_prompt_fn(tree, context):
+def _simple_action_prompt_fn(context: SimpleWorldModelContext) -> str:
     return "What to try next?"
 
 
@@ -21,7 +24,7 @@ def test_propose_uses_initial_action_on_empty_tree():
     tree = Tree(root=root)
     model = SimpleWorldModel(mock_llm, _simple_action_prompt_fn)
 
-    nodes = model.propose(tree)
+    nodes = model.propose(SimpleWorldModelContext(tree=tree))
 
     assert len(nodes) == 1
     assert nodes[0].action is not None
@@ -50,7 +53,7 @@ def test_propose_calls_llm_with_history():
     tree.add_node(first)
 
     model = SimpleWorldModel(mock_llm, _simple_action_prompt_fn)
-    nodes = model.propose(tree)
+    nodes = model.propose(SimpleWorldModelContext(tree=tree))
 
     assert len(nodes) == 1
     assert nodes[0].action is not None
@@ -68,35 +71,9 @@ def test_propose_sets_parent_to_last_in_chain():
     tree.add_node(first)
 
     model = SimpleWorldModel(mock_llm, _simple_action_prompt_fn)
-    nodes = model.propose(tree)
+    nodes = model.propose(SimpleWorldModelContext(tree=tree))
 
     assert nodes[0].parent is first
-
-
-def test_propose_passes_context_to_prompt_fn():
-    """propose() passes context to action_prompt_fn (when tree has history)."""
-    mock_llm = MagicMock(return_value="action")
-    mock_prompt_fn = MagicMock(return_value="prompt")
-
-    root = Node(status="closed")
-    tree = Tree(root=root)
-
-    # Add history so prompt_fn is called
-    from k_search.modular.world.cycle import Cycle
-
-    first = Node(parent=root, status="closed")
-    mock_round = MagicMock()
-    mock_round.score = 0.5
-    mock_round.result.succeeded.return_value = True
-    first.cycle = Cycle(rounds=[mock_round])
-    tree.add_node(first)
-
-    model = SimpleWorldModel(mock_llm, mock_prompt_fn)
-
-    context = {"round_idx": 5}
-    model.propose(tree, context)
-
-    mock_prompt_fn.assert_called_once_with(tree, context)
 
 
 def test_propose_raises_on_branching_tree():
@@ -113,7 +90,7 @@ def test_propose_raises_on_branching_tree():
     model = SimpleWorldModel(mock_llm, _simple_action_prompt_fn)
 
     with pytest.raises(ValueError, match="linear tree"):
-        model.propose(tree)
+        model.propose(SimpleWorldModelContext(tree=tree))
 
 
 def test_select_returns_latest():
@@ -127,7 +104,7 @@ def test_select_returns_latest():
     tree.add_node(node2)
 
     model = SimpleWorldModel(MagicMock(), _simple_action_prompt_fn)
-    selected = model.select(tree)
+    selected = model.select(SimpleWorldModelContext(tree=tree))
 
     assert selected == [node2]
 
@@ -138,7 +115,7 @@ def test_select_empty_frontier():
     tree = Tree(root=root)
 
     model = SimpleWorldModel(MagicMock(), _simple_action_prompt_fn)
-    selected = model.select(tree)
+    selected = model.select(SimpleWorldModelContext(tree=tree))
 
     assert selected == []
 
@@ -149,4 +126,4 @@ def test_update_is_noop():
     tree = Tree(root=root)
 
     model = SimpleWorldModel(MagicMock(), _simple_action_prompt_fn)
-    model.update(tree)
+    model.update(SimpleWorldModelContext(tree=tree))

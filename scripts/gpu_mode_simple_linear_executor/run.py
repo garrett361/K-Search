@@ -10,7 +10,6 @@ import os
 import sys
 from pathlib import Path
 from collections.abc import Callable
-from typing import Any
 
 import openai
 
@@ -21,7 +20,10 @@ from k_search.modular.logging import prompt_color
 from k_search.modular.protocols.task_definition import TaskDefinition
 from k_search.modular.world.node import Node
 from k_search.modular.world.tree import Tree
-from k_search.modular.world_models.simple import SimpleWorldModel
+from k_search.modular.world_models.simple import (
+    SimpleWorldModel,
+    SimpleWorldModelContext,
+)
 from k_search.tasks.gpu_mode_task import GpuModeTriMulTask
 
 logging.basicConfig(
@@ -71,16 +73,27 @@ def _extract_code_block(llm_response: str) -> str:
     return llm_response
 
 
+def _collect_all_nodes(tree: Tree) -> list[Node]:
+    """Collect all nodes in tree via BFS."""
+    result = []
+    queue = [tree.root]
+    while queue:
+        node = queue.pop(0)
+        result.append(node)
+        queue.extend(node.children)
+    return result
+
+
 def _get_last_evaluated_node(tree: Tree) -> Node | None:
     """Return most recently evaluated node (highest ID, closed, has cycle)."""
     evaluated = [
         n
-        for n in tree._all_nodes()
+        for n in _collect_all_nodes(tree)
         if n.status == "closed" and n.cycle and n.cycle.rounds
     ]
     if not evaluated:
         return None
-    return max(evaluated, key=lambda n: int(n._id))
+    return max(evaluated, key=lambda n: int(n.id))
 
 
 ACTION_PROMPT_TEMPLATE = """You are proposing the next optimization action for a GPU kernel.
@@ -154,8 +167,9 @@ def create_action_prompt_fn(
     If analyze_failures=True, also uses LLM to analyze failures.
     """
 
-    def action_prompt_fn(tree: Tree, context: dict[str, Any] | None) -> str:
+    def action_prompt_fn(context: SimpleWorldModelContext) -> str:
         task_spec = task_def.get_prompt_text()
+        tree = context.tree
 
         feedback_section = ""
         best_node = tree.get_best_node()
@@ -246,7 +260,7 @@ def create_code_prompt_fn(
             best_node = tree.get_best_node()
             if best_node and best_node.cycle and best_node.cycle.best_round:
                 best_round = best_node.cycle.best_round
-                if last_node is None or best_node._id != last_node._id:
+                if last_node is None or best_node.id != last_node.id:
                     best_summary = _format_round_summary(best_round)
                     best_code = best_round.llm_response
                     prompt += f"\n\nBest Successful Solution So Far:\n{best_summary}\n\nCode:\n{best_code}"
