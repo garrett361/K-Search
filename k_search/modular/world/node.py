@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from k_search.modular.world.action import Action
@@ -14,11 +14,9 @@ if TYPE_CHECKING:
 class Node:
     """Search tree node."""
 
-    _id: str = ""
+    id: str = ""
     parent: Node | None = None
     children: list[Node] = field(default_factory=list)
-    status: str = "open"  # "open" | "in_progress" | "closed"
-
+    status: str = ""
     action: Action | None = None
     cycle: Cycle | None = None
-    annotations: dict[str, Any] | None = None
