@@ -53,7 +53,6 @@ class V1Action(Action):
     expected_vs_baseline_factor: float | None = None
     confidence: float = 0.5
     rationale: str = ""
-    v1_action_data: dict[str, Any] | None = None
 
 
 @dataclass
@@ -268,7 +267,6 @@ class V1WorldModel:
                     expected_vs_baseline_factor=expected_vs_baseline,
                     confidence=confidence,
                     rationale=rationale,
-                    v1_action_data=action_data,
                 ),
                 node_id=node_id,
                 parent_id=parent_id,
