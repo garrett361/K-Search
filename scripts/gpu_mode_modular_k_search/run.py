@@ -18,7 +18,7 @@ from typing import Any, Callable, Literal, cast
 
 import openai
 
-from k_search.kernel_generators.world_model import render_world_model_section
+from k_search.kernel_generators.world_model import Prediction, render_world_model_section
 from k_search.kernel_generators.world_model_manager import (
     WorldModelConfig,
     WorldModelManager,
@@ -99,6 +99,7 @@ class V1UpdateContext:
     node: Node
     cycle: Cycle
     round_idx: int
+    max_debug_improve_rounds: int
 
 
 @dataclass
@@ -196,24 +197,41 @@ class V1WorldModel:
 
     def update(self, context: V1UpdateContext) -> None:
         """Update tree after cycle - attach solution or mark too hard."""
+        from k_search.tasks.task_base import EvalResult
+
         node = context.node
         cycle = context.cycle
         best_round = cycle.best_round
         code = best_round.llm_response if best_round else ""
         action_text = node.action.title if (node and node.action) else ""
 
-        if best_round is not None:
-            from k_search.tasks.task_base import EvalResult
+        # Extract prediction from action metadata (V1 semantics)
+        prediction: Prediction | None = None
+        if node and node.action:
+            action = node.action
+            evb = getattr(action, "expected_vs_baseline_factor", None)
+            if isinstance(evb, (int, float)):
+                prediction = Prediction(
+                    expected_vs_baseline_factor=float(evb),
+                    confidence=getattr(action, "confidence", 0.5),
+                    rationale=str(getattr(action, "rationale", "") or ""),
+                )
 
+        if best_round is not None:
             eval_dict = best_round.result.get_metrics()
             if best_round.result.succeeded():
                 eval_result = EvalResult(
                     status="passed",
-                    latency_ms=eval_dict["latency_ms"],
-                    speedup_factor=eval_dict["speedup_factor"],
+                    latency_ms=eval_dict.get("latency_ms"),
+                    speedup_factor=eval_dict.get("speedup_factor"),
                 )
             else:
                 eval_result = EvalResult(status="failed")
+            has_pred = prediction is not None
+            logger.info(
+                f"[WorldModel: update] action={action_text!r}, status={eval_result.status}, "
+                f"prediction={has_pred}, round_idx={context.round_idx}"
+            )
             self._manager.refine(
                 definition_name=self.task_name,
                 definition_text=self._definition_text,
@@ -223,10 +241,29 @@ class V1WorldModel:
                     definition_name=self.task_name
                 ),
                 eval_result=eval_result,
-                prediction=None,
+                prediction=prediction,
                 round_index=context.round_idx,
             )
         else:
+            # V1 semantics: pass last round's eval_result if available
+            last_eval: EvalResult | None = None
+            if cycle.rounds:
+                last_round = cycle.rounds[-1]
+                last_metrics = last_round.result.get_metrics()
+                if last_round.result.succeeded():
+                    last_eval = EvalResult(
+                        status="passed",
+                        latency_ms=last_metrics.get("latency_ms"),
+                        speedup_factor=last_metrics.get("speedup_factor"),
+                    )
+                else:
+                    last_eval = EvalResult(status="failed")
+                code = last_round.llm_response
+
+            logger.info(
+                f"[WorldModel: update] action={action_text!r}, rounds={len(cycle.rounds)}, "
+                f"max_debug_improve={context.max_debug_improve_rounds}, has_last_eval={last_eval is not None}"
+            )
             self._manager.note_action_too_hard(
                 definition_name=self.task_name,
                 definition_text=self._definition_text,
@@ -235,15 +272,15 @@ class V1WorldModel:
                 current_tree_path=self._manager.get_tree_path_text(
                     definition_name=self.task_name
                 ),
-                eval_result=None,
+                eval_result=last_eval,
                 debug_and_improve_round=len(cycle.rounds),
-                debug_and_improve_max_rounds=10,
+                debug_and_improve_max_rounds=context.max_debug_improve_rounds,
                 baseline_targets_text="",
                 round_index=context.round_idx,
             )
         self.invalidate_cache()
 
-    def _get_prompt_section(self, max_chars: int = 6000) -> str:
+    def _get_prompt_section(self, max_chars: int = 50000) -> str:
         """Get world model section to append to prompts."""
         wm_dict = self._get_parsed_wm()
         if wm_dict is None:
@@ -474,7 +511,7 @@ class V1SequentialExecutor:
         self.max_rounds = max_rounds
         self.cycle_config = cycle_config or CycleConfig()
         self.global_best_round: Round | None = None
-        self.global_best_score: float = 0.0
+        self.global_best_score: float = -1.0
 
     def _check_unsupported_task_features(self) -> None:
         """Error if task provides features V2 doesn't support yet."""
@@ -502,7 +539,7 @@ class V1SequentialExecutor:
         select_context = V1SelectContext(tree=self.tree)
 
         while rounds_used < self.max_rounds:
-            logger.info(f"[CYCLE_START] rounds_used={rounds_used}/{self.max_rounds}")
+            logger.info(f"[CYCLE: start] rounds_used={rounds_used}/{self.max_rounds}")
 
             propose_context = V1ProposeContext(
                 tree=self.tree,
@@ -518,7 +555,7 @@ class V1SequentialExecutor:
             node = selected[0]
             node.status = "in_progress"
             action_title = node.action.title if node.action else "unknown"
-            logger.info(f"[ACTION] Selected: {action_title}")
+            logger.info(f"[ACTION: selected] {action_title}")
 
             # Get action context from modular Node (authoritative source)
             action_ctx = self.world_model.get_action_context(node)
@@ -537,6 +574,7 @@ class V1SequentialExecutor:
                 node=node,
                 cycle=cycle,
                 round_idx=rounds_used + len(cycle.rounds) - 1,
+                max_debug_improve_rounds=self.cycle_config.max_debug_improve_rounds,
             )
             self.world_model.update(update_context)
 
@@ -545,7 +583,7 @@ class V1SequentialExecutor:
                 self.global_best_score = cycle.best_round.score
 
             rounds_used += len(cycle.rounds)
-            logger.info(f"[CYCLE_END] cycle_rounds={len(cycle.rounds)}, total={rounds_used}")
+            logger.info(f"[CYCLE: end] cycle_rounds={len(cycle.rounds)}, total={rounds_used}")
 
         return self.tree.get_best_node()
 
@@ -558,7 +596,7 @@ class V1SequentialExecutor:
     ) -> Cycle:
         """Run multiple attempts on a single action with stagnation detection."""
         rounds: list[Round] = []
-        best_score = 0.0
+        best_score = -1.0
         best_speedup: float | None = None
         best_code = ""
         best_result: EvaluationResult | None = None
@@ -570,7 +608,7 @@ class V1SequentialExecutor:
             "action_text", node.action.title if node.action else ""
         )
         base_code = action_ctx.get("base_code", "")
-        base_score = action_ctx.get("base_score", 0.0)
+        base_score = action_ctx.get("base_score", -1.0)
         base_result: EvaluationResult | None = action_ctx.get("base_result")
         parent_is_root = action_ctx.get("parent_is_root", False)
 
@@ -589,7 +627,7 @@ class V1SequentialExecutor:
             global_speedup_str = f"{global_speedup:.2f}x" if global_speedup else "-"
             stag = self.cycle_config.stagnation_rounds
             logger.info(
-                f"[ROUND] cycle_round={attempt + 1}/{max_attempts} | "
+                f"[ROUND: start] cycle_round={attempt + 1}/{max_attempts} | "
                 f"global_round={rounds_used + attempt + 1}/{self.max_rounds} | "
                 f"best={self.global_best_score:.4f} ({global_speedup_str}) | "
                 f"no_improve={no_improve}/{stag} | no_improve_over_base={no_improve_over_base}/{stag}"
@@ -645,7 +683,7 @@ class V1SequentialExecutor:
 
             logger.debug(
                 prompt_color(
-                    f"[CODE_PROMPT] ({len(prompt)} chars, ~{len(prompt) // 4} toks):\n\n{prompt}\n"
+                    f"[ROUND: prompt] ({len(prompt)} chars, ~{len(prompt) // 4} toks):\n\n{prompt}\n"
                 )
             )
 
@@ -653,14 +691,18 @@ class V1SequentialExecutor:
             current_code = code
 
             logger.debug(
-                response_color(f"[CODE_RESPONSE] ({len(code)} chars):\n\n{code}\n")
+                response_color(f"[ROUND: response] ({len(code)} chars):\n\n{code}\n")
             )
 
             impl = self.task.create_impl(code)
             result = self.evaluator.evaluate(impl, context={"round_idx": attempt})
 
-            # V1 semantics: -1.0 on failure, 1/latency on success
-            if result.succeeded():
+            # V1 semantics: use EvalResult.score() priority chain
+            # Priority: metrics["score"] > mean_vs_baseline_factor > speedup_factor > 1/latency
+            inner = getattr(result, "_inner", result)
+            if hasattr(inner, "score") and callable(inner.score):
+                score = inner.score()
+            elif result.succeeded():
                 metrics = result.get_metrics()
                 latency = metrics.get("latency_ms")
                 if isinstance(latency, (int, float)) and latency > 0:
@@ -693,15 +735,15 @@ class V1SequentialExecutor:
                 best_result = result
                 no_improve = 0
                 logger.info(
-                    f"[CYCLE: IMPROVED] score={score:.4f}, speedup={speedup_str}, "
-                    f"best_speedup_in_cycle={speedup_str}"
+                    f"[CYCLE: improved] score={score:.4f}, speedup={speedup_str}, "
+                    f"best_speedup_cycle={speedup_str}, best_speedup_global={global_speedup_str}"
                 )
             else:
                 no_improve += 1
                 best_speedup_str = f"{best_speedup:.2f}x" if best_speedup else "-"
                 logger.info(
-                    f"[CYCLE: NO_IMPROVE] score={score:.4f}, speedup={speedup_str}, "
-                    f"best_speedup_in_cycle={best_speedup_str}, streak={no_improve}"
+                    f"[CYCLE: no_improve] score={score:.4f}, speedup={speedup_str}, "
+                    f"best_speedup_cycle={best_speedup_str}, best_speedup_global={global_speedup_str}, streak={no_improve}"
                 )
 
             # Track failure to beat base (V1 semantics: only when we have a passing
@@ -713,10 +755,10 @@ class V1SequentialExecutor:
                     no_improve_over_base += 1
 
             if no_improve >= self.cycle_config.stagnation_rounds:
-                logger.info(f"[STAGNATION] no improvement for {no_improve} rounds")
+                logger.info(f"[CYCLE: stagnation] no improvement for {no_improve} rounds")
                 break
             if no_improve_over_base >= self.cycle_config.stagnation_rounds:
-                logger.info(f"[STAGNATION] no improvement over base for {no_improve_over_base} rounds")
+                logger.info(f"[CYCLE: stagnation] no improvement over base for {no_improve_over_base} rounds")
                 break
 
         return Cycle(rounds=rounds)
@@ -756,12 +798,12 @@ def wrap_with_action_logging(llm: LLMCall) -> LLMCall:
     def logged_llm_call(prompt: str) -> str:
         logger.debug(
             prompt_color(
-                f"[ACTION_PROMPT] ({len(prompt)} chars, ~{len(prompt) // 4} toks):\n\n{prompt}\n"
+                f"[ACTION: prompt] ({len(prompt)} chars, ~{len(prompt) // 4} toks):\n\n{prompt}\n"
             )
         )
         result = llm(prompt)
         logger.debug(
-            response_color(f"[ACTION_RESPONSE] ({len(result)} chars):\n\n{result}\n")
+            response_color(f"[ACTION: response] ({len(result)} chars):\n\n{result}\n")
         )
         return result
 
