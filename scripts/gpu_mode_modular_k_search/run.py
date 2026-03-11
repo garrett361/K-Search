@@ -35,7 +35,7 @@ from k_search.kernel_generators.world_model_prompts import (
 from k_search.modular.adapters import GpuModeEvaluator, GpuModeTriMulTaskDefinition
 from k_search.modular.llm import get_endpoint
 from k_search.modular.logging import prompt_color, response_color
-from k_search.modular.protocols import Evaluator
+from k_search.modular.protocols import EvaluationResult, Evaluator
 from k_search.modular.protocols.task_definition import TaskDefinition
 from k_search.modular.world.action import Action
 from k_search.modular.world.cycle import Cycle
@@ -105,8 +105,8 @@ class V1UpdateContext:
 class CycleConfig:
     """Configuration for cycle-based execution."""
 
-    max_rounds_per_cycle: int = 10
     stagnation_rounds: int = 5
+    max_debug_improve_rounds: int = 5
 
 
 class V1WorldModel:
@@ -131,6 +131,8 @@ class V1WorldModel:
         self._target_gpu = target_gpu
         self._node_id_map: dict[str, V1Node] = {}
         self._initialized = False
+        self._cached_wm: dict | None = None
+        self._cached_wm_json: str | None = None
 
     def _ensure_initialized(self) -> None:
         if self._initialized:
@@ -140,6 +142,23 @@ class V1WorldModel:
             definition_text=self._definition_text,
         )
         self._initialized = True
+
+    def _get_parsed_wm(self) -> dict | None:
+        """Get parsed world model, caching to avoid redundant json.loads()."""
+        wm_json = self._manager.get(self.task_name)
+        if wm_json is None:
+            self._cached_wm = None
+            self._cached_wm_json = None
+            return None
+        if wm_json != self._cached_wm_json:
+            self._cached_wm = json.loads(wm_json)
+            self._cached_wm_json = wm_json
+        return self._cached_wm
+
+    def invalidate_cache(self) -> None:
+        """Call after operations that modify the world model."""
+        self._cached_wm = None
+        self._cached_wm_json = None
 
     def propose(self, context: V1ProposeContext) -> list[V1Node]:
         """Generate new action nodes by calling V1 manager's propose_action_nodes."""
@@ -155,6 +174,7 @@ class V1WorldModel:
             baseline_targets_text="",
             round_index=context.round_idx,
         )
+        self.invalidate_cache()
 
         return self._sync_frontier_from_manager(context.tree)
 
@@ -189,11 +209,14 @@ class V1WorldModel:
             from k_search.tasks.task_base import EvalResult
 
             eval_dict = best_round.result.get_metrics()
-            eval_result = EvalResult(
-                status="passed" if best_round.result.succeeded() else "failed",
-                latency_ms=eval_dict.get("latency_ms"),
-                speedup_factor=eval_dict.get("speedup_factor"),
-            )
+            if best_round.result.succeeded():
+                eval_result = EvalResult(
+                    status="passed",
+                    latency_ms=eval_dict["latency_ms"],
+                    speedup_factor=eval_dict["speedup_factor"],
+                )
+            else:
+                eval_result = EvalResult(status="failed")
             self._manager.refine(
                 definition_name=self.task_name,
                 definition_text=self._definition_text,
@@ -221,19 +244,20 @@ class V1WorldModel:
                 baseline_targets_text="",
                 round_index=context.round_idx,
             )
+        self.invalidate_cache()
 
     def _get_prompt_section(self, max_chars: int = 6000) -> str:
         """Get world model section to append to prompts."""
-        wm_json = self._manager.get(self.task_name)
-        return render_world_model_section(wm_json, max_chars=max_chars)
+        wm_dict = self._get_parsed_wm()
+        if wm_dict is None:
+            return ""
+        return render_world_model_section(wm_dict, max_chars=max_chars)
 
     def _sync_frontier_from_manager(self, tree: Tree) -> list[V1Node]:
         """Sync V1 JSON tree nodes to modular Tree, return new frontier nodes."""
-        wm_json = self._manager.get(self.task_name)
-        if not wm_json:
+        wm = self._get_parsed_wm()
+        if wm is None:
             raise ValueError(f"No world model found for task {self.task_name}")
-
-        wm = json.loads(wm_json)  # Let JSONDecodeError propagate
 
         dt = wm.get("decision_tree", {})
         nodes_list = dt.get("nodes", [])
@@ -282,10 +306,12 @@ class V1WorldModel:
         """Get context for the selected action node."""
         base_code = ""
         base_score = 0.0
+        base_result: EvaluationResult | None = None
         if node.parent and node.parent.cycle and node.parent.cycle.best_round:
             best = node.parent.cycle.best_round
             base_code = best.llm_response
             base_score = best.score
+            base_result = best.result
 
         action: V1Action | None = node.action
         return {
@@ -297,7 +323,18 @@ class V1WorldModel:
             "parent_is_root": node.parent_is_root,
             "base_code": base_code,
             "base_score": base_score,
+            "base_result": base_result,
         }
+
+
+def _get_perf_summary_lines(result: EvaluationResult | None, prefix: str) -> list[str]:
+    """Extract perf_summary_lines from EvaluationResult wrapper."""
+    if result is None:
+        return []
+    inner = getattr(result, "_inner", result)
+    if hasattr(inner, "perf_summary_lines"):
+        return inner.perf_summary_lines(prefix=prefix)
+    return []
 
 
 class V1PromptBuilder:
@@ -324,6 +361,7 @@ class V1PromptBuilder:
         current_code: str,
         perf_summary: str = "",
         parent_is_root: bool = False,
+        max_debug_improve_rounds: int = 5,
     ) -> str:
         """Build prompt based on cycle phase.
 
@@ -333,6 +371,8 @@ class V1PromptBuilder:
         - Subsequent, has base: debug/improve vs base code
         """
         has_base = bool(base_code and base_code.strip())
+        # V1 semantics: 1-indexed, capped at max_debug_improve_rounds
+        debug_round = min(attempt + 1, max_debug_improve_rounds)
 
         if attempt == 0:
             if has_base:
@@ -362,8 +402,8 @@ class V1PromptBuilder:
                     trace_logs=trace_logs,
                     current_code=current_code,
                     action_text=action_text,
-                    debug_round=attempt,
-                    max_rounds=10,
+                    debug_round=debug_round,
+                    max_rounds=max_debug_improve_rounds,
                     target_gpu=self._target_gpu,
                     perf_summary=perf_summary,
                 )
@@ -376,8 +416,8 @@ class V1PromptBuilder:
                     base_code=base_code,
                     buggy_code=current_code,
                     action_text=action_text,
-                    debug_round=attempt,
-                    max_rounds=10,
+                    debug_round=debug_round,
+                    max_rounds=max_debug_improve_rounds,
                     target_gpu=self._target_gpu,
                     perf_summary=perf_summary,
                 )
@@ -390,8 +430,8 @@ class V1PromptBuilder:
                 definition_text=self._definition_text,
                 trace_logs=trace_logs,
                 current_code=current_code,
-                debug_round=attempt,
-                max_rounds=10,
+                debug_round=debug_round,
+                max_rounds=max_debug_improve_rounds,
                 target_gpu=self._target_gpu,
                 perf_summary=perf_summary,
             )
@@ -403,8 +443,8 @@ class V1PromptBuilder:
                 trace_logs=trace_logs,
                 base_code=base_code,
                 current_code=current_code,
-                debug_round=attempt,
-                max_rounds=10,
+                debug_round=debug_round,
+                max_rounds=max_debug_improve_rounds,
                 target_gpu=self._target_gpu,
                 perf_summary=perf_summary,
             )
@@ -507,6 +547,7 @@ class V1SequentialExecutor:
         best_score = 0.0
         best_speedup: float | None = None
         best_code = ""
+        best_result: EvaluationResult | None = None
         no_improve = 0
         no_improve_over_base = 0
 
@@ -516,9 +557,13 @@ class V1SequentialExecutor:
         )
         base_code = action_ctx.get("base_code", "")
         base_score = action_ctx.get("base_score", 0.0)
+        base_result: EvaluationResult | None = action_ctx.get("base_result")
         parent_is_root = action_ctx.get("parent_is_root", False)
 
-        max_attempts = min(self.cycle_config.max_rounds_per_cycle, rounds_remaining)
+        max_attempts = rounds_remaining
+
+        # Compute once - WM doesn't change during cycle attempts
+        wm_section = self.world_model._get_prompt_section()
 
         current_code = ""
         for attempt in range(max_attempts):
@@ -538,13 +583,34 @@ class V1SequentialExecutor:
             )
 
             last_round = rounds[-1] if rounds else None
+            last_result = last_round.result if last_round else None
             has_passed = best_score > 0
             trace_logs = last_round.result.get_log() if last_round else ""
 
             # Select better reference for debug prompts (V1 semantics)
+            # V1 validates string is non-empty before score comparison
             effective_base_code = base_code
-            if best_score > base_score and best_code:
+            use_best = (
+                best_code
+                and best_code.strip()
+                and (best_score > base_score or base_score <= 0)
+            )
+            if use_best:
                 effective_base_code = best_code
+
+            # V1 semantics: select base_perf_eval based on which code was chosen
+            if use_best and best_result:
+                base_perf_eval = best_result
+            elif base_result:
+                base_perf_eval = base_result
+            else:
+                base_perf_eval = None
+
+            # Build perf_summary from last_result + base_perf_eval (V1 semantics)
+            perf_lines: list[str] = []
+            perf_lines.extend(_get_perf_summary_lines(last_result, prefix="Last"))
+            perf_lines.extend(_get_perf_summary_lines(base_perf_eval, prefix="Base"))
+            perf_summary = "\n".join(perf_lines)
 
             prompt = self.prompt_builder.build(
                 action_text=action_text,
@@ -554,10 +620,11 @@ class V1SequentialExecutor:
                 base_code=effective_base_code,
                 trace_logs=trace_logs,
                 current_code=current_code,
+                perf_summary=perf_summary,
                 parent_is_root=parent_is_root,
+                max_debug_improve_rounds=self.cycle_config.max_debug_improve_rounds,
             )
 
-            wm_section = self.world_model._get_prompt_section()
             if wm_section:
                 prompt = prompt + "\n\n" + wm_section
 
@@ -576,7 +643,17 @@ class V1SequentialExecutor:
 
             impl = self.task.create_impl(code)
             result = self.evaluator.evaluate(impl, context={"round_idx": attempt})
-            score = self.task.scorer.score(result)
+
+            # V1 semantics: -1.0 on failure, 1/latency on success
+            if result.succeeded():
+                metrics = result.get_metrics()
+                latency = metrics.get("latency_ms")
+                if isinstance(latency, (int, float)) and latency > 0:
+                    score = 1.0 / latency
+                else:
+                    score = -1.0
+            else:
+                score = -1.0
 
             round_ = Round(
                 impl=impl,
@@ -598,6 +675,7 @@ class V1SequentialExecutor:
                 best_score = score
                 best_speedup = speedup
                 best_code = code
+                best_result = result
                 no_improve = 0
                 logger.info(
                     "[IMPROVED] score=%.4f, speedup=%s, best_speedup=%s",
@@ -705,13 +783,24 @@ def main():
     parser.add_argument(
         "--reasoning-effort", default="medium", choices=["low", "medium", "high"]
     )
-    parser.add_argument("--max-rounds-per-cycle", type=int, default=10)
-    parser.add_argument("--stagnation-rounds", type=int, default=5)
+    parser.add_argument(
+        "--stagnation-rounds",
+        type=int,
+        default=5,
+        help="Stagnation window (v1: --wm-stagnation-window)",
+    )
+    parser.add_argument(
+        "--max-debug-improve-rounds",
+        type=int,
+        default=5,
+        help="Max debug/improve rounds shown in prompts (v1: num_debug_and_improve_rounds)",
+    )
     parser.add_argument(
         "--max-difficulty",
         type=int,
         default=None,
-        help="Max difficulty (1-5) for action selection",
+        choices=[1, 2, 3, 4, 5],
+        help="Max difficulty (1-5) for action selection (v1: --wm-max-difficulty)",
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Enable debug logging"
@@ -795,8 +884,8 @@ def main():
     )
 
     cycle_config = CycleConfig(
-        max_rounds_per_cycle=args.max_rounds_per_cycle,
         stagnation_rounds=args.stagnation_rounds,
+        max_debug_improve_rounds=args.max_debug_improve_rounds,
     )
 
     tree = Tree(root=Node(status="closed"))
