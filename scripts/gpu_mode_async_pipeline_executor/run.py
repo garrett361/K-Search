@@ -518,6 +518,7 @@ async def async_main(args: argparse.Namespace) -> None:
     client_kwargs: dict[str, Any] = {
         "api_key": api_key,
         "timeout": args.timeout,
+        "max_retries": args.max_retries,
         "base_url": get_endpoint(args.model_name),
     }
     if (rits_api_key := os.getenv("RITS_API_KEY")) is not None:
@@ -575,6 +576,7 @@ def main():
     parser.add_argument("--model-name", required=True, help="LLM model name")
     parser.add_argument("--api-key", default=None, help="API key (or set LLM_API_KEY)")
     parser.add_argument("--timeout", type=int, default=300)
+    parser.add_argument("--max-retries", type=int, default=3)
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Enable debug logging"
     )

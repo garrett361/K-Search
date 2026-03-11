@@ -235,6 +235,7 @@ def main():
         "--api-key", default=None, help="API key; if omitted, uses LLM_API_KEY env var"
     )
     parser.add_argument("--timeout", type=int, default=300)
+    parser.add_argument("--max-retries", type=int, default=3)
     parser.add_argument(
         "--no-reasoning-api",
         dest="use_reasoning_api",
@@ -316,6 +317,7 @@ def main():
     client_kwargs = {
         "api_key": api_key,
         "timeout": args.timeout,
+        "max_retries": args.max_retries,
         "base_url": get_endpoint(args.model_name),
     }
     if (rits_api_key := os.getenv("RITS_API_KEY")) is not None:

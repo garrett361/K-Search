@@ -182,14 +182,13 @@ class V1WorldModel:
         node = context.node
         cycle = context.cycle
         best_round = cycle.best_round
-        succeeded = best_round is not None
         code = best_round.llm_response if best_round else ""
 
         action_text = ""
         if node and node.action:
             action_text = node.action.title
 
-        if succeeded:
+        if best_round is not None:
             from k_search.tasks.task_base import EvalResult
 
             eval_dict = best_round.result.get_metrics()
@@ -674,6 +673,7 @@ def main():
         "--api-key", default=None, help="API key; if omitted, uses LLM_API_KEY env var"
     )
     parser.add_argument("--timeout", type=int, default=300)
+    parser.add_argument("--max-retries", type=int, default=3)
     parser.add_argument(
         "--no-reasoning-api",
         dest="use_reasoning_api",
@@ -726,6 +726,7 @@ def main():
     client_kwargs: dict[str, Any] = {
         "api_key": api_key,
         "timeout": args.timeout,
+        "max_retries": args.max_retries,
         "base_url": get_endpoint(args.model_name),
     }
     if rits_key := os.getenv("RITS_API_KEY"):
