@@ -19,8 +19,6 @@ from typing import Any, Callable, Literal
 import openai
 
 from k_search.kernel_generators.world_model import render_world_model_section
-from k_search.modular.llm import get_endpoint
-from k_search.modular.logging import prompt_color, response_color
 from k_search.kernel_generators.world_model_manager import (
     WorldModelConfig,
     WorldModelManager,
@@ -35,6 +33,8 @@ from k_search.kernel_generators.world_model_prompts import (
     get_improve_generated_code_prompt_from_text,
 )
 from k_search.modular.adapters import GpuModeEvaluator, GpuModeTriMulTaskDefinition
+from k_search.modular.llm import get_endpoint
+from k_search.modular.logging import prompt_color, response_color
 from k_search.modular.protocols import Evaluator
 from k_search.modular.protocols.task_definition import TaskDefinition
 from k_search.modular.world.action import Action
@@ -71,9 +71,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Suppress noisy HTTP client logs
-for noisy_logger in ("httpcore", "httpx", "openai", "openai._base_client"):
-    logging.getLogger(noisy_logger).setLevel(logging.WARNING)
 
 LLMCall = Callable[[str], str]
 
@@ -510,7 +507,11 @@ class V1SequentialExecutor:
         return self._tree.get_best_node()
 
     def _run_cycle(
-        self, node: Node, action_ctx: dict[str, Any], rounds_remaining: int, rounds_used: int
+        self,
+        node: Node,
+        action_ctx: dict[str, Any],
+        rounds_remaining: int,
+        rounds_used: int,
     ) -> Cycle:
         """Run multiple attempts on a single action with stagnation detection."""
         rounds: list[Round] = []
@@ -704,6 +705,10 @@ def main():
 
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+    else:
+        # Suppress noisy HTTP client logs
+        for noisy_logger in ("httpcore", "httpx", "openai", "openai._base_client"):
+            logging.getLogger(noisy_logger).setLevel(logging.WARNING)
 
     api_key = args.api_key or os.getenv("LLM_API_KEY")
     if not api_key:
