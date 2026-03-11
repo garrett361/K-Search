@@ -340,13 +340,14 @@ class V1PromptBuilder:
         trace_logs: str,
         current_code: str,
         perf_summary: str = "",
+        parent_is_root: bool = False,
     ) -> str:
         """Build prompt based on cycle phase.
 
-        Prompt selection:
+        Prompt selection (V1 4-level nesting):
         - Attempt 0: action prompt (with or without base code)
-        - Subsequent, no PASSED: debug prompt
-        - Subsequent, has PASSED: improve prompt
+        - Subsequent, parent_is_root or no base: debug/improve from spec
+        - Subsequent, has base: debug/improve vs base code
         """
         has_base = bool(base_code and base_code.strip())
 
@@ -367,8 +368,24 @@ class V1PromptBuilder:
                     target_gpu=self._target_gpu,
                 )
 
+        # V1 semantics: parent_is_root means we use spec-based prompts even if
+        # base_code exists (base_code would be from root, not a real parent solution)
         if not has_passed:
-            if has_base:
+            if parent_is_root or not has_base:
+                # TYPE C: debug from spec
+                return get_debug_and_improve_from_spec_prompt_from_text(
+                    self._language,
+                    definition_text=self._definition_text,
+                    trace_logs=trace_logs,
+                    current_code=current_code,
+                    action_text=action_text,
+                    debug_round=attempt,
+                    max_rounds=10,
+                    target_gpu=self._target_gpu,
+                    perf_summary=perf_summary,
+                )
+            else:
+                # TYPE D: debug vs base code
                 return get_debug_generated_code_prompt_from_text(
                     self._language,
                     definition_text=self._definition_text,
@@ -381,25 +398,14 @@ class V1PromptBuilder:
                     target_gpu=self._target_gpu,
                     perf_summary=perf_summary,
                 )
-            else:
-                return get_debug_and_improve_from_spec_prompt_from_text(
-                    self._language,
-                    definition_text=self._definition_text,
-                    trace_logs=trace_logs,
-                    current_code=current_code,
-                    action_text=action_text,
-                    debug_round=attempt,
-                    max_rounds=10,
-                    target_gpu=self._target_gpu,
-                    perf_summary=perf_summary,
-                )
 
-        if has_base:
-            return get_improve_generated_code_prompt_from_text(
+        # has_passed == True
+        if parent_is_root or not has_base:
+            # TYPE E: improve from spec
+            return get_improve_from_spec_prompt_from_text(
                 self._language,
                 definition_text=self._definition_text,
                 trace_logs=trace_logs,
-                base_code=base_code,
                 current_code=current_code,
                 debug_round=attempt,
                 max_rounds=10,
@@ -407,10 +413,12 @@ class V1PromptBuilder:
                 perf_summary=perf_summary,
             )
         else:
-            return get_improve_from_spec_prompt_from_text(
+            # TYPE F: improve vs base code
+            return get_improve_generated_code_prompt_from_text(
                 self._language,
                 definition_text=self._definition_text,
                 trace_logs=trace_logs,
+                base_code=base_code,
                 current_code=current_code,
                 debug_round=attempt,
                 max_rounds=10,
@@ -517,13 +525,17 @@ class V1SequentialExecutor:
         rounds: list[Round] = []
         best_score = 0.0
         best_speedup: float | None = None
+        best_code = ""
         no_improve = 0
+        no_improve_over_base = 0
 
         # All metadata from action_ctx (which reads from modular Node)
         action_text = action_ctx.get(
             "action_text", node.action.title if node.action else ""
         )
         base_code = action_ctx.get("base_code", "")
+        base_score = action_ctx.get("base_score", 0.0)
+        parent_is_root = action_ctx.get("parent_is_root", False)
 
         max_attempts = min(self._cycle_config.max_rounds_per_cycle, rounds_remaining)
 
@@ -531,7 +543,7 @@ class V1SequentialExecutor:
         for attempt in range(max_attempts):
             best_speedup_str = f"{best_speedup:.2f}x" if best_speedup else "-"
             logger.info(
-                "[ATTEMPT] cycle_round=%d/%d | global_round=%d/%d | best=%.4f (%s) | no_improve=%d/%d",
+                "[ATTEMPT] cycle_round=%d/%d | global_round=%d/%d | best=%.4f (%s) | no_improve=%d/%d | no_improve_over_base=%d/%d",
                 attempt + 1,
                 max_attempts,
                 rounds_used + attempt + 1,
@@ -540,20 +552,28 @@ class V1SequentialExecutor:
                 best_speedup_str,
                 no_improve,
                 self._cycle_config.stagnation_rounds,
+                no_improve_over_base,
+                self._cycle_config.stagnation_rounds,
             )
 
             last_round = rounds[-1] if rounds else None
             has_passed = best_score > 0
             trace_logs = last_round.result.get_log() if last_round else ""
 
+            # Select better reference for debug prompts (V1 semantics)
+            effective_base_code = base_code
+            if best_score > base_score and best_code:
+                effective_base_code = best_code
+
             prompt = self._prompt_builder.build(
                 action_text=action_text,
                 attempt=attempt,
                 last_round=last_round,
                 has_passed=has_passed,
-                base_code=base_code,
+                base_code=effective_base_code,
                 trace_logs=trace_logs,
                 current_code=current_code,
+                parent_is_root=parent_is_root,
             )
 
             wm_section = self._world_model._get_prompt_section()
@@ -596,6 +616,7 @@ class V1SequentialExecutor:
             if result.succeeded() and score > best_score:
                 best_score = score
                 best_speedup = speedup
+                best_code = code
                 no_improve = 0
                 logger.info(
                     "[IMPROVED] score=%.4f, speedup=%s, best_speedup=%s",
@@ -614,8 +635,22 @@ class V1SequentialExecutor:
                     no_improve,
                 )
 
+            # Track failure to beat base (V1 semantics: only when we have a passing
+            # solution AND base exists)
+            if best_score > 0 and base_score > 0:
+                if best_score > base_score:
+                    no_improve_over_base = 0
+                else:
+                    no_improve_over_base += 1
+
             if no_improve >= self._cycle_config.stagnation_rounds:
                 logger.info("[STAGNATION] no improvement for %d rounds", no_improve)
+                break
+            if no_improve_over_base >= self._cycle_config.stagnation_rounds:
+                logger.info(
+                    "[STAGNATION] no improvement over base for %d rounds",
+                    no_improve_over_base,
+                )
                 break
 
         return Cycle(rounds=rounds)
