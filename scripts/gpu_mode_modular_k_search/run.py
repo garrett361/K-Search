@@ -305,7 +305,7 @@ class V1WorldModel:
     def get_action_context(self, node: V1Node) -> dict[str, Any]:
         """Get context for the selected action node."""
         base_code = ""
-        base_score = 0.0
+        base_score = -1.0  # V1 semantics: -1.0 when no parent solution
         base_result: EvaluationResult | None = None
         if node.parent and node.parent.cycle and node.parent.cycle.best_round:
             best = node.parent.cycle.best_round
@@ -589,7 +589,9 @@ class V1SequentialExecutor:
         for attempt in range(max_attempts):
             global_speedup = None
             if self.global_best_round:
-                global_speedup = self.global_best_round.result.get_metrics().get("speedup_factor")
+                global_speedup = self.global_best_round.result.get_metrics().get(
+                    "speedup_factor"
+                )
             global_speedup_str = f"{global_speedup:.2f}x" if global_speedup else "-"
             logger.info(
                 "[ATTEMPT] cycle_round=%d/%d | global_round=%d/%d | best=%.4f (%s) | no_improve=%d/%d | no_improve_over_base=%d/%d",
@@ -631,8 +633,8 @@ class V1SequentialExecutor:
 
             # Build perf_summary from last_result + base_perf_eval (V1 semantics)
             perf_lines: list[str] = []
-            perf_lines.extend(_get_perf_summary_lines(last_result, prefix="Last"))
-            perf_lines.extend(_get_perf_summary_lines(base_perf_eval, prefix="Base"))
+            perf_lines.extend(_get_perf_summary_lines(last_result, prefix="last_attempt"))
+            perf_lines.extend(_get_perf_summary_lines(base_perf_eval, prefix="base"))
             perf_summary = "\n".join(perf_lines)
 
             prompt = self.prompt_builder.build(
