@@ -42,7 +42,9 @@ class MockTask:
 
 
 class MockEvaluator:
-    def __init__(self, results: list):  # Accepts MockResult or MockResultWithPerfSummary
+    def __init__(
+        self, results: list
+    ):  # Accepts MockResult or MockResultWithPerfSummary
         self._results = results
         self._idx = 0
 
@@ -104,10 +106,10 @@ def test_no_improve_over_base_ends_cycle():
     # Each result improves over previous so no_improve=0
     # But all are below base_score=1.0 (latency 1.0ms), so no_improve_over_base increments
     results = [
-        MockResult(True, 2.0),    # score = 0.5
-        MockResult(True, 1.67),   # score = 0.6
-        MockResult(True, 1.43),   # score = 0.7
-        MockResult(True, 1.25),   # score = 0.8
+        MockResult(True, 2.0),  # score = 0.5
+        MockResult(True, 1.67),  # score = 0.6
+        MockResult(True, 1.43),  # score = 0.7
+        MockResult(True, 1.25),  # score = 0.8
     ]
 
     mock_wm = MagicMock()
@@ -704,7 +706,9 @@ class TestPerfSummaryConstruction:
         perf_summary = second_call.kwargs.get("perf_summary", "")
 
         # V1 uses lowercase prefixes: "last_attempt" and "base"
-        assert "last_attempt:" in perf_summary, f"Expected 'last_attempt:' prefix, got: {perf_summary}"
+        assert "last_attempt:" in perf_summary, (
+            f"Expected 'last_attempt:' prefix, got: {perf_summary}"
+        )
         assert "base:" in perf_summary, f"Expected 'base:' prefix, got: {perf_summary}"
 
 
@@ -934,7 +938,7 @@ class TestTreeSyncLogic:
         mock_manager = MagicMock()
 
         # Simulate world model JSON with full action metadata
-        mock_manager.get.return_value = '''{
+        mock_manager.get.return_value = """{
             "decision_tree": {
                 "root_id": "root",
                 "nodes": [{
@@ -949,7 +953,7 @@ class TestTreeSyncLogic:
                     }
                 }]
             }
-        }'''
+        }"""
 
         wm = V1WorldModel(
             manager=mock_manager,
@@ -1041,3 +1045,128 @@ class TestTreeSyncLogic:
         assert ctx["base_code"] == "parent_generated_code"
         assert ctx["base_score"] == 0.5
         assert ctx["base_result"] is parent_result
+
+
+class TestSolutionAttachment:
+    """V1 semantics: successful cycle attaches solution_id to node via attach_solution_to_active_leaf."""
+
+    def test_update_attaches_solution_id_on_success(self):
+        """V1 semantics: passing cycle calls attach_solution_to_active_leaf."""
+        from scripts.gpu_mode_modular_k_search.run import (
+            V1WorldModel,
+            V1UpdateContext,
+            V1Node,
+            V1Action,
+        )
+        from k_search.modular.world.cycle import Cycle
+
+        mock_manager = MagicMock()
+        mock_manager.get.return_value = (
+            '{"decision_tree": {"root_id": "root", "nodes": []}}'
+        )
+
+        wm = V1WorldModel(
+            manager=mock_manager,
+            task_name="test",
+            definition_text="test",
+            language="triton",
+            target_gpu="H100",
+        )
+
+        tree = Tree(root=Node(status="closed"))
+        node = V1Node(
+            parent=tree.root,
+            status="open",
+            action=V1Action(title="Optimize"),
+            node_id="action1",
+            parent_id="root",
+            parent_is_root=True,
+        )
+
+        passing_result = MockResult(succeeded=True, latency_ms=2.0)
+        passing_round = Round(
+            impl=MockImpl(),
+            result=passing_result,
+            prompt="test",
+            llm_response="good_code",
+            prompt_tokens=100,
+            completion_tokens=50,
+            duration_secs=1.0,
+            score=0.5,
+        )
+        cycle = Cycle(rounds=[passing_round])
+
+        context = V1UpdateContext(
+            tree=tree,
+            node=node,
+            cycle=cycle,
+            round_idx=0,
+            max_debug_improve_rounds=5,
+        )
+
+        wm.update(context)
+
+        mock_manager.attach_solution_to_active_leaf.assert_called_once()
+        call_kwargs = mock_manager.attach_solution_to_active_leaf.call_args.kwargs
+        assert call_kwargs["definition_name"] == "test"
+        assert call_kwargs["solution_id"].startswith("sol_")
+        assert "action1" in call_kwargs["solution_id"]
+
+    def test_update_does_not_attach_on_failure(self):
+        """V1 semantics: failing cycle does NOT call attach_solution_to_active_leaf."""
+        from scripts.gpu_mode_modular_k_search.run import (
+            V1WorldModel,
+            V1UpdateContext,
+            V1Node,
+            V1Action,
+        )
+        from k_search.modular.world.cycle import Cycle
+
+        mock_manager = MagicMock()
+        mock_manager.get.return_value = (
+            '{"decision_tree": {"root_id": "root", "nodes": []}}'
+        )
+
+        wm = V1WorldModel(
+            manager=mock_manager,
+            task_name="test",
+            definition_text="test",
+            language="triton",
+            target_gpu="H100",
+        )
+
+        tree = Tree(root=Node(status="closed"))
+        node = V1Node(
+            parent=tree.root,
+            status="open",
+            action=V1Action(title="Optimize"),
+            node_id="action1",
+            parent_id="root",
+            parent_is_root=True,
+        )
+
+        failing_result = MockResult(succeeded=False, latency_ms=0.0)
+        failing_round = Round(
+            impl=MockImpl(),
+            result=failing_result,
+            prompt="test",
+            llm_response="bad_code",
+            prompt_tokens=100,
+            completion_tokens=50,
+            duration_secs=1.0,
+            score=-1.0,
+        )
+        cycle = Cycle(rounds=[failing_round])
+
+        context = V1UpdateContext(
+            tree=tree,
+            node=node,
+            cycle=cycle,
+            round_idx=0,
+            max_debug_improve_rounds=5,
+        )
+
+        wm.update(context)
+
+        mock_manager.attach_solution_to_active_leaf.assert_not_called()
+        mock_manager.note_action_too_hard.assert_called_once()

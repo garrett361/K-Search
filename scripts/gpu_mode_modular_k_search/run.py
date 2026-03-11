@@ -231,6 +231,9 @@ class V1WorldModel:
                     confidence=getattr(action, "confidence", 0.5),
                     rationale=str(getattr(action, "rationale", "") or ""),
                 )
+                logger.debug(
+                    f"[V1_DEBUG: prediction] evb={evb}, confidence={prediction.confidence}"
+                )
 
         if best_round is not None:
             eval_dict = best_round.result.get_metrics()
@@ -242,8 +245,9 @@ class V1WorldModel:
                 )
 
                 # V1: Generate solution_id and attach to node
-                v1_node = cast(V1Node, node) if isinstance(node, V1Node) else None
-                node_id = v1_node.node_id if v1_node else "unknown"
+                if not isinstance(node, V1Node):
+                    raise TypeError(f"Expected V1Node, got {type(node)}")
+                node_id = node.node_id
                 solution_id = f"sol_{node_id}_{context.round_idx}"
 
                 # V1: Set active leaf before attach
@@ -302,6 +306,9 @@ class V1WorldModel:
                 f"[WorldModel: update] action={action_text!r}, rounds={len(cycle.rounds)}, "
                 f"max_debug_improve={context.max_debug_improve_rounds}, has_last_eval={last_eval is not None}"
             )
+            if not isinstance(node, V1Node):
+                raise TypeError(f"Expected V1Node, got {type(node)}")
+            node_id = node.node_id
             self._manager.note_action_too_hard(
                 definition_name=self.task_name,
                 definition_text=self._definition_text,
@@ -315,6 +322,9 @@ class V1WorldModel:
                 debug_and_improve_max_rounds=context.max_debug_improve_rounds,
                 baseline_targets_text="",
                 round_index=context.round_idx,
+            )
+            logger.debug(
+                f"[V1_DEBUG: too_hard] node_id={node_id}, rounds={len(cycle.rounds)}"
             )
         self.invalidate_cache()
 
@@ -375,7 +385,7 @@ class V1WorldModel:
             for i, n in enumerate(kids):
                 node_id = n.get("node_id", "?")
                 action = n.get("action", {})
-                title = action.get("title", "?")[:35]
+                title = action.get("title", "?")
                 sol_ref = n.get("solution_ref", {})
                 has_solution = bool(sol_ref.get("solution_id"))
                 status = "SOLVED" if has_solution else "OPEN"
