@@ -479,8 +479,28 @@ class V1SequentialExecutor:
         self.global_best_round: Round | None = None
         self.global_best_score: float = 0.0
 
+    def _check_unsupported_task_features(self) -> None:
+        """Error if task provides features V2 doesn't support yet."""
+        # V1 uses these to add context to prompts. V2 doesn't implement them yet.
+        # Error early to prevent silent degradation.
+        task_obj = getattr(self.task, "_task", self.task)
+
+        if callable(getattr(task_obj, "get_code_format_text", None)):
+            raise NotImplementedError(
+                "Task provides get_code_format_text() but V2 executor doesn't support it yet. "
+                "Use V1 executor or implement code_format support in V2."
+            )
+
+        if callable(getattr(task_obj, "get_baseline_targets_text", None)):
+            raise NotImplementedError(
+                "Task provides get_baseline_targets_text() but V2 executor doesn't support it yet. "
+                "Use V1 executor or implement baseline_targets support in V2."
+            )
+
     def run(self) -> Node | None:
         """Execute search, return best node."""
+        self._check_unsupported_task_features()
+
         rounds_used = 0
         select_context = V1SelectContext(tree=self.tree)
 
@@ -567,15 +587,18 @@ class V1SequentialExecutor:
 
         current_code = ""
         for attempt in range(max_attempts):
-            best_speedup_str = f"{best_speedup:.2f}x" if best_speedup else "-"
+            global_speedup = None
+            if self.global_best_round:
+                global_speedup = self.global_best_round.result.get_metrics().get("speedup_factor")
+            global_speedup_str = f"{global_speedup:.2f}x" if global_speedup else "-"
             logger.info(
                 "[ATTEMPT] cycle_round=%d/%d | global_round=%d/%d | best=%.4f (%s) | no_improve=%d/%d | no_improve_over_base=%d/%d",
                 attempt + 1,
                 max_attempts,
                 rounds_used + attempt + 1,
                 self.max_rounds,
-                best_score,
-                best_speedup_str,
+                self.global_best_score,
+                global_speedup_str,
                 no_improve,
                 self.cycle_config.stagnation_rounds,
                 no_improve_over_base,

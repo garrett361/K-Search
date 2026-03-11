@@ -67,12 +67,12 @@ class _CorrectnessChecker:
 class _Scorer:
     def score(self, result: EvaluationResult) -> float:
         if not result.succeeded():
-            return 0.0
+            return -1.0
         metrics = result.get_metrics()
         latency = metrics.get("latency_ms")
         if latency and latency > 0:
             return 1.0 / latency
-        return 0.0
+        return -1.0
 
 
 class _FeedbackProvider:
