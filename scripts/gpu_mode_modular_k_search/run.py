@@ -14,7 +14,7 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Literal, cast
 
 import openai
 
@@ -333,7 +333,7 @@ def _get_perf_summary_lines(result: EvaluationResult | None, prefix: str) -> lis
         return []
     inner = getattr(result, "_inner", result)
     if hasattr(inner, "perf_summary_lines"):
-        return inner.perf_summary_lines(prefix=prefix)
+        return cast(Any, inner).perf_summary_lines(prefix=prefix)
     return []
 
 
@@ -633,7 +633,9 @@ class V1SequentialExecutor:
 
             # Build perf_summary from last_result + base_perf_eval (V1 semantics)
             perf_lines: list[str] = []
-            perf_lines.extend(_get_perf_summary_lines(last_result, prefix="last_attempt"))
+            perf_lines.extend(
+                _get_perf_summary_lines(last_result, prefix="last_attempt")
+            )
             perf_lines.extend(_get_perf_summary_lines(base_perf_eval, prefix="base"))
             perf_summary = "\n".join(perf_lines)
 

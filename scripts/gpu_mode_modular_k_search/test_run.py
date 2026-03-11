@@ -42,11 +42,11 @@ class MockTask:
 
 
 class MockEvaluator:
-    def __init__(self, results: list[MockResult]):
+    def __init__(self, results: list):  # Accepts MockResult or MockResultWithPerfSummary
         self._results = results
         self._idx = 0
 
-    def evaluate(self, impl, context=None) -> MockResult:
+    def evaluate(self, impl, context=None):
         result = self._results[self._idx % len(self._results)]
         self._idx += 1
         return result
@@ -79,8 +79,8 @@ def test_stagnation_ends_cycle_early():
 
     executor = V1SequentialExecutor(
         world_model=mock_wm,
-        task=MockTask(),
-        evaluator=evaluator,
+        task=MockTask(),  # type: ignore[arg-type]
+        evaluator=evaluator,  # type: ignore[arg-type]
         llm=lambda p: "code",
         prompt_builder=prompt_builder,
         tree=tree,
@@ -133,8 +133,8 @@ def test_no_improve_over_base_ends_cycle():
 
     executor = V1SequentialExecutor(
         world_model=mock_wm,
-        task=MockTask(),
-        evaluator=evaluator,
+        task=MockTask(),  # type: ignore[arg-type]
+        evaluator=evaluator,  # type: ignore[arg-type]
         llm=lambda p: "code",
         prompt_builder=prompt_builder,
         tree=tree,
@@ -186,8 +186,8 @@ class TestScoringSemantics:
 
         executor = V1SequentialExecutor(
             world_model=mock_wm,
-            task=MockTask(),
-            evaluator=evaluator,
+            task=MockTask(),  # type: ignore[arg-type]
+            evaluator=evaluator,  # type: ignore[arg-type]
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
             tree=tree,
@@ -201,6 +201,7 @@ class TestScoringSemantics:
         nodes = [n for n in tree._nodes_by_id.values() if n.cycle]
         assert len(nodes) == 1
         cycle = nodes[0].cycle
+        assert cycle is not None
         assert len(cycle.rounds) == 1
         assert cycle.rounds[0].score == -1.0
 
@@ -233,8 +234,8 @@ class TestScoringSemantics:
 
         executor = V1SequentialExecutor(
             world_model=mock_wm,
-            task=MockTask(),
-            evaluator=evaluator,
+            task=MockTask(),  # type: ignore[arg-type]
+            evaluator=evaluator,  # type: ignore[arg-type]
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
             tree=tree,
@@ -247,6 +248,7 @@ class TestScoringSemantics:
         nodes = [n for n in tree._nodes_by_id.values() if n.cycle]
         assert len(nodes) == 1
         cycle = nodes[0].cycle
+        assert cycle is not None
         assert len(cycle.rounds) == 1
         # score = 1.0 / 2.0 = 0.5
         assert cycle.rounds[0].score == 0.5
@@ -292,8 +294,8 @@ class TestBestCodeSelection:
 
         executor = V1SequentialExecutor(
             world_model=mock_wm,
-            task=MockTask(),
-            evaluator=evaluator,
+            task=MockTask(),  # type: ignore[arg-type]
+            evaluator=evaluator,  # type: ignore[arg-type]
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
             tree=tree,
@@ -351,8 +353,8 @@ class TestBestCodeSelection:
 
         executor = V1SequentialExecutor(
             world_model=mock_wm,
-            task=MockTask(),
-            evaluator=evaluator,
+            task=MockTask(),  # type: ignore[arg-type]
+            evaluator=evaluator,  # type: ignore[arg-type]
             llm=llm_with_tracking,
             prompt_builder=prompt_builder,
             tree=tree,
@@ -391,7 +393,7 @@ class TestPromptTypeSelection:
         """Create a mock Round for testing."""
         mock_result = MockResult(succeeded=False, latency_ms=0.0)
         return Round(
-            impl=MockImpl(),
+            impl=MockImpl(),  # type: ignore[arg-type]
             result=mock_result,
             prompt="test",
             llm_response="code",
@@ -521,7 +523,7 @@ class TestDebugRoundClamping:
     def mock_round(self):
         mock_result = MockResult(succeeded=False, latency_ms=0.0)
         return Round(
-            impl=MockImpl(),
+            impl=MockImpl(),  # type: ignore[arg-type]
             result=mock_result,
             prompt="test",
             llm_response="code",
@@ -603,8 +605,8 @@ class TestStagnationCounterIndependence:
 
         executor = V1SequentialExecutor(
             world_model=mock_wm,
-            task=MockTask(),
-            evaluator=evaluator,
+            task=MockTask(),  # type: ignore[arg-type]
+            evaluator=evaluator,  # type: ignore[arg-type]
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
             tree=tree,
@@ -685,8 +687,8 @@ class TestPerfSummaryConstruction:
 
         executor = V1SequentialExecutor(
             world_model=mock_wm,
-            task=MockTask(),
-            evaluator=evaluator,
+            task=MockTask(),  # type: ignore[arg-type]
+            evaluator=evaluator,  # type: ignore[arg-type]
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
             tree=tree,
@@ -742,8 +744,8 @@ class TestNoImproveOverBaseActivation:
 
         executor = V1SequentialExecutor(
             world_model=mock_wm,
-            task=MockTask(),
-            evaluator=evaluator,
+            task=MockTask(),  # type: ignore[arg-type]
+            evaluator=evaluator,  # type: ignore[arg-type]
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
             tree=tree,
@@ -792,8 +794,8 @@ class TestNoImproveOverBaseActivation:
 
         executor = V1SequentialExecutor(
             world_model=mock_wm,
-            task=MockTask(),
-            evaluator=evaluator,
+            task=MockTask(),  # type: ignore[arg-type]
+            evaluator=evaluator,  # type: ignore[arg-type]
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
             tree=tree,
@@ -882,19 +884,8 @@ class TestParentIsRootDetermination:
         )
         assert node_root.parent_is_root is True
 
-        # Test with parent_id = None - V1 does NOT treat this as root
-        # V2 currently does (divergence)
-        node_none = V1Node(
-            status="open",
-            node_id="child2",
-            parent_id=None,
-            # V1 semantics: this should be False
-            # V2 bug: sets this to True
-        )
-        # This tests the sync logic - parent_is_root should be False for None parent_id
-        # according to V1 semantics (line 461: parent_is_root = parent_id == "root")
-        # Note: We can't directly test _sync_frontier_from_manager without mocking
-        # the entire WorldModelManager, so this is a documentation test
+        # Note: V1 does NOT treat parent_id=None as root (only "root" string).
+        # V2 diverges here. _sync_frontier_from_manager tests cover this.
 
 
 # =============================================================================
@@ -929,6 +920,7 @@ class TestTreeSyncLogic:
 
         assert len(new_nodes) == 1
         assert new_nodes[0].node_id == "action1"
+        assert new_nodes[0].action is not None
         assert new_nodes[0].action.title == "Optimize"
         assert new_nodes[0].parent_is_root is True
         # Node should be in tree's registry
@@ -972,6 +964,7 @@ class TestTreeSyncLogic:
 
         assert len(new_nodes) == 1
         action = new_nodes[0].action
+        assert action is not None
         assert action.title == "Use shared memory"
         assert action.difficulty == 4
         assert action.expected_vs_baseline_factor == 1.5
@@ -1022,7 +1015,7 @@ class TestTreeSyncLogic:
         parent = Node(status="closed")
         parent_result = MockResult(True, 2.0)
         parent_round = Round(
-            impl=MockImpl(),
+            impl=MockImpl(),  # type: ignore[arg-type]
             result=parent_result,
             prompt="parent prompt",
             llm_response="parent_generated_code",
