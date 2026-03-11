@@ -482,7 +482,10 @@ class V1SequentialExecutor:
             action_ctx = self._world_model.get_action_context(node)
 
             cycle = self._run_cycle(
-                node, action_ctx, rounds_remaining=self._max_rounds - rounds_used
+                node,
+                action_ctx,
+                rounds_remaining=self._max_rounds - rounds_used,
+                rounds_used=rounds_used,
             )
             node.cycle = cycle
             node.status = "closed"
@@ -507,7 +510,7 @@ class V1SequentialExecutor:
         return self._tree.get_best_node()
 
     def _run_cycle(
-        self, node: Node, action_ctx: dict[str, Any], rounds_remaining: int
+        self, node: Node, action_ctx: dict[str, Any], rounds_remaining: int, rounds_used: int
     ) -> Cycle:
         """Run multiple attempts on a single action with stagnation detection."""
         rounds: list[Round] = []
@@ -527,9 +530,11 @@ class V1SequentialExecutor:
         for attempt in range(max_attempts):
             best_speedup_str = f"{best_speedup:.2f}x" if best_speedup else "-"
             logger.info(
-                "[ATTEMPT] %d/%d | best=%.4f (%s) | no_improve=%d/%d",
+                "[ATTEMPT] cycle_round=%d/%d | global_round=%d/%d | best=%.4f (%s) | no_improve=%d/%d",
                 attempt + 1,
                 max_attempts,
+                rounds_used + attempt + 1,
+                self._max_rounds,
                 best_score,
                 best_speedup_str,
                 no_improve,

@@ -395,10 +395,7 @@ class AsyncPipelineExecutor:
         while rounds_proposed < self._max_rounds:
             await completion_queue.get()
             self._rounds_completed += 1
-            logger.debug(
-                f"[PROPOSER] Completion received ({self._rounds_completed}/{self._max_rounds}), "
-                f"proposing next"
-            )
+            logger.info(f"[Round {self._rounds_completed}/{self._max_rounds}] completed")
 
             nodes = await self._world_model.propose(context)
             for node in nodes:
@@ -409,9 +406,7 @@ class AsyncPipelineExecutor:
         while self._rounds_completed < self._max_rounds:
             await completion_queue.get()
             self._rounds_completed += 1
-            logger.debug(
-                f"[PROPOSER] Draining completion ({self._rounds_completed}/{self._max_rounds})"
-            )
+            logger.info(f"[Round {self._rounds_completed}/{self._max_rounds}] completed")
 
         logger.info(f"[PROPOSER] Sending {self._llm_queue_depth} shutdown sentinels")
         for _ in range(self._llm_queue_depth):
@@ -471,8 +466,8 @@ class AsyncPipelineExecutor:
             node.cycle = Cycle(rounds=[round_])
             node.status = "closed"
 
-            logger.info(
-                f"[WORKER-{worker_id}] Round complete: score={score:.4f}, success={result.succeeded()}"
+            logger.debug(
+                f"[WORKER-{worker_id}] score={score:.4f}, success={result.succeeded()}"
             )
 
             if not result.succeeded():
