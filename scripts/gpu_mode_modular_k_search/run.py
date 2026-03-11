@@ -200,10 +200,7 @@ class V1WorldModel:
         cycle = context.cycle
         best_round = cycle.best_round
         code = best_round.llm_response if best_round else ""
-
-        action_text = ""
-        if node and node.action:
-            action_text = node.action.title
+        action_text = node.action.title if (node and node.action) else ""
 
         if best_round is not None:
             from k_search.tasks.task_base import EvalResult
@@ -505,7 +502,7 @@ class V1SequentialExecutor:
         select_context = V1SelectContext(tree=self.tree)
 
         while rounds_used < self.max_rounds:
-            logger.info("[CYCLE_START] rounds_used=%d/%d", rounds_used, self.max_rounds)
+            logger.info(f"[CYCLE_START] rounds_used={rounds_used}/{self.max_rounds}")
 
             propose_context = V1ProposeContext(
                 tree=self.tree,
@@ -520,9 +517,8 @@ class V1SequentialExecutor:
 
             node = selected[0]
             node.status = "in_progress"
-            logger.info(
-                "[ACTION] Selected: %s", node.action.title if node.action else "unknown"
-            )
+            action_title = node.action.title if node.action else "unknown"
+            logger.info(f"[ACTION] Selected: {action_title}")
 
             # Get action context from modular Node (authoritative source)
             action_ctx = self.world_model.get_action_context(node)
@@ -549,9 +545,7 @@ class V1SequentialExecutor:
                 self.global_best_score = cycle.best_round.score
 
             rounds_used += len(cycle.rounds)
-            logger.info(
-                "[CYCLE_END] cycle_rounds=%d, total=%d", len(cycle.rounds), rounds_used
-            )
+            logger.info(f"[CYCLE_END] cycle_rounds={len(cycle.rounds)}, total={rounds_used}")
 
         return self.tree.get_best_node()
 
@@ -593,18 +587,12 @@ class V1SequentialExecutor:
                     "speedup_factor"
                 )
             global_speedup_str = f"{global_speedup:.2f}x" if global_speedup else "-"
+            stag = self.cycle_config.stagnation_rounds
             logger.info(
-                "[ATTEMPT] cycle_round=%d/%d | global_round=%d/%d | best=%.4f (%s) | no_improve=%d/%d | no_improve_over_base=%d/%d",
-                attempt + 1,
-                max_attempts,
-                rounds_used + attempt + 1,
-                self.max_rounds,
-                self.global_best_score,
-                global_speedup_str,
-                no_improve,
-                self.cycle_config.stagnation_rounds,
-                no_improve_over_base,
-                self.cycle_config.stagnation_rounds,
+                f"[ROUND] cycle_round={attempt + 1}/{max_attempts} | "
+                f"global_round={rounds_used + attempt + 1}/{self.max_rounds} | "
+                f"best={self.global_best_score:.4f} ({global_speedup_str}) | "
+                f"no_improve={no_improve}/{stag} | no_improve_over_base={no_improve_over_base}/{stag}"
             )
 
             last_round = rounds[-1] if rounds else None
@@ -705,20 +693,15 @@ class V1SequentialExecutor:
                 best_result = result
                 no_improve = 0
                 logger.info(
-                    "[IMPROVED] score=%.4f, speedup=%s, best_speedup=%s",
-                    score,
-                    speedup_str,
-                    speedup_str,
+                    f"[CYCLE: IMPROVED] score={score:.4f}, speedup={speedup_str}, "
+                    f"best_speedup_in_cycle={speedup_str}"
                 )
             else:
                 no_improve += 1
                 best_speedup_str = f"{best_speedup:.2f}x" if best_speedup else "-"
                 logger.info(
-                    "[NO_IMPROVE] score=%.4f, speedup=%s, best_speedup=%s, streak=%d",
-                    score,
-                    speedup_str,
-                    best_speedup_str,
-                    no_improve,
+                    f"[CYCLE: NO_IMPROVE] score={score:.4f}, speedup={speedup_str}, "
+                    f"best_speedup_in_cycle={best_speedup_str}, streak={no_improve}"
                 )
 
             # Track failure to beat base (V1 semantics: only when we have a passing
@@ -730,13 +713,10 @@ class V1SequentialExecutor:
                     no_improve_over_base += 1
 
             if no_improve >= self.cycle_config.stagnation_rounds:
-                logger.info("[STAGNATION] no improvement for %d rounds", no_improve)
+                logger.info(f"[STAGNATION] no improvement for {no_improve} rounds")
                 break
             if no_improve_over_base >= self.cycle_config.stagnation_rounds:
-                logger.info(
-                    "[STAGNATION] no improvement over base for %d rounds",
-                    no_improve_over_base,
-                )
+                logger.info(f"[STAGNATION] no improvement over base for {no_improve_over_base} rounds")
                 break
 
         return Cycle(rounds=rounds)
@@ -928,24 +908,19 @@ def main():
         cycle_config=cycle_config,
     )
 
-    logger.info(
-        "Starting V1 case search: max_rounds=%d, model=%s",
-        args.max_rounds,
-        args.model_name,
-    )
+    logger.info(f"Starting V1 case search: max_rounds={args.max_rounds}, model={args.model_name}")
 
     best_node = executor.run()
 
     logger.info("=" * 60)
     logger.info("SEARCH COMPLETE")
     if best_node:
-        logger.info(
-            "Best node: %s", best_node.action.title if best_node.action else "root"
-        )
+        best_title = best_node.action.title if best_node.action else "root"
+        logger.info(f"Best node: {best_title}")
     global_best = executor.global_best_round
     if global_best:
-        logger.info("Best score: %.4f", global_best.score)
-        logger.info("Best round metrics: %s", global_best.result.get_metrics())
+        logger.info(f"Best score: {global_best.score:.4f}")
+        logger.info(f"Best round metrics: {global_best.result.get_metrics()}")
     else:
         logger.info("No successful solution found")
     logger.info("=" * 60)
