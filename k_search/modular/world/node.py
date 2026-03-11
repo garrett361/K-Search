@@ -12,7 +12,12 @@ if TYPE_CHECKING:
 
 @dataclass
 class Node:
-    """Search tree node."""
+    """Search tree node.
+
+    Future: Consider splitting into base Node (id, parent, children, status)
+    and subclasses that add action/cycle. This would enable multiple cycles
+    per node and cleaner separation of tree structure from domain data.
+    """
 
     id: str = ""
     parent: Node | None = None
