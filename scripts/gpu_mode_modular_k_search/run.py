@@ -251,7 +251,7 @@ class V1WorldModel:
         wm_dict = self._get_parsed_wm()
         if wm_dict is None:
             return ""
-        return render_world_model_section(wm_dict, max_chars=max_chars)
+        return render_world_model_section(self._cached_wm_json, max_chars=max_chars)
 
     def _sync_frontier_from_manager(self, tree: Tree) -> list[V1Node]:
         """Sync V1 JSON tree nodes to modular Tree, return new frontier nodes."""
