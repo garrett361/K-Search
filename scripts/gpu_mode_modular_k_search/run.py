@@ -18,7 +18,10 @@ from typing import Any, Callable, Literal, cast
 
 import openai
 
-from k_search.kernel_generators.world_model import Prediction, render_world_model_section
+from k_search.kernel_generators.world_model import (
+    Prediction,
+    render_world_model_section,
+)
 from k_search.kernel_generators.world_model_manager import (
     WorldModelConfig,
     WorldModelManager,
@@ -164,6 +167,7 @@ class V1WorldModel:
     def propose(self, context: V1ProposeContext) -> list[V1Node]:
         """Generate new action nodes by calling V1 manager's propose_action_nodes."""
         self._ensure_initialized()
+        nodes_before = len(self._node_id_map)
 
         self._manager.propose_action_nodes(
             definition_name=self.task_name,
@@ -177,7 +181,12 @@ class V1WorldModel:
         )
         self.invalidate_cache()
 
-        return self._sync_frontier_from_manager(context.tree)
+        new_nodes = self._sync_frontier_from_manager(context.tree)
+        logger.debug(
+            f"[V1_DEBUG: propose] nodes_before={nodes_before}, "
+            f"nodes_after={len(self._node_id_map)}, new_nodes={len(new_nodes)}"
+        )
+        return new_nodes
 
     def select(self, context: V1SelectContext) -> list[V1Node]:
         """Select next action using V1's policy-based chooser."""
@@ -185,6 +194,7 @@ class V1WorldModel:
             definition_name=self.task_name
         )
         if not node_id:
+            logger.debug("[V1_DEBUG: select] no node_id returned by chooser")
             return []
 
         node = self._node_id_map.get(node_id)
@@ -192,7 +202,12 @@ class V1WorldModel:
             self._manager.set_active_leaf_id(
                 definition_name=self.task_name, node_id=node_id
             )
+            logger.debug(f"[V1_DEBUG: select] selected node_id={node_id}")
             return [node]
+        logger.debug(
+            f"[V1_DEBUG: select] node_id={node_id} not in map, "
+            f"known_ids={list(self._node_id_map.keys())}"
+        )
         return []
 
     def update(self, context: V1UpdateContext) -> None:
@@ -224,6 +239,29 @@ class V1WorldModel:
                     status="passed",
                     latency_ms=eval_dict.get("latency_ms"),
                     speedup_factor=eval_dict.get("speedup_factor"),
+                )
+
+                # V1: Generate solution_id and attach to node
+                v1_node = cast(V1Node, node) if isinstance(node, V1Node) else None
+                node_id = v1_node.node_id if v1_node else "unknown"
+                solution_id = f"sol_{node_id}_{context.round_idx}"
+
+                # V1: Set active leaf before attach
+                self._manager.set_active_leaf_id(
+                    definition_name=self.task_name,
+                    node_id=node_id,
+                )
+
+                # V1: Attach solution to mark node as solved
+                self._manager.attach_solution_to_active_leaf(
+                    definition_name=self.task_name,
+                    solution_id=solution_id,
+                    solution_name=f"cycle_{context.round_idx}",
+                    eval_result=eval_result,
+                    round_index=context.round_idx,
+                )
+                logger.debug(
+                    f"[V1_DEBUG: attach] node_id={node_id}, solution_id={solution_id}"
                 )
             else:
                 eval_result = EvalResult(status="failed")
@@ -286,6 +324,72 @@ class V1WorldModel:
         if wm_dict is None:
             return ""
         return render_world_model_section(self._cached_wm_json, max_chars=max_chars)
+
+    def _log_tree_status(self) -> None:
+        """Log tree structure showing open/closed nodes as file-system tree."""
+        wm = self._get_parsed_wm()
+        if not wm:
+            raise RuntimeError("_log_tree_status called but world model is None")
+        dt = wm.get("decision_tree", {})
+        if not dt:
+            raise RuntimeError("_log_tree_status called but decision_tree is empty")
+        nodes = dt.get("nodes", [])
+        root_id = dt.get("root_id", "root")
+        active_id = dt.get("active_leaf_id") or ""
+
+        # Debug: check for problematic nodes
+        for n in nodes:
+            node_id = n.get("node_id")
+            parent_id = n.get("parent_id")
+            if node_id == parent_id:
+                raise RuntimeError(
+                    f"Tree invariant violation: self-referential node {node_id}"
+                )
+            if node_id == root_id and parent_id:
+                raise RuntimeError(
+                    f"Tree invariant violation: root node {node_id} has parent {parent_id}"
+                )
+
+        # Build parent->children map
+        children: dict[str, list[dict]] = {}
+        for n in nodes:
+            node_id = n.get("node_id")
+            parent_id = n.get("parent_id", "root") or "root"
+            children.setdefault(parent_id, []).append(n)
+
+        lines = [f"{root_id}/"]
+        visited: set[str] = set()
+
+        def render_subtree(parent_id: str, prefix: str, depth: int) -> None:
+            if depth > 100:
+                raise RuntimeError(
+                    f"Tree invariant violation: depth {depth} exceeds max 100"
+                )
+            if parent_id in visited:
+                raise RuntimeError(
+                    f"Tree invariant violation: cycle detected at {parent_id}"
+                )
+            visited.add(parent_id)
+
+            kids = children.get(parent_id, [])
+            for i, n in enumerate(kids):
+                node_id = n.get("node_id", "?")
+                action = n.get("action", {})
+                title = action.get("title", "?")[:35]
+                sol_ref = n.get("solution_ref", {})
+                has_solution = bool(sol_ref.get("solution_id"))
+                status = "SOLVED" if has_solution else "OPEN"
+                active_marker = " ← active" if node_id == active_id else ""
+
+                is_last = i == len(kids) - 1
+                connector = "└── " if is_last else "├── "
+                child_prefix = "    " if is_last else "│   "
+
+                lines.append(f"{prefix}{connector}[{status}] {title}{active_marker}")
+                render_subtree(node_id, prefix + child_prefix, depth + 1)
+
+        render_subtree(root_id, "", 0)
+        logger.info("[TREE: state]\n" + "\n".join(lines))
 
     def _sync_frontier_from_manager(self, tree: Tree) -> list[V1Node]:
         """Sync V1 JSON tree nodes to modular Tree, return new frontier nodes."""
@@ -551,11 +655,13 @@ class V1SequentialExecutor:
             if not selected:
                 logger.info("No more actions to select, stopping")
                 break
-
+            if len(selected) != 1:
+                raise RuntimeError(f"{selected=} expected to be of len 1.")
             node = selected[0]
             node.status = "in_progress"
             action_title = node.action.title if node.action else "unknown"
             logger.info(f"[ACTION: selected] {action_title}")
+            self.world_model._log_tree_status()
 
             # Get action context from modular Node (authoritative source)
             action_ctx = self.world_model.get_action_context(node)
@@ -583,7 +689,9 @@ class V1SequentialExecutor:
                 self.global_best_score = cycle.best_round.score
 
             rounds_used += len(cycle.rounds)
-            logger.info(f"[CYCLE: end] cycle_rounds={len(cycle.rounds)}, total={rounds_used}")
+            logger.info(
+                f"[CYCLE: end] cycle_rounds={len(cycle.rounds)}, total={rounds_used}"
+            )
 
         return self.tree.get_best_node()
 
@@ -691,7 +799,9 @@ class V1SequentialExecutor:
             current_code = code
 
             logger.debug(
-                response_color(f"[ROUND: response] ({len(code)} chars):\n\n{code}\n")
+                response_color(
+                    f"[ROUND: response] ({len(code)} chars, ~{len(code) // 4} toks):\n\n{code}\n"
+                )
             )
 
             impl = self.task.create_impl(code)
@@ -755,10 +865,14 @@ class V1SequentialExecutor:
                     no_improve_over_base += 1
 
             if no_improve >= self.cycle_config.stagnation_rounds:
-                logger.info(f"[CYCLE: stagnation] no improvement for {no_improve} rounds")
+                logger.info(
+                    f"[CYCLE: stagnation] no improvement for {no_improve} rounds"
+                )
                 break
             if no_improve_over_base >= self.cycle_config.stagnation_rounds:
-                logger.info(f"[CYCLE: stagnation] no improvement over base for {no_improve_over_base} rounds")
+                logger.info(
+                    f"[CYCLE: stagnation] no improvement over base for {no_improve_over_base} rounds"
+                )
                 break
 
         return Cycle(rounds=rounds)
@@ -803,7 +917,9 @@ def wrap_with_action_logging(llm: LLMCall) -> LLMCall:
         )
         result = llm(prompt)
         logger.debug(
-            response_color(f"[ACTION: response] ({len(result)} chars):\n\n{result}\n")
+            response_color(
+                f"[ACTION: response] ({len(result)} chars, ~{len(result) // 4} toks):\n\n{result}\n"
+            )
         )
         return result
 
@@ -950,7 +1066,9 @@ def main():
         cycle_config=cycle_config,
     )
 
-    logger.info(f"Starting V1 case search: max_rounds={args.max_rounds}, model={args.model_name}")
+    logger.info(
+        f"Starting V1 case search: max_rounds={args.max_rounds}, model={args.model_name}"
+    )
 
     best_node = executor.run()
 
