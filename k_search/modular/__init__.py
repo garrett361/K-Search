@@ -21,7 +21,6 @@ from k_search.modular.protocols import (
     MetricsTracker,
     ReferenceImpl,
     Scorer,
-    StateFormatter,
     TaskDefinition,
     WorldModel,
 )
@@ -62,7 +61,6 @@ __all__ = [
     "MetricsTracker",
     "ReferenceImpl",
     "Scorer",
-    "StateFormatter",
     "TaskDefinition",
     "WorldModel",
     # Adapters
