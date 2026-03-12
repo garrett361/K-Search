@@ -46,7 +46,12 @@ from k_search.modular.config import (
 from k_search.modular.llm import get_endpoint
 from k_search.modular.logging import prompt_color, response_color
 from k_search.modular.metrics import create_metrics_trackers
-from k_search.modular.protocols import ArtifactStore, EvaluationResult, Evaluator, MetricsTracker
+from k_search.modular.protocols import (
+    ArtifactStore,
+    EvaluationResult,
+    Evaluator,
+    MetricsTracker,
+)
 from k_search.modular.protocols.task_definition import TaskDefinition
 from k_search.modular.world.action import Action
 from k_search.modular.world.cycle import Cycle
@@ -412,7 +417,9 @@ class V1WorldModel:
                 connector = "└── " if is_last else "├── "
                 child_prefix = "    " if is_last else "│   "
 
-                lines.append(f"{prefix}{connector}[{status} {debug_info}] {title}{active_marker}")
+                lines.append(
+                    f"{prefix}{connector}[{status} {debug_info}] {title}{active_marker}"
+                )
                 render_subtree(node_id, prefix + child_prefix, depth + 1)
 
         render_subtree(root_id, "", 0)
@@ -782,7 +789,7 @@ class V1SequentialExecutor:
 
         rounds: list[Round] = []
         best_score = -1.0
-        best_speedup: float | None = None
+        cycle_speedup: float | None = None
         best_code = ""
         best_result: EvaluationResult | None = None
         no_improve = 0
@@ -804,17 +811,16 @@ class V1SequentialExecutor:
 
         current_code = ""
         for attempt in range(max_attempts):
-            global_speedup = None
+            overall_speedup = None
             if self.global_best_round:
-                global_speedup = self.global_best_round.result.get_metrics().get(
+                overall_speedup = self.global_best_round.result.get_metrics().get(
                     "speedup_factor"
                 )
-            global_speedup_str = f"{global_speedup:.2f}x" if global_speedup else "-"
             stag = self.cycle_config.stagnation_rounds
             logger.info(
-                f"[ROUND: start] cycle_round={attempt } | "
+                f"[ROUND: start] cycle_round={attempt} | "
                 f"global_round={rounds_used + attempt}/{self.max_rounds} | "
-                f"best={self.global_best_score:.4f} ({global_speedup_str}) | "
+                f"best={self.global_best_score:.4f} ({overall_speedup}x) | "
                 f"no_improve={no_improve}/{stag} | no_improve_over_base={no_improve_over_base}/{stag}"
             )
 
@@ -930,25 +936,23 @@ class V1SequentialExecutor:
             self.global_round_idx += 1
 
             metrics = result.get_metrics()
-            speedup = metrics.get("speedup_factor")
-            speedup_str = f"{speedup:.2f}x" if speedup else "-"
+            round_speedup = metrics.get("speedup_factor")
 
             if result.succeeded() and score > best_score:
                 best_score = score
-                best_speedup = speedup
+                cycle_speedup = round_speedup
                 best_code = code
                 best_result = result
                 no_improve = 0
                 logger.info(
-                    f"[CYCLE: improved] score={score:.4f}, speedup={speedup_str}, "
-                    f"best_speedup_cycle={speedup_str}, best_speedup_global={global_speedup_str}"
+                    f"[CYCLE: improved] {score=}, {round_speedup=}x, "
+                    f"{round_speedup=}x, {overall_speedup=}x"
                 )
             else:
                 no_improve += 1
-                best_speedup_str = f"{best_speedup:.2f}x" if best_speedup else "-"
                 logger.info(
-                    f"[CYCLE: no_improve] score={score:.4f}, speedup={speedup_str}, "
-                    f"best_speedup_cycle={best_speedup_str}, best_speedup_global={global_speedup_str}, streak={no_improve}"
+                    f"[CYCLE: no_improve] {score=}, {round_speedup=}x, "
+                    f"{cycle_speedup=}x, {overall_speedup=}x, streak={no_improve}"
                 )
 
             # Track failure to beat base (V1 semantics: only when we have a passing
@@ -1077,7 +1081,6 @@ def main():
     )
     parser.add_argument(
         "--run-name",
-        default=None,
         help="Wandb run name",
     )
     parser.add_argument(
@@ -1189,7 +1192,9 @@ def main():
         max_debug_improve_rounds=args.max_debug_improve_rounds,
     )
 
-    metrics_config = MetricsConfig(wandb=args.wandb, local=bool(args.artifact_output_dir))
+    metrics_config = MetricsConfig(
+        wandb=args.wandb, local=bool(args.artifact_output_dir)
+    )
     artifact_config = ArtifactConfig(
         output_dir=args.artifact_output_dir,
         only_store_successes=(args.artifact_mode == "successes"),
@@ -1199,7 +1204,7 @@ def main():
     wandb_tags = args.wandb_tags.split(",") if args.wandb_tags else None
 
     run_config = build_run_config(
-        run_id=args.run_name or f"{args.task}-v1-{args.model_name.replace('/', '-')}-r{args.max_rounds}",
+        run_id=args.run_name,
         model_name=args.model_name,
         reasoning_effort=args.reasoning_effort,
         search_config=SearchConfig(max_rounds=args.max_rounds),
