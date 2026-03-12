@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "k-search"
+version = "0.1.0"
+description = "LLM-Driven GPU Kernel Optimization"
+requires-python = ">=3.10"
+dependencies = [
+    "openai",
+    "wandb",
+    "pyyaml",
+    "numpy",
+    "torch>=2.0",
+    "flash-linear-attention",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-timeout", "ty", "ruff"]
+flashinfer = [
+    "flashinfer-bench-ksearch @ git+https://github.com/caoshiyi/flashinfer-bench-ksearch.git",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["k_search*", "scripts*"]
+
+# V1 code is vendored/legacy - only lint the new modular subsystem
+[tool.ruff]
+extend-exclude = [
+    "k_search/kernel_generators/",
+    "k_search/tasks/",
+    "k_search/utils/",
+    "generate_kernels_and_eval.py",
+    "baselines/",
+    "results/",
+]
+
+[tool.ty.src]
+exclude = [
+    "k_search/kernel_generators/**",
+    "k_search/tasks/**",
+    "k_search/utils/**",
+    "generate_kernels_and_eval.py",
+    "baselines/**",
+    "results/**",
+]

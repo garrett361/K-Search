@@ -13,7 +13,6 @@ from pathlib import Path
 
 from k_search.kernel_generators.kernel_generator import KernelGenerator
 from k_search.tasks.task_base import code_from_solution
-from k_search.kernel_generators.kernel_generator_prompts import get_prompt_from_definition_text
 from k_search.kernel_generators.world_model_prompts import (
     get_debug_and_improve_from_spec_prompt_from_text,
     get_debug_generated_code_prompt_from_text,
@@ -36,6 +35,9 @@ from k_search.kernel_generators.world_model import (
 from k_search.utils.solution_db import SolutionDB
 from k_search.utils.paths import get_ksearch_artifacts_dir
 
+import logging
+from k_search.kernel_generators._logging import prompt_color, response_color
+logger = logging.getLogger(__name__)
 
 class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
     """Baseline-aware generator variant that maintains and injects a persistent world model."""
@@ -101,17 +103,30 @@ class WorldModelKernelGeneratorWithBaseline(KernelGenerator):
         self._artifacts_dir = artifacts_dir
 
         def _llm_call(prompt: str) -> str:
+            logger.info(prompt_color(f"[PROMPT] ({len(prompt)} chars, ~{len(prompt) // 4} toks):\n\n{prompt}\n"))
             if self.model_name.startswith("gpt-5") or self.model_name.startswith("o3"):
                 response = self.client.responses.create(
                     model=self.model_name,
                     input=prompt,
                     reasoning={"effort": self.reasoning_effort},
                 )
-                return (response.output_text or "").strip()
+                response =  (response.output_text or "").strip()
+                logger.info(response_color(f"[RESPONSE] ({len(response)} chars, ~{len(response) // 4} toks):\n\n{response}\n"))
+                return response
             response = self.client.chat.completions.create(
-                model=self.model_name, messages=[{"role": "user", "content": prompt}]
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+                reasoning_effort=self.reasoning_effort,
             )
-            return (response.choices[0].message.content or "").strip()
+            if len(response.choices) != 1:
+                raise RuntimeError(f"Expected {len(response.choices)=} to be 1.")
+            response = response.choices[0].message
+            content = response.content or getattr(response, "reasoning_content", None)
+            if content is None:
+                raise ValueError(f"LLM returned no content: {response}")
+            content = content.strip()
+            logger.info(response_color(f"[RESPONSE] ({len(content)} chars, ~{len(content) // 4} toks):\n\n{content}\n"))
+            return content
 
         selection_policy = WorldModelSelectionPolicy()
         if wm_max_difficulty is not None:
