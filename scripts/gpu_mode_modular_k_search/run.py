@@ -420,6 +420,9 @@ class V1WorldModel:
         nodes_list = dt.get("nodes", [])
         new_nodes = []
 
+        # Track parents that receive new children (split detection)
+        parents_with_new_children: set[str] = set()
+
         for node_data in nodes_list:
             node_id = node_data.get("node_id")
             if not node_id or node_id in self._node_id_map:
@@ -429,6 +432,12 @@ class V1WorldModel:
 
             parent_id = node_data.get("parent_id")
             action_data = node_data.get("action") or {}
+
+            # Detect split: if parent was synced in a previous call, this new child
+            # means V1 called split_node. Root is never in _node_id_map, so initial
+            # proposals (parent_id="root") don't trigger this.
+            if parent_id and parent_id in self._node_id_map:
+                parents_with_new_children.add(parent_id)
 
             # Extract all V1 metadata
             title = action_data.get("title", "")
@@ -456,6 +465,13 @@ class V1WorldModel:
             tree.add_node(new_node)
             self._node_id_map[node_id] = new_node
             new_nodes.append(new_node)
+
+        # Mark split parents as closed
+        for parent_v1_id in parents_with_new_children:
+            parent_node = self._node_id_map.get(parent_v1_id)
+            if parent_node and parent_node.status == "open":
+                parent_node.status = "closed"
+                logger.debug(f"[WorldModel: split_sync] marked {parent_v1_id} closed")
 
         return new_nodes
 

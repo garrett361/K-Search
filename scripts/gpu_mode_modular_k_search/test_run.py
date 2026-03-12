@@ -1001,6 +1001,131 @@ class TestTreeSyncLogic:
         second_sync = wm._sync_frontier_from_manager(tree)
         assert len(second_sync) == 0
 
+    def test_split_parent_marked_closed_on_sync(self):
+        """When sync adds children to an existing open node, mark parent as closed."""
+        from scripts.gpu_mode_modular_k_search.run import V1WorldModel
+
+        tree = Tree(root=Node(status="closed"))
+        mock_manager = MagicMock()
+
+        # First sync: add parent node
+        mock_manager.get.return_value = """{
+            "decision_tree": {
+                "root_id": "root",
+                "nodes": [{"node_id": "parent1", "parent_id": "root", "action": {"title": "First"}}]
+            }
+        }"""
+
+        wm = V1WorldModel(
+            manager=mock_manager,
+            task_name="test",
+            definition_text="test",
+            language="triton",
+            target_gpu="H100",
+        )
+        wm._initialized = True
+
+        first_sync = wm._sync_frontier_from_manager(tree)
+        assert len(first_sync) == 1
+        parent_node = first_sync[0]
+        assert parent_node.status == "open"
+
+        # Second sync: add children to that parent (simulates split_node operation)
+        mock_manager.get.return_value = """{
+            "decision_tree": {
+                "root_id": "root",
+                "nodes": [
+                    {"node_id": "parent1", "parent_id": "root", "action": {"title": "First"}},
+                    {"node_id": "child1", "parent_id": "parent1", "action": {"title": "Child A"}},
+                    {"node_id": "child2", "parent_id": "parent1", "action": {"title": "Child B"}}
+                ]
+            }
+        }"""
+
+        second_sync = wm._sync_frontier_from_manager(tree)
+        assert len(second_sync) == 2
+
+        # Parent should now be closed since it was split
+        assert parent_node.status == "closed"
+
+    def test_already_closed_parent_unchanged(self):
+        """Already-closed parents should not be affected by sync."""
+        from scripts.gpu_mode_modular_k_search.run import V1WorldModel
+
+        tree = Tree(root=Node(status="closed"))
+        mock_manager = MagicMock()
+
+        # First sync: add parent node
+        mock_manager.get.return_value = """{
+            "decision_tree": {
+                "root_id": "root",
+                "nodes": [{"node_id": "parent1", "parent_id": "root", "action": {"title": "First"}}]
+            }
+        }"""
+
+        wm = V1WorldModel(
+            manager=mock_manager,
+            task_name="test",
+            definition_text="test",
+            language="triton",
+            target_gpu="H100",
+        )
+        wm._initialized = True
+
+        first_sync = wm._sync_frontier_from_manager(tree)
+        parent_node = first_sync[0]
+
+        # Manually close the parent
+        parent_node.status = "closed"
+
+        # Second sync: add children to that closed parent
+        mock_manager.get.return_value = """{
+            "decision_tree": {
+                "root_id": "root",
+                "nodes": [
+                    {"node_id": "parent1", "parent_id": "root", "action": {"title": "First"}},
+                    {"node_id": "child1", "parent_id": "parent1", "action": {"title": "Child A"}}
+                ]
+            }
+        }"""
+
+        wm._sync_frontier_from_manager(tree)
+
+        # Parent should remain closed (no error, no change)
+        assert parent_node.status == "closed"
+
+    def test_root_children_dont_close_root(self):
+        """Root node should never be marked closed from child sync."""
+        from scripts.gpu_mode_modular_k_search.run import V1WorldModel
+
+        tree = Tree(root=Node(status="closed"))
+        mock_manager = MagicMock()
+
+        mock_manager.get.return_value = """{
+            "decision_tree": {
+                "root_id": "root",
+                "nodes": [
+                    {"node_id": "child1", "parent_id": "root", "action": {"title": "Child A"}},
+                    {"node_id": "child2", "parent_id": "root", "action": {"title": "Child B"}}
+                ]
+            }
+        }"""
+
+        wm = V1WorldModel(
+            manager=mock_manager,
+            task_name="test",
+            definition_text="test",
+            language="triton",
+            target_gpu="H100",
+        )
+        wm._initialized = True
+
+        # Root should remain closed and unaffected
+        wm._sync_frontier_from_manager(tree)
+
+        # Root is not in _node_id_map (special case), so it won't be touched
+        assert tree.root.status == "closed"
+
     def test_base_code_from_parent_cycle(self):
         """get_action_context should extract base_code from parent's cycle best_round."""
         from scripts.gpu_mode_modular_k_search.run import V1WorldModel, V1Node
