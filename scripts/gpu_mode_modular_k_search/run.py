@@ -36,9 +36,17 @@ from k_search.kernel_generators.world_model_prompts import (
     get_improve_generated_code_prompt_from_text,
 )
 from k_search.modular.adapters import GpuModeEvaluator, GpuModeTriMulTaskDefinition
+from k_search.modular.artifacts import create_artifact_stores
+from k_search.modular.config import (
+    ArtifactConfig,
+    MetricsConfig,
+    SearchConfig,
+    build_run_config,
+)
 from k_search.modular.llm import get_endpoint
 from k_search.modular.logging import prompt_color, response_color
-from k_search.modular.protocols import EvaluationResult, Evaluator
+from k_search.modular.metrics import create_metrics_trackers
+from k_search.modular.protocols import ArtifactStore, EvaluationResult, Evaluator, MetricsTracker
 from k_search.modular.protocols.task_definition import TaskDefinition
 from k_search.modular.world.action import Action
 from k_search.modular.world.cycle import Cycle
@@ -510,6 +518,29 @@ def _get_perf_summary_lines(result: EvaluationResult | None, prefix: str) -> lis
     return []
 
 
+def _build_v1_round_metrics(
+    round_time_secs: float,
+    score: float,
+    result: EvaluationResult,
+    best_score: float,
+    cycle_idx: int,
+    cycle_round: int,
+) -> dict[str, float | int | str | None]:
+    """Build metrics dict for a V1 case search round."""
+    metrics: dict[str, float | int | str | None] = {
+        "round_time_secs": round_time_secs,
+        "score": score,
+        "succeeded": int(result.succeeded()),
+        "best_score": best_score,
+        "cycle_idx": cycle_idx,
+        "cycle_round": cycle_round,
+    }
+    for key, val in result.get_metrics().items():
+        if isinstance(val, (int, float, str)) and not isinstance(val, bool):
+            metrics[key] = val
+    return metrics
+
+
 class V1PromptBuilder:
     """Handles V1-style prompt routing based on cycle phase."""
 
@@ -640,6 +671,8 @@ class V1SequentialExecutor:
         tree: Tree,
         max_rounds: int,
         cycle_config: CycleConfig | None = None,
+        metrics_trackers: list[MetricsTracker] | None = None,
+        artifact_stores: list[ArtifactStore] | None = None,
     ):
         self.world_model = world_model
         self.task = task
@@ -649,8 +682,11 @@ class V1SequentialExecutor:
         self.tree = tree
         self.max_rounds = max_rounds
         self.cycle_config = cycle_config or CycleConfig()
+        self.metrics_trackers = metrics_trackers or []
+        self.artifact_stores = artifact_stores or []
         self.global_best_round: Round | None = None
         self.global_best_score: float = -1.0
+        self.global_round_idx: int = 0
 
     def _check_unsupported_task_features(self) -> None:
         """Error if task provides features V2 doesn't support yet."""
@@ -675,6 +711,7 @@ class V1SequentialExecutor:
         self._check_unsupported_task_features()
 
         rounds_used = 0
+        cycle_idx = 0
         select_context = V1SelectContext(tree=self.tree)
 
         while rounds_used < self.max_rounds:
@@ -706,6 +743,7 @@ class V1SequentialExecutor:
                 action_ctx,
                 rounds_remaining=self.max_rounds - rounds_used,
                 rounds_used=rounds_used,
+                cycle_idx=cycle_idx,
             )
             node.cycle = cycle
             node.status = "closed"
@@ -724,6 +762,7 @@ class V1SequentialExecutor:
                 self.global_best_score = cycle.best_round.score
 
             rounds_used += len(cycle.rounds)
+            cycle_idx += 1
             logger.info(
                 f"[CYCLE: end] cycle_rounds={len(cycle.rounds)}, total={rounds_used}"
             )
@@ -736,8 +775,11 @@ class V1SequentialExecutor:
         action_ctx: dict[str, Any],
         rounds_remaining: int,
         rounds_used: int,
+        cycle_idx: int,
     ) -> Cycle:
         """Run multiple attempts on a single action with stagnation detection."""
+        import time as time_module
+
         rounds: list[Round] = []
         best_score = -1.0
         best_speedup: float | None = None
@@ -775,6 +817,8 @@ class V1SequentialExecutor:
                 f"best={self.global_best_score:.4f} ({global_speedup_str}) | "
                 f"no_improve={no_improve}/{stag} | no_improve_over_base={no_improve_over_base}/{stag}"
             )
+
+            round_start = time_module.perf_counter()
 
             last_round = rounds[-1] if rounds else None
             last_result = last_round.result if last_round else None
@@ -857,6 +901,8 @@ class V1SequentialExecutor:
             else:
                 score = -1.0
 
+            round_elapsed = time_module.perf_counter() - round_start
+
             round_ = Round(
                 impl=impl,
                 result=result,
@@ -864,10 +910,24 @@ class V1SequentialExecutor:
                 llm_response=code,
                 prompt_tokens=len(prompt) // 4,
                 completion_tokens=len(code) // 4,
-                duration_secs=0.0,
+                duration_secs=round_elapsed,
                 score=score,
             )
             rounds.append(round_)
+
+            round_metrics = _build_v1_round_metrics(
+                round_time_secs=round_elapsed,
+                score=score,
+                result=result,
+                best_score=best_score,
+                cycle_idx=cycle_idx,
+                cycle_round=attempt,
+            )
+            for tracker in self.metrics_trackers:
+                tracker.log(round_metrics, step=self.global_round_idx)
+            for store in self.artifact_stores:
+                store.store(round_, self.global_round_idx)
+            self.global_round_idx += 1
 
             metrics = result.get_metrics()
             speedup = metrics.get("speedup_factor")
@@ -1005,6 +1065,47 @@ def main():
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Enable debug logging"
     )
+    parser.add_argument(
+        "--wandb",
+        action="store_true",
+        help="Enable wandb logging",
+    )
+    parser.add_argument(
+        "--wandb-project",
+        default=None,
+        help="Wandb project name",
+    )
+    parser.add_argument(
+        "--run-name",
+        default=None,
+        help="Wandb run name",
+    )
+    parser.add_argument(
+        "--wandb-dir",
+        default=None,
+        help="Directory for wandb local files",
+    )
+    parser.add_argument(
+        "--wandb-group",
+        default=None,
+        help="Wandb group name (e.g., experiment name)",
+    )
+    parser.add_argument(
+        "--wandb-tags",
+        default=None,
+        help="Comma-separated wandb tags",
+    )
+    parser.add_argument(
+        "--artifact-output-dir",
+        default=None,
+        help="Directory to save artifacts (code, metadata)",
+    )
+    parser.add_argument(
+        "--artifact-mode",
+        default="successes",
+        choices=["successes", "all"],
+        help="Which artifacts to store: 'successes' or 'all'",
+    )
 
     args = parser.parse_args()
 
@@ -1088,6 +1189,53 @@ def main():
         max_debug_improve_rounds=args.max_debug_improve_rounds,
     )
 
+    metrics_config = MetricsConfig(wandb=args.wandb, local=bool(args.artifact_output_dir))
+    artifact_config = ArtifactConfig(
+        output_dir=args.artifact_output_dir,
+        only_store_successes=(args.artifact_mode == "successes"),
+        wandb=args.wandb,
+    )
+
+    wandb_tags = args.wandb_tags.split(",") if args.wandb_tags else None
+
+    run_config = build_run_config(
+        run_id=args.run_name or f"{args.task}-v1-{args.model_name.replace('/', '-')}-r{args.max_rounds}",
+        model_name=args.model_name,
+        reasoning_effort=args.reasoning_effort,
+        search_config=SearchConfig(max_rounds=args.max_rounds),
+        metrics_config=metrics_config,
+        artifact_config=artifact_config,
+        wandb_project=args.wandb_project,
+        wandb_run_name=args.run_name,
+        wandb_group=args.wandb_group,
+        wandb_tags=wandb_tags,
+        task=args.task,
+        language=args.language,
+        stagnation_rounds=args.stagnation_rounds,
+        max_debug_improve_rounds=args.max_debug_improve_rounds,
+        max_difficulty=args.max_difficulty,
+    )
+
+    if args.wandb:
+        import wandb
+
+        wandb.init(
+            project=args.wandb_project,
+            name=args.run_name,
+            dir=args.wandb_dir,
+            config=run_config,
+            group=args.wandb_group,
+            tags=wandb_tags,
+        )
+        logger.info(f"Wandb enabled: project={args.wandb_project}, run={args.run_name}")
+
+    metrics_trackers = create_metrics_trackers(
+        metrics_config,
+        output_dir=args.artifact_output_dir,
+        run_config=run_config,
+    )
+    artifact_stores = create_artifact_stores(artifact_config)
+
     tree = Tree(root=Node(status="closed"))
 
     executor = V1SequentialExecutor(
@@ -1099,6 +1247,8 @@ def main():
         tree=tree,
         max_rounds=args.max_rounds,
         cycle_config=cycle_config,
+        metrics_trackers=metrics_trackers,
+        artifact_stores=artifact_stores,
     )
 
     logger.info(
