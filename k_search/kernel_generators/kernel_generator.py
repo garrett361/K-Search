@@ -19,6 +19,11 @@ try:
 except Exception:  # pragma: no cover
     wandb = None
 
+
+import logging
+from k_search.kernel_generators._logging import prompt_color, response_color
+logger = logging.getLogger(__name__)
+
 def get_code_from_solution(language: str, solution: Any):
     from k_search.tasks.task_base import code_from_solution
     return code_from_solution(language, solution)
@@ -154,6 +159,7 @@ class KernelGenerator:
         last_err: Exception | None = None
         for attempt in range(1, (max_parse_retries if is_cuda else 1) + 1):
             try:
+                logger.info(prompt_color(f"[PROMPT ({attempt=})] ({len(prompt)} chars, ~{len(prompt) // 4} toks):\n\n{prompt}\n"))
                 effective_prompt = prompt
 
                 if self.model_name.startswith("gpt-5") or self.model_name.startswith("o3"):
@@ -167,6 +173,7 @@ class KernelGenerator:
                     )
                     generated_code = response.choices[0].message.content.strip()
 
+                logger.info(response_color(f"[RESPONSE] ({len(generated_code)} chars, ~{len(generated_code) // 4} toks):\n\n{generated_code}\n"))
                 cleaned_code = self._clean_generated_code(generated_code)
 
                 if is_cuda:
@@ -260,7 +267,7 @@ class KernelGenerator:
             description=solution_description,
         )
         return solution
-    
+
     def generate(  # type: ignore[override]
         self,
         task: Task,
