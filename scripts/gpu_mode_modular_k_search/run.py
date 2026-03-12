@@ -360,10 +360,12 @@ class V1WorldModel:
                     f"Tree invariant violation: root node {node_id} has parent {parent_id}"
                 )
 
-        # Build parent->children map
+        # Build parent->children map (skip root node itself)
         children: dict[str, list[dict]] = {}
         for n in nodes:
             node_id = n.get("node_id")
+            if node_id == root_id:
+                continue  # Root node is not a child of anything
             parent_id = n.get("parent_id", "root") or "root"
             children.setdefault(parent_id, []).append(n)
 
@@ -391,11 +393,18 @@ class V1WorldModel:
                 status = "SOLVED" if has_solution else "OPEN"
                 active_marker = " ← active" if node_id == active_id else ""
 
+                # Debug info: r=rating d=difficulty c=confidence evb=expected_vs_baseline
+                rating = n.get("overall_rating_0_to_10", "?")
+                diff = action.get("difficulty_1_to_5", "?")
+                conf = n.get("confidence_0_to_1", "?")
+                evb = action.get("expected_vs_baseline_factor", "-")
+                debug_info = f"r={rating} d={diff} c={conf} evb={evb}"
+
                 is_last = i == len(kids) - 1
                 connector = "└── " if is_last else "├── "
                 child_prefix = "    " if is_last else "│   "
 
-                lines.append(f"{prefix}{connector}[{status}] {title}{active_marker}")
+                lines.append(f"{prefix}{connector}[{status} {debug_info}] {title}{active_marker}")
                 render_subtree(node_id, prefix + child_prefix, depth + 1)
 
         render_subtree(root_id, "", 0)
