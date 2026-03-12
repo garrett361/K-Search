@@ -7,14 +7,10 @@ Reference: k_search/kernel_generators/kernel_generator_world_model.py
 """
 
 import pytest
-from dataclasses import dataclass
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock
 
-from k_search.modular.world.action import Action
 from k_search.modular.world.cycle import Cycle
-from k_search.modular.world.node import Node
 from k_search.modular.world.round import Round
-from k_search.modular.world.tree import Tree
 from k_search.tasks.task_base import EvalResult
 
 from scripts.gpu_mode_modular_k_search.run import (
@@ -65,6 +61,7 @@ class MockResult:
             "latency_ms": self._latency_ms,
             "speedup_factor": self._speedup_factor,
             "mean_vs_baseline_factor": self._mean_vs_baseline_factor,
+            "score": self.score(),
         }
 
     def get_log(self) -> str:
@@ -114,7 +111,7 @@ class TestScoreInitialization:
         """V1SequentialExecutor.global_best_score should be -1.0, not 0.0."""
         mock_wm = MagicMock()
         prompt_builder = MagicMock()
-        tree = Tree(root=Node(status="closed"))
+        root = V1Node(status="closed")
 
         executor = V1SequentialExecutor(
             world_model=mock_wm,
@@ -122,7 +119,7 @@ class TestScoreInitialization:
             evaluator=MockEvaluator([]),
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
-            tree=tree,
+            root=root,
             max_rounds=10,
         )
 
@@ -143,7 +140,7 @@ class TestScoreInitialization:
         mock_wm = MagicMock()
         mock_wm.propose.return_value = []
         mock_wm.select.side_effect = [
-            [Node(status="open", action=Action(title="Test"))],
+            [V1Node(status="open", action=V1Action(title="Test"))],
             [],
         ]
         mock_wm.get_action_context.return_value = {
@@ -159,9 +156,9 @@ class TestScoreInitialization:
         prompt_builder = MagicMock()
         prompt_builder.build.return_value = "prompt"
 
-        tree = Tree(root=Node(status="closed"))
-        action_node = Node(parent=tree.root, status="open", action=Action(title="Test"))
-        tree.add_node(action_node)
+        root = V1Node(status="closed")
+        action_node = V1Node(parent=root, status="open", action=V1Action(title="Test"))
+        # tree.add_node no longer exists - node is already linked via parent=
         mock_wm.select.side_effect = [[action_node], []]
 
         executor = V1SequentialExecutor(
@@ -170,7 +167,7 @@ class TestScoreInitialization:
             evaluator=evaluator,
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
-            tree=tree,
+            root=root,
             max_rounds=1,
             cycle_config=CycleConfig(stagnation_rounds=10),
         )
@@ -204,9 +201,9 @@ class TestBaseScoreFallback:
         mock_wm = MagicMock()
         mock_wm.propose.return_value = []
 
-        tree = Tree(root=Node(status="closed"))
-        action_node = Node(parent=tree.root, status="open", action=Action(title="Test"))
-        tree.add_node(action_node)
+        root = V1Node(status="closed")
+        action_node = V1Node(parent=root, status="open", action=V1Action(title="Test"))
+        # tree.add_node no longer exists - node is already linked via parent=
 
         mock_wm.select.side_effect = [[action_node], []]
         # Deliberately omit base_score to test fallback
@@ -236,7 +233,7 @@ class TestBaseScoreFallback:
             evaluator=evaluator,
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
-            tree=tree,
+            root=root,
             max_rounds=1,
             cycle_config=CycleConfig(stagnation_rounds=10),
         )
@@ -244,10 +241,10 @@ class TestBaseScoreFallback:
         # Patch _run_cycle to capture base_score
         original_run_cycle = executor._run_cycle
 
-        def patched_run_cycle(node, action_ctx, rounds_remaining, rounds_used):
+        def patched_run_cycle(node, action_ctx, rounds_remaining, rounds_used, cycle_idx):
             base_score = action_ctx.get("base_score", 0.0)  # Current buggy default
             captured_base_scores.append(base_score)
-            return original_run_cycle(node, action_ctx, rounds_remaining, rounds_used)
+            return original_run_cycle(node, action_ctx, rounds_remaining, rounds_used, cycle_idx)
 
         executor._run_cycle = patched_run_cycle
         executor.run()
@@ -280,9 +277,9 @@ class TestScoreCalculation:
             custom_score=10.0,  # Should take priority
         )
 
-        tree = Tree(root=Node(status="closed"))
-        action_node = Node(parent=tree.root, status="open", action=Action(title="Test"))
-        tree.add_node(action_node)
+        root = V1Node(status="closed")
+        action_node = V1Node(parent=root, status="open", action=V1Action(title="Test"))
+        # tree.add_node no longer exists - node is already linked via parent=
 
         mock_wm = MagicMock()
         mock_wm.propose.return_value = []
@@ -306,7 +303,7 @@ class TestScoreCalculation:
             evaluator=evaluator,
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
-            tree=tree,
+            root=root,
             max_rounds=1,
             cycle_config=CycleConfig(stagnation_rounds=10),
         )
@@ -330,9 +327,9 @@ class TestScoreCalculation:
             mean_vs_baseline_factor=3.0,  # Should take priority
         )
 
-        tree = Tree(root=Node(status="closed"))
-        action_node = Node(parent=tree.root, status="open", action=Action(title="Test"))
-        tree.add_node(action_node)
+        root = V1Node(status="closed")
+        action_node = V1Node(parent=root, status="open", action=V1Action(title="Test"))
+        # tree.add_node no longer exists - node is already linked via parent=
 
         mock_wm = MagicMock()
         mock_wm.propose.return_value = []
@@ -356,7 +353,7 @@ class TestScoreCalculation:
             evaluator=evaluator,
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
-            tree=tree,
+            root=root,
             max_rounds=1,
             cycle_config=CycleConfig(stagnation_rounds=10),
         )
@@ -394,9 +391,9 @@ class TestNoteActionTooHardParams:
         mock_wm = MagicMock()
         mock_wm.propose.return_value = []
 
-        tree = Tree(root=Node(status="closed"))
-        action_node = Node(parent=tree.root, status="open", action=Action(title="Test"))
-        tree.add_node(action_node)
+        root = V1Node(status="closed")
+        action_node = V1Node(parent=root, status="open", action=V1Action(title="Test"))
+        # tree.add_node no longer exists - node is already linked via parent=
 
         mock_wm.select.side_effect = [[action_node], []]
         mock_wm.get_action_context.return_value = {
@@ -421,7 +418,7 @@ class TestNoteActionTooHardParams:
             evaluator=evaluator,
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
-            tree=tree,
+            root=root,
             max_rounds=1,
             cycle_config=cycle_config,
         )
@@ -462,7 +459,7 @@ class TestNoteActionTooHardManagerCall:
         )
 
         context = V1UpdateContext(
-            tree=Tree(root=Node(status="closed")),
+            root=V1Node(status="closed"),
             node=node,
             cycle=cycle,
             round_idx=5,
@@ -623,7 +620,7 @@ class TestPredictionParameter:
         )
 
         context = V1UpdateContext(
-            tree=Tree(root=Node(status="closed")),
+            root=V1Node(status="closed"),
             node=node,
             cycle=cycle,
             round_idx=5,
@@ -698,7 +695,7 @@ class TestNoteActionTooHardEvalResult:
         )
 
         context = V1UpdateContext(
-            tree=Tree(root=Node(status="closed")),
+            root=V1Node(status="closed"),
             node=node,
             cycle=cycle,
             round_idx=5,
@@ -781,9 +778,9 @@ class TestFullCycleV1Semantics:
             MockResult(True, 2.0),   # score = 0.5 (via 1/latency)
         ]
 
-        tree = Tree(root=Node(status="closed"))
-        action_node = Node(parent=tree.root, status="open", action=Action(title="Test"))
-        tree.add_node(action_node)
+        root = V1Node(status="closed")
+        action_node = V1Node(parent=root, status="open", action=V1Action(title="Test"))
+        # tree.add_node no longer exists - node is already linked via parent=
 
         mock_wm = MagicMock()
         mock_wm.propose.return_value = []
@@ -807,7 +804,7 @@ class TestFullCycleV1Semantics:
             evaluator=evaluator,
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
-            tree=tree,
+            root=root,
             max_rounds=2,
             cycle_config=CycleConfig(stagnation_rounds=10),
         )

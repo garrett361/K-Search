@@ -25,6 +25,7 @@ class GpuModeEvaluationResult:
         d = self._inner.to_dict(include_log_excerpt=False, max_str_chars=max_str_chars)
         d["reference_latency_ms"] = self._reference_latency_ms
         d["speedup_factor"] = self.speedup_factor
+        d["score"] = self.score()
         return d
 
     def get_log(self) -> str:

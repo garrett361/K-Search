@@ -62,7 +62,7 @@ class TestGpuModeTriMulTaskDefinitionScorer:
 
         assert score > 0
 
-    def test_scorer_returns_zero_for_failed(self):
+    def test_scorer_returns_negative_one_for_failed(self):
         from k_search.modular.adapters.gpu_mode import (
             GpuModeEvaluationResult,
             GpuModeTriMulTaskDefinition,
@@ -75,7 +75,7 @@ class TestGpuModeTriMulTaskDefinitionScorer:
         result = GpuModeEvaluationResult(EvalResult(status="failed"))
         score = task_def.scorer.score(result)
 
-        assert score == 0.0
+        assert score == -1.0  # V1 semantics: -1.0 for failed results
 
 
 @pytest.mark.cuda

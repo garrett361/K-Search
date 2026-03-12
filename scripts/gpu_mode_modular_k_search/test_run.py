@@ -3,13 +3,12 @@
 import pytest
 from unittest.mock import MagicMock
 
-from k_search.modular.world.action import Action
-from k_search.modular.world.node import Node
 from k_search.modular.world.round import Round
-from k_search.modular.world.tree import Tree
 
 from scripts.gpu_mode_modular_k_search.run import (
     CycleConfig,
+    V1Action,
+    V1Node,
     V1PromptBuilder,
     V1SequentialExecutor,
 )
@@ -24,7 +23,8 @@ class MockResult:
         return self._succeeded
 
     def get_metrics(self) -> dict:
-        return {"latency_ms": self._latency_ms, "speedup_factor": 1.0}
+        score = 1.0 / self._latency_ms if self._succeeded else -1.0
+        return {"latency_ms": self._latency_ms, "speedup_factor": 1.0, "score": score}
 
     def get_log(self) -> str:
         return ""
@@ -61,8 +61,10 @@ def test_stagnation_ends_cycle_early():
 
     mock_wm = MagicMock()
     mock_wm.propose.return_value = []
+
+    action_node = V1Node(status="open", action=V1Action(title="Test"))
     mock_wm.select.side_effect = [
-        [Node(status="open", action=Action(title="Test"))],
+        [action_node],
         [],
     ]
     mock_wm.get_action_context.return_value = {
@@ -77,7 +79,7 @@ def test_stagnation_ends_cycle_early():
     prompt_builder = MagicMock()
     prompt_builder.build.return_value = "prompt"
 
-    tree = Tree(root=Node(status="closed"))
+    root = V1Node(status="closed")
 
     executor = V1SequentialExecutor(
         world_model=mock_wm,
@@ -85,7 +87,7 @@ def test_stagnation_ends_cycle_early():
         evaluator=evaluator,  # type: ignore[arg-type]
         llm=lambda p: "code",
         prompt_builder=prompt_builder,
-        tree=tree,
+        root=root,
         max_rounds=20,
         cycle_config=CycleConfig(stagnation_rounds=3),
     )
@@ -114,8 +116,10 @@ def test_no_improve_over_base_ends_cycle():
 
     mock_wm = MagicMock()
     mock_wm.propose.return_value = []
+
+    action_node = V1Node(status="open", action=V1Action(title="Test"))
     mock_wm.select.side_effect = [
-        [Node(status="open", action=Action(title="Test"))],
+        [action_node],
         [],
     ]
     mock_wm.get_action_context.return_value = {
@@ -131,7 +135,7 @@ def test_no_improve_over_base_ends_cycle():
     prompt_builder = MagicMock()
     prompt_builder.build.return_value = "prompt"
 
-    tree = Tree(root=Node(status="closed"))
+    root = V1Node(status="closed")
 
     executor = V1SequentialExecutor(
         world_model=mock_wm,
@@ -139,7 +143,7 @@ def test_no_improve_over_base_ends_cycle():
         evaluator=evaluator,  # type: ignore[arg-type]
         llm=lambda p: "code",
         prompt_builder=prompt_builder,
-        tree=tree,
+        root=root,
         max_rounds=20,
         cycle_config=CycleConfig(stagnation_rounds=3),
     )
@@ -163,15 +167,13 @@ class TestScoringSemantics:
         """V1 semantics: failed evals score -1.0, not 0.0."""
         results = [MockResult(succeeded=False, latency_ms=0.0)]
 
-        tree = Tree(root=Node(status="closed"))
-        # Create node attached to tree so it appears in _nodes_by_id
-        action_node = Node(parent=tree.root, status="open", action=Action(title="Test"))
-        tree.add_node(action_node)
+        root = V1Node(status="closed")
+        action_node = V1Node(status="open", action=V1Action(title="Test"))
 
         mock_wm = MagicMock()
         mock_wm.propose.return_value = []
         mock_wm.select.side_effect = [
-            [action_node],  # Return the node from the tree
+            [action_node],
             [],
         ]
         mock_wm.get_action_context.return_value = {
@@ -192,34 +194,29 @@ class TestScoringSemantics:
             evaluator=evaluator,  # type: ignore[arg-type]
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
-            tree=tree,
+            root=root,
             max_rounds=1,
             cycle_config=CycleConfig(stagnation_rounds=10),
         )
 
         executor.run()
 
-        # Access the cycle attached to the node
-        nodes = [n for n in tree._nodes_by_id.values() if n.cycle]
-        assert len(nodes) == 1
-        cycle = nodes[0].cycle
-        assert cycle is not None
-        assert len(cycle.rounds) == 1
-        assert cycle.rounds[0].score == -1.0
+        # The action_node should now have a cycle attached
+        assert action_node.cycle is not None
+        assert len(action_node.cycle.rounds) == 1
+        assert action_node.cycle.rounds[0].score == -1.0
 
     def test_success_is_inverse_latency(self):
         """V1 semantics: score = 1.0 / latency_ms."""
         results = [MockResult(succeeded=True, latency_ms=2.0)]
 
-        tree = Tree(root=Node(status="closed"))
-        # Create node attached to tree so it appears in _nodes_by_id
-        action_node = Node(parent=tree.root, status="open", action=Action(title="Test"))
-        tree.add_node(action_node)
+        root = V1Node(status="closed")
+        action_node = V1Node(status="open", action=V1Action(title="Test"))
 
         mock_wm = MagicMock()
         mock_wm.propose.return_value = []
         mock_wm.select.side_effect = [
-            [action_node],  # Return the node from the tree
+            [action_node],
             [],
         ]
         mock_wm.get_action_context.return_value = {
@@ -240,20 +237,18 @@ class TestScoringSemantics:
             evaluator=evaluator,  # type: ignore[arg-type]
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
-            tree=tree,
+            root=root,
             max_rounds=1,
             cycle_config=CycleConfig(stagnation_rounds=10),
         )
 
         executor.run()
 
-        nodes = [n for n in tree._nodes_by_id.values() if n.cycle]
-        assert len(nodes) == 1
-        cycle = nodes[0].cycle
-        assert cycle is not None
-        assert len(cycle.rounds) == 1
+        # The action_node should now have a cycle attached
+        assert action_node.cycle is not None
+        assert len(action_node.cycle.rounds) == 1
         # score = 1.0 / 2.0 = 0.5
-        assert cycle.rounds[0].score == 0.5
+        assert action_node.cycle.rounds[0].score == 0.5
 
 
 # =============================================================================
@@ -275,8 +270,10 @@ class TestBestCodeSelection:
 
         mock_wm = MagicMock()
         mock_wm.propose.return_value = []
+
+        action_node = V1Node(status="open", action=V1Action(title="Test"))
         mock_wm.select.side_effect = [
-            [Node(status="open", action=Action(title="Test"))],
+            [action_node],
             [],
         ]
         mock_wm.get_action_context.return_value = {
@@ -292,7 +289,7 @@ class TestBestCodeSelection:
         prompt_builder = MagicMock()
         prompt_builder.build.return_value = "prompt"
 
-        tree = Tree(root=Node(status="closed"))
+        root = V1Node(status="closed")
 
         executor = V1SequentialExecutor(
             world_model=mock_wm,
@@ -300,7 +297,7 @@ class TestBestCodeSelection:
             evaluator=evaluator,  # type: ignore[arg-type]
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
-            tree=tree,
+            root=root,
             max_rounds=2,
             cycle_config=CycleConfig(stagnation_rounds=10),
         )
@@ -325,8 +322,10 @@ class TestBestCodeSelection:
 
         mock_wm = MagicMock()
         mock_wm.propose.return_value = []
+
+        action_node = V1Node(status="open", action=V1Action(title="Test"))
         mock_wm.select.side_effect = [
-            [Node(status="open", action=Action(title="Test"))],
+            [action_node],
             [],
         ]
         mock_wm.get_action_context.return_value = {
@@ -351,7 +350,7 @@ class TestBestCodeSelection:
             code_idx[0] += 1
             return code
 
-        tree = Tree(root=Node(status="closed"))
+        root = V1Node(status="closed")
 
         executor = V1SequentialExecutor(
             world_model=mock_wm,
@@ -359,7 +358,7 @@ class TestBestCodeSelection:
             evaluator=evaluator,  # type: ignore[arg-type]
             llm=llm_with_tracking,
             prompt_builder=prompt_builder,
-            tree=tree,
+            root=root,
             max_rounds=2,
             cycle_config=CycleConfig(stagnation_rounds=10),
         )
@@ -587,8 +586,10 @@ class TestStagnationCounterIndependence:
 
         mock_wm = MagicMock()
         mock_wm.propose.return_value = []
+
+        action_node = V1Node(status="open", action=V1Action(title="Test"))
         mock_wm.select.side_effect = [
-            [Node(status="open", action=Action(title="Test"))],
+            [action_node],
             [],
         ]
         mock_wm.get_action_context.return_value = {
@@ -603,7 +604,7 @@ class TestStagnationCounterIndependence:
         prompt_builder = MagicMock()
         prompt_builder.build.return_value = "prompt"
 
-        tree = Tree(root=Node(status="closed"))
+        root = V1Node(status="closed")
 
         executor = V1SequentialExecutor(
             world_model=mock_wm,
@@ -611,7 +612,7 @@ class TestStagnationCounterIndependence:
             evaluator=evaluator,  # type: ignore[arg-type]
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
-            tree=tree,
+            root=root,
             max_rounds=20,
             cycle_config=CycleConfig(stagnation_rounds=3),
         )
@@ -639,7 +640,8 @@ class MockResultWithPerfSummary:
         return self._succeeded
 
     def get_metrics(self) -> dict:
-        return {"latency_ms": self._latency_ms, "speedup_factor": 1.0}
+        score = 1.0 / self._latency_ms if self._succeeded else -1.0
+        return {"latency_ms": self._latency_ms, "speedup_factor": 1.0, "score": score}
 
     def get_log(self) -> str:
         return "log output"
@@ -666,7 +668,7 @@ class TestPerfSummaryConstruction:
         mock_wm = MagicMock()
         mock_wm.propose.return_value = []
         mock_wm.select.side_effect = [
-            [Node(status="open", action=Action(title="Test"))],
+            [V1Node(status="open", action=V1Action(title="Test"))],
             [],
         ]
 
@@ -685,7 +687,7 @@ class TestPerfSummaryConstruction:
         prompt_builder = MagicMock()
         prompt_builder.build.return_value = "prompt"
 
-        tree = Tree(root=Node(status="closed"))
+        root = V1Node(status="closed")
 
         executor = V1SequentialExecutor(
             world_model=mock_wm,
@@ -693,7 +695,7 @@ class TestPerfSummaryConstruction:
             evaluator=evaluator,  # type: ignore[arg-type]
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
-            tree=tree,
+            root=root,
             max_rounds=2,
             cycle_config=CycleConfig(stagnation_rounds=10),
         )
@@ -729,7 +731,7 @@ class TestNoImproveOverBaseActivation:
         mock_wm = MagicMock()
         mock_wm.propose.return_value = []
         mock_wm.select.side_effect = [
-            [Node(status="open", action=Action(title="Test"))],
+            [V1Node(status="open", action=V1Action(title="Test"))],
             [],
         ]
         mock_wm.get_action_context.return_value = {
@@ -744,7 +746,7 @@ class TestNoImproveOverBaseActivation:
         prompt_builder = MagicMock()
         prompt_builder.build.return_value = "prompt"
 
-        tree = Tree(root=Node(status="closed"))
+        root = V1Node(status="closed")
 
         executor = V1SequentialExecutor(
             world_model=mock_wm,
@@ -752,7 +754,7 @@ class TestNoImproveOverBaseActivation:
             evaluator=evaluator,  # type: ignore[arg-type]
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
-            tree=tree,
+            root=root,
             max_rounds=20,
             cycle_config=CycleConfig(stagnation_rounds=3),
         )
@@ -778,7 +780,7 @@ class TestNoImproveOverBaseActivation:
         mock_wm = MagicMock()
         mock_wm.propose.return_value = []
         mock_wm.select.side_effect = [
-            [Node(status="open", action=Action(title="Test"))],
+            [V1Node(status="open", action=V1Action(title="Test"))],
             [],
         ]
         mock_wm.get_action_context.return_value = {
@@ -794,7 +796,7 @@ class TestNoImproveOverBaseActivation:
         prompt_builder = MagicMock()
         prompt_builder.build.return_value = "prompt"
 
-        tree = Tree(root=Node(status="closed"))
+        root = V1Node(status="closed")
 
         executor = V1SequentialExecutor(
             world_model=mock_wm,
@@ -802,7 +804,7 @@ class TestNoImproveOverBaseActivation:
             evaluator=evaluator,  # type: ignore[arg-type]
             llm=lambda p: "code",
             prompt_builder=prompt_builder,
-            tree=tree,
+            root=root,
             max_rounds=20,
             cycle_config=CycleConfig(stagnation_rounds=3),
         )
@@ -833,7 +835,7 @@ class TestBaseScoreDefault:
         from scripts.gpu_mode_modular_k_search.run import V1WorldModel, V1Node
 
         # Create a node with no parent cycle (simulating root's child)
-        root = Node(status="closed")
+        root = V1Node(status="closed")
         child = V1Node(
             parent=root,
             status="open",
@@ -904,7 +906,7 @@ class TestTreeSyncLogic:
         """Nodes synced from world model JSON should be added to the modular tree."""
         from scripts.gpu_mode_modular_k_search.run import V1WorldModel
 
-        tree = Tree(root=Node(status="closed"))
+        root = V1Node(status="closed")
         mock_manager = MagicMock()
 
         # Simulate world model JSON with one action node
@@ -919,22 +921,22 @@ class TestTreeSyncLogic:
         )
         wm._initialized = True
 
-        # Sync should add the node to the tree
-        new_nodes = wm._sync_frontier_from_manager(tree)
+        # Sync should add the node to the root
+        new_nodes = wm._sync_frontier_from_manager(root)
 
         assert len(new_nodes) == 1
         assert new_nodes[0].node_id == "action1"
         assert new_nodes[0].action is not None
         assert new_nodes[0].action.title == "Optimize"
         assert new_nodes[0].parent_is_root is True
-        # Node should be in tree's registry
-        assert tree.get_node_by_id(new_nodes[0].id) is not None
+        # Node should be in wm's node_id_map
+        assert wm._node_id_map.get(new_nodes[0].node_id) is not None
 
     def test_action_metadata_extracted_correctly(self):
         """Action metadata (difficulty, confidence, rationale) should be extracted during sync."""
         from scripts.gpu_mode_modular_k_search.run import V1WorldModel
 
-        tree = Tree(root=Node(status="closed"))
+        root = V1Node(status="closed")
         mock_manager = MagicMock()
 
         # Simulate world model JSON with full action metadata
@@ -964,7 +966,7 @@ class TestTreeSyncLogic:
         )
         wm._initialized = True
 
-        new_nodes = wm._sync_frontier_from_manager(tree)
+        new_nodes = wm._sync_frontier_from_manager(root)
 
         assert len(new_nodes) == 1
         action = new_nodes[0].action
@@ -979,7 +981,7 @@ class TestTreeSyncLogic:
         """Nodes already in _node_id_map should not be re-added."""
         from scripts.gpu_mode_modular_k_search.run import V1WorldModel
 
-        tree = Tree(root=Node(status="closed"))
+        root = V1Node(status="closed")
         mock_manager = MagicMock()
 
         mock_manager.get.return_value = '{"decision_tree": {"root_id": "root", "nodes": [{"node_id": "action1", "parent_id": "root", "action": {"title": "Test"}}]}}'
@@ -994,18 +996,18 @@ class TestTreeSyncLogic:
         wm._initialized = True
 
         # First sync
-        first_sync = wm._sync_frontier_from_manager(tree)
+        first_sync = wm._sync_frontier_from_manager(root)
         assert len(first_sync) == 1
 
         # Second sync with same data - should return empty (no new nodes)
-        second_sync = wm._sync_frontier_from_manager(tree)
+        second_sync = wm._sync_frontier_from_manager(root)
         assert len(second_sync) == 0
 
     def test_split_parent_marked_closed_on_sync(self):
         """When sync adds children to an existing open node, mark parent as closed."""
         from scripts.gpu_mode_modular_k_search.run import V1WorldModel
 
-        tree = Tree(root=Node(status="closed"))
+        root = V1Node(status="closed")
         mock_manager = MagicMock()
 
         # First sync: add parent node
@@ -1025,7 +1027,7 @@ class TestTreeSyncLogic:
         )
         wm._initialized = True
 
-        first_sync = wm._sync_frontier_from_manager(tree)
+        first_sync = wm._sync_frontier_from_manager(root)
         assert len(first_sync) == 1
         parent_node = first_sync[0]
         assert parent_node.status == "open"
@@ -1042,7 +1044,7 @@ class TestTreeSyncLogic:
             }
         }"""
 
-        second_sync = wm._sync_frontier_from_manager(tree)
+        second_sync = wm._sync_frontier_from_manager(root)
         assert len(second_sync) == 2
 
         # Parent should now be closed since it was split
@@ -1052,7 +1054,7 @@ class TestTreeSyncLogic:
         """Already-closed parents should not be affected by sync."""
         from scripts.gpu_mode_modular_k_search.run import V1WorldModel
 
-        tree = Tree(root=Node(status="closed"))
+        root = V1Node(status="closed")
         mock_manager = MagicMock()
 
         # First sync: add parent node
@@ -1072,7 +1074,7 @@ class TestTreeSyncLogic:
         )
         wm._initialized = True
 
-        first_sync = wm._sync_frontier_from_manager(tree)
+        first_sync = wm._sync_frontier_from_manager(root)
         parent_node = first_sync[0]
 
         # Manually close the parent
@@ -1089,7 +1091,7 @@ class TestTreeSyncLogic:
             }
         }"""
 
-        wm._sync_frontier_from_manager(tree)
+        wm._sync_frontier_from_manager(root)
 
         # Parent should remain closed (no error, no change)
         assert parent_node.status == "closed"
@@ -1098,7 +1100,7 @@ class TestTreeSyncLogic:
         """Root node should never be marked closed from child sync."""
         from scripts.gpu_mode_modular_k_search.run import V1WorldModel
 
-        tree = Tree(root=Node(status="closed"))
+        root = V1Node(status="closed")
         mock_manager = MagicMock()
 
         mock_manager.get.return_value = """{
@@ -1121,10 +1123,10 @@ class TestTreeSyncLogic:
         wm._initialized = True
 
         # Root should remain closed and unaffected
-        wm._sync_frontier_from_manager(tree)
+        wm._sync_frontier_from_manager(root)
 
         # Root is not in _node_id_map (special case), so it won't be touched
-        assert tree.root.status == "closed"
+        assert root.status == "closed"
 
     def test_base_code_from_parent_cycle(self):
         """get_action_context should extract base_code from parent's cycle best_round."""
@@ -1141,7 +1143,7 @@ class TestTreeSyncLogic:
         )
 
         # Create parent with a completed cycle
-        parent = Node(status="closed")
+        parent = V1Node(status="closed")
         parent_result = MockResult(True, 2.0)
         parent_round = Round(
             impl=MockImpl(),  # type: ignore[arg-type]
@@ -1198,9 +1200,9 @@ class TestSolutionAttachment:
             target_gpu="H100",
         )
 
-        tree = Tree(root=Node(status="closed"))
+        root = V1Node(status="closed")
         node = V1Node(
-            parent=tree.root,
+            parent=root,
             status="open",
             action=V1Action(title="Optimize"),
             node_id="action1",
@@ -1222,7 +1224,7 @@ class TestSolutionAttachment:
         cycle = Cycle(rounds=[passing_round])
 
         context = V1UpdateContext(
-            tree=tree,
+            root=root,
             node=node,
             cycle=cycle,
             round_idx=0,
@@ -1260,9 +1262,9 @@ class TestSolutionAttachment:
             target_gpu="H100",
         )
 
-        tree = Tree(root=Node(status="closed"))
+        root = V1Node(status="closed")
         node = V1Node(
-            parent=tree.root,
+            parent=root,
             status="open",
             action=V1Action(title="Optimize"),
             node_id="action1",
@@ -1284,7 +1286,7 @@ class TestSolutionAttachment:
         cycle = Cycle(rounds=[failing_round])
 
         context = V1UpdateContext(
-            tree=tree,
+            root=root,
             node=node,
             cycle=cycle,
             round_idx=0,

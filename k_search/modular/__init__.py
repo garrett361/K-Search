@@ -7,7 +7,7 @@ from k_search.modular.config import (
     SearchResult,
 )
 from k_search.modular.results import AnalysisResult, CheckResult
-from k_search.modular.world import Action, Cycle, Node, Round, Tree
+from k_search.modular.world import Action, Cycle, Node, Round
 
 from k_search.modular.protocols import (
     Analyzer,
@@ -50,7 +50,6 @@ __all__ = [
     "Cycle",
     "Node",
     "Round",
-    "Tree",
     # Protocols
     "Analyzer",
     "ArtifactStore",
