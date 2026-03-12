@@ -57,38 +57,61 @@ class Tree:
 
 ### V1Node in run.py (updated)
 
-The existing `V1Node` subclass in `scripts/gpu_mode_modular_k_search/run.py` already has some custom fields. It will be updated to include all removed fields:
+The existing `V1Node` subclass in `scripts/gpu_mode_modular_k_search/run.py` already has custom fields (`node_id`, `parent_id`, `parent_is_root`). It will be updated to include the removed base fields:
 
 ```python
 @dataclass
 class V1Node(Node):
-    id: str = ""
+    # Fields moved from base Node
     status: str = ""
     action: V1Action | None = None
     cycle: Cycle | None = None
-    # existing V1-specific fields
+    # Existing V1-specific fields (node_id used instead of base id)
     node_id: str = ""
     parent_id: str = ""
     parent_is_root: bool = False
 ```
 
-Tree methods (`get_best_node`, `get_frontier`, etc.) will be added as standalone functions or a `V1Tree` subclass in run.py as needed.
+Note: V1Node uses `node_id` (arbitrary string like `"root"`, `"m0"`) rather than the base `id` (auto-incremented integer). The base `id` field is not needed.
+
+### V1Tree in run.py
+
+Add a `V1Tree` subclass with the `get_best_node()` method:
+
+```python
+@dataclass
+class V1Tree(Tree):
+    """Tree with V1-specific methods."""
+
+    def get_best_node(self) -> V1Node | None:
+        """Return best completed node by score, or None."""
+        def collect_nodes(node: Node) -> list[V1Node]:
+            result = [node] if isinstance(node, V1Node) else []
+            for child in node.children:
+                result.extend(collect_nodes(child))
+            return result
+
+        completed = [
+            n for n in collect_nodes(self.root)
+            if n.status == "closed" and n.cycle and n.cycle.succeeded
+        ]
+        if not completed:
+            return None
+        return max(completed, key=lambda n: n.cycle.best_round.score)
+```
 
 ## Files to Delete
 
 Unused reference implementations that depend on removed Node/Tree properties:
 
-| File | Reason |
-|------|--------|
-| `k_search/modular/executors/sequential.py` | Unused executor |
-| `k_search/modular/executors/__init__.py` | Only exports SequentialExecutor |
-| `tests/modular/executors/test_sequential.py` | Tests for deleted code |
-| `k_search/modular/formatters/simple.py` | Unused formatter |
-| `k_search/modular/formatters/__init__.py` | Only exports DefaultFormatter |
+| File/Directory | Reason |
+|----------------|--------|
+| `k_search/modular/executors/` | Unused executor module (entire directory) |
+| `k_search/modular/formatters/` | Unused formatter module (entire directory) |
+| `k_search/modular/world_models/` | Unused world model module (entire directory) |
+| `tests/modular/executors/` | Tests for deleted code (entire directory) |
+| `tests/modular/world_models/` | Tests for deleted code (entire directory) |
 | `tests/modular/test_formatters.py` | Tests for deleted code |
-| `k_search/modular/world_models/simple.py` | Unused world model |
-| `k_search/modular/world_models/__init__.py` | Only exports SimpleWorldModel |
-| `tests/modular/world_models/test_simple.py` | Tests for deleted code |
 
 ## Files to Modify
 
@@ -97,7 +120,7 @@ Unused reference implementations that depend on removed Node/Tree properties:
 | `k_search/modular/world/node.py` | Remove id, status, action, cycle |
 | `k_search/modular/world/tree.py` | Remove all methods except add_node, get_path_to_root |
 | `tests/modular/world/test_tree.py` | Delete 6 tests, keep 3 structural tests |
-| `scripts/gpu_mode_modular_k_search/run.py` | Add removed fields to V1Node, add helper functions for removed Tree methods |
+| `scripts/gpu_mode_modular_k_search/run.py` | Add removed fields to V1Node, add V1Tree subclass with get_best_node() |
 
 ### Tests to keep in test_tree.py
 
