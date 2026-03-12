@@ -20,6 +20,7 @@ import openai
 
 from k_search.kernel_generators.world_model import (
     Prediction,
+    render_chosen_action_node_block,
     render_world_model_section,
 )
 from k_search.kernel_generators.world_model_manager import (
@@ -68,6 +69,7 @@ class V1Action(Action):
     expected_vs_baseline_factor: float | None = None
     confidence: float = 0.5
     rationale: str = ""
+    description: str = ""
 
 
 @dataclass
@@ -81,6 +83,23 @@ class V1Node(Node):
     node_id: str = ""
     parent_id: str = ""
     parent_is_root: bool = False
+
+    def render_action_text(self) -> str:
+        """Render full action block for LLM prompts, matching V1 format."""
+        if not self.action:
+            return ""
+        a = self.action
+        return render_chosen_action_node_block({
+            "node_id": self.node_id,
+            "parent_id": self.parent_id,
+            "action": {
+                "title": a.title,
+                "description": a.description,
+                "difficulty_1_to_5": a.difficulty,
+                "expected_vs_baseline_factor": a.expected_vs_baseline_factor,
+                "rationale": a.rationale,
+            },
+        }).strip()
 
 
 def get_path_to_root(node: Node) -> list[Node]:
@@ -262,7 +281,7 @@ class V1WorldModel:
         cycle = context.cycle
         best_round = cycle.best_round
         code = best_round.llm_response if best_round else ""
-        action_text = node.action.title if (node and node.action) else ""
+        action_text = node.render_action_text() if node else ""
 
         # Extract prediction from action metadata (V1 semantics)
         prediction: Prediction | None = None
@@ -491,6 +510,7 @@ class V1WorldModel:
             expected_vs_baseline = action_data.get("expected_vs_baseline_factor")
             confidence = action_data.get("confidence", 0.5)
             rationale = action_data.get("rationale", "")
+            description = action_data.get("description", "")
 
             parent_node = self._node_id_map.get(parent_id, root)
 
@@ -503,6 +523,7 @@ class V1WorldModel:
                     expected_vs_baseline_factor=expected_vs_baseline,
                     confidence=confidence,
                     rationale=rationale,
+                    description=description,
                 ),
                 node_id=node_id,
                 parent_id=parent_id,
@@ -537,7 +558,7 @@ class V1WorldModel:
         action: V1Action | None = node.action
         return {
             "node_id": node.node_id,
-            "action_text": action.title if action else "",
+            "action_text": node.render_action_text(),
             "difficulty": action.difficulty if action else 3,
             "confidence": action.confidence if action else 0.5,
             "rationale": action.rationale if action else "",
