@@ -812,8 +812,8 @@ class V1SequentialExecutor:
             global_speedup_str = f"{global_speedup:.2f}x" if global_speedup else "-"
             stag = self.cycle_config.stagnation_rounds
             logger.info(
-                f"[ROUND: start] cycle_round={attempt + 1}/{max_attempts} | "
-                f"global_round={rounds_used + attempt + 1}/{self.max_rounds} | "
+                f"[ROUND: start] cycle_round={attempt } | "
+                f"global_round={rounds_used + attempt}/{self.max_rounds} | "
                 f"best={self.global_best_score:.4f} ({global_speedup_str}) | "
                 f"no_improve={no_improve}/{stag} | no_improve_over_base={no_improve_over_base}/{stag}"
             )
