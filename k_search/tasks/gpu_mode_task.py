@@ -9,9 +9,10 @@ Note: the legacy top-level `gpu_mode/` folder is expected to be removed later.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import importlib.util
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from k_search.tasks.task_base import (
     BuildSpec,
@@ -24,7 +25,6 @@ from k_search.tasks.task_base import (
 )
 from k_search.tasks.gpu_mode.code_utils import normalize_cuda_sources
 from k_search.tasks.gpu_mode.evaluator import evaluate_trimul_submission
-from k_search.tasks.gpu_mode.trimul.spec import TRIMUL_SPEC_TEXT_CUDA, TRIMUL_SPEC_TEXT_TRITON
 from k_search.tasks.gpu_mode import DEFAULT_TRIMUL_TASK_DIR
 
 
@@ -47,13 +47,13 @@ class GpuModeTriMulTask:
         keep_tmp: bool = False,
         task_dir: str | Path | None = None,
         artifacts_dir: str | None = None,
-        name: str = "gpumode_trimul",
     ) -> None:
-        self._name = str(name or "gpumode_trimul")
+        resolved_dir = Path(task_dir).expanduser().resolve() if task_dir else DEFAULT_TRIMUL_TASK_DIR
+        self._name = resolved_dir.name
         self._cfg = GpuModeTriMulTaskConfig(
             mode=str(mode or "benchmark"),
             keep_tmp=bool(keep_tmp),
-            task_dir=(Path(task_dir).expanduser().resolve() if task_dir is not None else DEFAULT_TRIMUL_TASK_DIR),
+            task_dir=resolved_dir,
         )
         self._ksearch_artifacts_dir: str | None = (str(artifacts_dir) if artifacts_dir is not None else None)
         self._solutions: dict[str, Solution] = {}
@@ -84,8 +84,22 @@ class GpuModeTriMulTask:
     # Optional helper (not part of the Task Protocol): generators/CLIs can use this
     # to get language-specific prompt text.
     def get_definition_text_for_language(self, *, language: str) -> str:
-        lang = str(language or "").strip().lower()
-        return TRIMUL_SPEC_TEXT_CUDA if lang == "cuda" else TRIMUL_SPEC_TEXT_TRITON
+        spec_path = self._cfg.task_dir / "spec.py"
+        if not spec_path.exists():
+            raise FileNotFoundError(f"No spec.py found in {self._cfg.task_dir}")
+
+        spec_module = importlib.util.spec_from_file_location("spec", spec_path)
+        if spec_module is None or spec_module.loader is None:
+            raise ImportError(f"Could not load spec from {spec_path}")
+        module = importlib.util.module_from_spec(spec_module)
+        spec_module.loader.exec_module(module)
+
+        lang_suffix = f"_SPEC_TEXT_{language.upper()}"
+        for name in dir(module):
+            if name.endswith(lang_suffix):
+                return getattr(module, name)
+
+        raise ValueError(f"No *{lang_suffix} variable found in {spec_path}")
 
     # Optional (not in Task Protocol): language-specific generation prompt.
     def get_generation_prompt(self, *, language: str, target_gpu: str) -> str:
@@ -172,7 +186,8 @@ class GpuModeTriMulTask:
     ) -> Solution:
         lang = str(language or "").strip().lower()
         uid = f"r{int(round_num)}"
-        sol_name = f"{model_name}_{self._name}_{lang}_{uid}"
+        model_safe = str(model_name).replace("/", "-")
+        sol_name = f"{model_safe}_{self._name}_{lang}_{uid}"
         if lang == "cuda":
             if not isinstance(cleaned_code, dict):
                 # Fall back to raw xml parse later in eval; store as-is in main.cpp for visibility.

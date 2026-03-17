@@ -1,0 +1,81 @@
+files:
+  - {"name": "submission.py", "source": "@SUBMISSION@"}
+  - {"name": "task.py", "source": "task.py"}
+  - {"name": "utils.py", "source": "utils.py"}
+  - {"name": "reference.py", "source": "reference.py"}
+  - {"name": "eval.py", "source": "eval.py"}
+
+lang: "py"
+
+description: |
+  SwiGLU Mixture of Experts forward pass.
+
+  Tokens are pre-sorted by expert (grouped_mm compatible format).
+  The baseline uses a Python for-loop over experts.
+
+  SPARSITY controlled by: top_k / num_experts
+    - Arcee Trinity Large: 4/256 = 1.56%
+    - DeepSeek-V2: 6/160 = 3.75%
+    - Qwen3: 8/128 = 6.25%
+
+  total_tokens = seq_tokens × top_k (each token activates top_k experts)
+
+  SwiGLU computation per expert:
+    h = silu(x @ w1.T) * (x @ w3.T)
+    out = h @ w2.T
+
+  Input:
+  - `data`: Tuple of (x, w1, w2, w3, num_tokens_per_expert, config)
+
+  Output:
+  - torch.Tensor [total_tokens, dim] bfloat16
+
+config:
+  main: "eval.py"
+
+templates:
+  Python: "submission.py"
+
+test_timeout: 1200
+benchmark_timeout: 1200
+ranked_timeout: 1200
+ranking_by: "geom"
+
+# Test cases: sparse activation like modern MoE models
+#
+# SPARSITY = top_k / num_experts
+#   - Mixtral: 2/8 = 25%
+#   - DeepSeek-V2: 6/160 = 3.75%
+#   - Arcee Trinity Large: 4/256 = 1.56%
+#   - Qwen3: 8/128 = 6.25%
+#
+# total_tokens = seq_tokens × top_k (computed in generate_input)
+# Balanced distribution enforced (no imbalance).
+
+tests:
+  # Mixtral-like: 8 experts, top_k=2 (25% sparsity)
+  - {"seq_tokens": 4096, "top_k": 2, "dim": 4096, "hidden_dim": 14336, "num_experts": 8, "seed": 1001}
+
+  # DeepSeek-V2-like: 64 experts, top_k=6 (9.4% sparsity)
+  - {"seq_tokens": 4096, "top_k": 6, "dim": 2048, "hidden_dim": 1408, "num_experts": 64, "seed": 1002}
+
+  # Arcee Trinity Large: 256 experts, top_k=4 (1.56% sparsity)
+  - {"seq_tokens": 4096, "top_k": 4, "dim": 3072, "hidden_dim": 3072, "num_experts": 256, "seed": 1003}
+
+  # Qwen3-like: 128 experts, top_k=8 (6.25% sparsity)
+  - {"seq_tokens": 4096, "top_k": 8, "dim": 1536, "hidden_dim": 8960, "num_experts": 128, "seed": 1004}
+
+benchmarks:
+  # Slight variations for benchmark diversity (different seq_tokens, same configs)
+
+  # Mixtral-like: larger batch
+  - {"seq_tokens": 8192, "top_k": 2, "dim": 4096, "hidden_dim": 14336, "num_experts": 8, "seed": 4001}
+
+  # DeepSeek-V2-like: smaller batch
+  - {"seq_tokens": 2048, "top_k": 6, "dim": 2048, "hidden_dim": 1408, "num_experts": 64, "seed": 4002}
+
+  # Arcee Trinity Large: standard batch
+  - {"seq_tokens": 4096, "top_k": 4, "dim": 3072, "hidden_dim": 3072, "num_experts": 256, "seed": 4003}
+
+  # Qwen3-like: smaller batch
+  - {"seq_tokens": 2048, "top_k": 8, "dim": 1536, "hidden_dim": 8960, "num_experts": 128, "seed": 4004}
